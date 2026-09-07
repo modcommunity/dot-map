@@ -18,7 +18,7 @@ live players.
 A catalogue, a rotation with a cooldown, a map time limit with rock-the-vote and
 extending, nominations and voting, and a loader that
 resolves a map to a scene — fetching its content through
-[dot-cloud](../dot-cloud) when the map is delivered and reading the disk when it ships
+[dot-cloud](https://github.com/modcommunity/dot-cloud) when the map is delivered and reading the disk when it ships
 in the build.
 
 ## Why
@@ -34,10 +34,10 @@ of them.
 
 ## Installing
 
-Copy `addons/dot_map/` and [`dot-core`](../dot-core)'s `addons/dot_core/` into your
+Copy `addons/dot_map/` and [`dot-core`](https://github.com/modcommunity/dot-core)'s `addons/dot_core/` into your
 project and enable dot-map in *Project → Project Settings → Plugins*.
 
-dot-cloud and [dot-timer](../dot-timer) are optional and are not named anywhere in the
+dot-cloud and [dot-timer](https://github.com/modcommunity/dot-timer) are optional and are not named anywhere in the
 source.
 
 ## Five minutes
