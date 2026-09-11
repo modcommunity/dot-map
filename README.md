@@ -12,33 +12,21 @@ This asset, along with all the others, was built initially with **Claude Code** 
 I intend on reviewing code, testing, and editing documentation regularly. If you're interested in helping out, please let me know!
 
 ## Maps as Content, Not as Builds
-**Maps as content, not as builds.** One Godot game, a hundred maps, switched under
-live players.
+**Maps as content, not as builds.** One Godot game, a hundred maps, switched under live players.
 
-A catalogue, a rotation with a cooldown, a map time limit with rock-the-vote and
-extending, nominations and voting, and a loader that
-resolves a map to a scene — fetching its content through
-[dot-cloud](https://github.com/modcommunity/dot-cloud) when the map is delivered and reading the disk when it ships
-in the build.
+A catalogue, a rotation with a cooldown, a map time limit with rock-the-vote and extending, nominations and voting, and a loader that resolves a map to a scene — fetching its content through [dot-cloud](https://github.com/modcommunity/dot-cloud) when the map is delivered and reading the disk when it ships in the build.
 
 ## Why
 
-The obvious way to ship a hundred surf maps is a hundred Godot projects. At map forty
-that is a hundred export pipelines, a hundred copies of every addon, a player who
-downloads a whole game to try one map, and records that cannot be compared because
-each project has its own.
+The obvious way to ship a hundred surf maps is a hundred Godot projects. At map forty that is a hundred export pipelines, a hundred copies of every addon, a player who downloads a whole game to try one map, and records that cannot be compared because each project has its own.
 
-A map here is an id, a version, a scene path and optionally a content pack. The server
-switches between them; the client fetches the one it needs; the leaderboard spans all
-of them.
+A map here is an id, a version, a scene path and optionally a content pack. The server switches between them; the client fetches the one it needs; the leaderboard spans all of them.
 
 ## Installing
 
-Copy `addons/dot_map/` and [`dot-core`](https://github.com/modcommunity/dot-core)'s `addons/dot_core/` into your
-project and enable dot-map in *Project → Project Settings → Plugins*.
+Copy `addons/dot_map/` and [`dot-core`](https://github.com/modcommunity/dot-core)'s `addons/dot_core/` into your project and enable dot-map in *Project → Project Settings → Plugins*.
 
-dot-cloud and [dot-timer](https://github.com/modcommunity/dot-timer) are optional and are not named anywhere in the
-source.
+dot-cloud and [dot-timer](https://github.com/modcommunity/dot-timer) are optional and are not named anywhere in the source.
 
 ## Five minutes
 
@@ -87,8 +75,7 @@ await session.change_to(&"surf_beginner")
 }
 ```
 
-The second map is delivered: its scene lives inside a dot-cloud pack that is fetched
-and mounted before the scene is loaded.
+The second map is delivered: its scene lives inside a dot-cloud pack that is fetched and mounted before the scene is loaded.
 
 ## Rotation and voting
 
@@ -126,9 +113,7 @@ session.rock_the_vote(player_id, player_count)
 
 ## Documentation
 
-[`CLAUDE.md`](CLAUDE.md) has the design reasoning: why the catalogue is not the
-rotation, the order a map change has to happen in and what breaks when it does not,
-and why the loader reaches dot-cloud through the registry rather than by name.
+[`CLAUDE.md`](CLAUDE.md) has the design reasoning: why the catalogue is not the rotation, the order a map change has to happen in and what breaks when it does not, and why the loader reaches dot-cloud through the registry rather than by name.
 
 ## Validating
 
