@@ -54,6 +54,8 @@ addons/dot_map/
   vote/
     dot_map_vote.gd       nominations, a ballot, a winner
     dot_map_timelimit.gd  when the map ends, and rock the vote
+  integrations/
+    dot_map_commands.gd   `map`, `maps`, `mapinfo` on any host. Names no dot-server class
 ```
 
 ## The catalogue is not the rotation
@@ -141,6 +143,27 @@ everybody every four minutes:
 
 A rotation running through `DotGameManager.change_game` would put every player through
 signon on every map. That is why this exists.
+
+**And it is why `map` is a command here rather than there.** dot-server shipped a `map`
+alias for `changelevel` for as long as it had no notion of a map at all — every other
+server calls the thing that swaps what is running `map`, so operators typed both. Once
+this addon existed, an operator typing `map de_dust2` on a server running one game and a
+hundred maps meant the row on the right every time, and got a refusal naming games. The
+plain name belongs to the plain thing; dot-server's game change is `changelevel`, `game`
+and `gamechange` now.
+
+`DotMapCommands.install(host, session)` registers `map`, `maps` and `mapinfo` on anything
+with `add_command` (a `DotModule`) or `command` (a `DotConsole`), duck-typed, so this file
+names no dot-server class and the addon stays installable without it. Pass a
+`DotMapSyncHost` as the third argument when the change has to reach clients rather than
+only the server's own process — it has the same three change methods, deliberately.
+
+**`map` is not `with_chat()` by default and `nextmap` is not registered at all.** The
+first because a map change destroys every run in progress and game-g2gfast's suite asserts
+in so many words that a player may not do that by typing; the second because dot-vote
+already registers `nextmap` and `timeleft` over the same maps, and two commands of one
+name is the last one registered winning silently. `mapinfo` answers both questions without
+taking a name somebody else has.
 
 ### The host may say *which* map, never *what* the map is
 
@@ -281,7 +304,7 @@ godot --headless --path . --import
 find . -name '*.gd' -not -path './.godot/*' | while read f; do
     godot --headless --path . --check-only --script "res://${f#./}"
 done
-godot --headless --path . res://examples/map_selftest.tscn   # 153 checks
+godot --headless --path . res://examples/map_selftest.tscn   # 176 checks
 ```
 
 **Run the check-only pass first.** This project hit the documented hazard while being

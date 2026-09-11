@@ -47,6 +47,7 @@ func _run() -> void:
 	await _test_sync_refuses_what_a_host_may_not_send()
 	await _test_sync_waits_and_times_out()
 	await _test_sync_a_delivered_map()
+	await _test_commands()
 
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
@@ -1298,3 +1299,186 @@ func _test_sync_a_delivered_map() -> void:
 	cloud.queue_free()
 	await get_tree().process_frame
 	DotPaths.remove_tree(data)
+
+
+# --- Commands ---------------------------------------------------------------
+
+## A `DotModule`-shaped host, and nothing else.
+##
+## Deliberately NOT a real `DotConsole`: dot-server is not linked into this project and
+## must not be, and the point of `DotMapCommands` is that it names no dot-server class.
+## A fake host is what proves the duck-typing rather than hiding it -- the games' own
+## suites run the same commands on a real console.
+class FakeCommand:
+	extends RefCounted
+
+	var name := ""
+	var help := ""
+	var permission := ""
+	var handler: Callable = Callable()
+	var chat := false
+	var usage := ""
+	var completer: Callable = Callable()
+
+	func with_chat() -> FakeCommand:
+		chat = true
+		return self
+
+	func with_usage(text: String) -> FakeCommand:
+		usage = text
+		return self
+
+	func with_completer(fn: Callable) -> FakeCommand:
+		completer = fn
+		return self
+
+
+class FakeHost:
+	extends RefCounted
+
+	var commands: Dictionary = {}
+
+	func add_command(
+		name: String, handler: Callable, help: String, permission: String
+	) -> FakeCommand:
+		var c := FakeCommand.new()
+		c.name = name
+		c.handler = handler
+		c.help = help
+		c.permission = permission
+		commands[name] = c
+		return c
+
+
+class FakeCtx:
+	extends RefCounted
+
+	var args := PackedStringArray()
+	var replies := PackedStringArray()
+
+	func reply(text: String) -> void:
+		replies.append(text)
+
+	func reply_lines(lines: PackedStringArray) -> void:
+		for l in lines:
+			replies.append(l)
+
+
+func _test_commands() -> void:
+	print("")
+	print("-- `map` belongs here, not in dot-server")
+
+	var session := DotMapSession.new()
+	session.catalogue = _catalogue(4)
+	session.initial_map = &""
+	add_child(session)
+
+	var host := FakeHost.new()
+	var commands := DotMapCommands.install(host, session)
+
+	_check(commands.registered.size() == 3, "three commands register on a duck-typed host")
+	_check(host.commands.has("map"), "including the plain name dot-server used to hold")
+	_check(host.commands.has("maps") and host.commands.has("mapinfo"), "and the two beside it")
+	_check(
+		not host.commands.has("nextmap") and not host.commands.has("timeleft"),
+		"and NOT nextmap or timeleft, which dot-vote registers over the same maps"
+	)
+
+	var map_cmd: FakeCommand = host.commands["map"]
+	_check(map_cmd.permission == "changemap", "changing the map needs a permission")
+	_check(
+		not map_cmd.chat,
+		"and is not typable in chat, because a map change destroys every run in progress"
+	)
+	_check(
+		(host.commands["maps"] as FakeCommand).chat,
+		"while listing them is, since reading changes nothing"
+	)
+	_check(map_cmd.usage != "", "the change has a usage line")
+	_check(
+		Array(map_cmd.completer.call("", 0)) == ["surf_0", "surf_1", "surf_2", "surf_3"],
+		"and completes from the catalogue, sorted as Strings rather than as StringNames"
+	)
+
+	# The one an operator hits first: a typo.
+	var ctx := FakeCtx.new()
+	ctx.args = PackedStringArray(["surf_nine"])
+	map_cmd.handler.call(ctx)
+	_check(
+		ctx.replies.size() == 1 and ctx.replies[0].contains("No map called"),
+		"a map nothing has is refused by name"
+	)
+	_check(
+		ctx.replies[0].contains("surf_"),
+		"with a suggestion, because 'no' is an argument and 'did you mean' is an answer"
+	)
+
+	# With no argument it lists rather than refusing: an operator typing `map` to remind
+	# themselves what there is should not be told the usage first.
+	ctx = FakeCtx.new()
+	map_cmd.handler.call(ctx)
+	_check(
+		ctx.replies.size() == 1 and ctx.replies[0].contains("surf_0"),
+		"and `map` with no argument lists instead of complaining"
+	)
+
+	ctx = FakeCtx.new()
+	(host.commands["mapinfo"] as FakeCommand).handler.call(ctx)
+	_check(ctx.replies.size() > 2, "`mapinfo` answers in lines")
+
+	# The change itself, ACTUALLY PERFORMED. Both `change_to` methods are coroutines, so a
+	# handler that called one without awaiting would get a GDScriptFunctionState back, skip
+	# its reply, and leave an operator with "Changing to X…" and no answer -- while the map
+	# changed perfectly. Only running one catches that; every check above passes either way.
+	ctx = FakeCtx.new()
+	ctx.args = PackedStringArray(["surf_2"])
+	await map_cmd.handler.call(ctx)
+	_check(
+		session.current != null and session.current.id == &"surf_2",
+		"`map <id>` actually changes the map"
+	)
+	_check(
+		ctx.replies.size() == 2 and ctx.replies[1].contains("Now on"),
+		"and answers when it is done, which needs the await a non-coroutine call would skip"
+	)
+
+	# `change_fn` wins over the changer, for a host whose change resets props and NPCs
+	# first -- handing the session straight to the command would change the world out from
+	# under all three.
+	var routed := []
+	var by_fn := FakeHost.new()
+	DotMapCommands.install_with(by_fn, session, func(id: StringName) -> DotResult:
+		routed.append(id)
+		return DotResult.success(null)
+	)
+	var fn_ctx := FakeCtx.new()
+	fn_ctx.args = PackedStringArray(["surf_1"])
+	await (by_fn.commands["map"] as FakeCommand).handler.call(fn_ctx)
+	_check(routed == [&"surf_1"], "a host's own change method is used instead of the session's")
+	_check(
+		session.current.id == &"surf_2",
+		"and the session is not changed behind its back"
+	)
+
+	# Every name is configurable, for dot-vote's reason: a deployment may already have a
+	# `map` of its own, and a second registration of one name is the first one gone.
+	var renamed := DotMapCommands.new()
+	renamed.session = session
+	renamed.prefix = "sv_"
+	renamed.names = {"maps": "maplist"}
+	_check(renamed.command_name("maps") == "sv_maplist", "every command name is configurable")
+
+	# The changer is duck-typed on `change_to` so a DotMapSyncHost can stand in front of
+	# the session -- the two have the same three methods deliberately.
+	var sync := DotMapSyncHost.new()
+	sync.session = session
+	add_child(sync)
+	var synced_host := FakeHost.new()
+	DotMapCommands.install(synced_host, session, sync)
+	_check(
+		synced_host.commands.has("map"),
+		"and a sync host stands in for the session without dot-map caring which it got"
+	)
+
+	sync.queue_free()
+	session.queue_free()

@@ -14,7 +14,7 @@ I intend on reviewing code, testing, and editing documentation regularly. If you
 ## Maps as Content, Not as Builds
 **Maps as content, not as builds.** One Godot game, a hundred maps, switched under live players.
 
-A catalogue, a rotation with a cooldown, a map time limit with rock-the-vote and extending, nominations and voting, and a loader that resolves a map to a scene — fetching its content through [dot-cloud](https://github.com/modcommunity/dot-cloud) when the map is delivered and reading the disk when it ships in the build.
+A catalogue, a rotation with a cooldown, a map time limit with rock-the-vote and extending, nominations and voting, and a loader that resolves a map to a scene, fetching its content through [dot-cloud](https://github.com/modcommunity/dot-cloud) when the map is delivered and reading the disk when it ships in the build.
 
 ## Why
 
@@ -119,7 +119,7 @@ session.rock_the_vote(player_id, player_count)
 
 ```bash
 godot --headless --path . --import
-godot --headless --path . res://examples/map_selftest.tscn   # 120 checks
+godot --headless --path . res://examples/map_selftest.tscn   # 176 checks
 ```
 
 ## Licence
