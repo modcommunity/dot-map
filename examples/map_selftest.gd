@@ -1327,12 +1327,19 @@ class FakeCommand:
 	var help := ""
 	var permission := ""
 	var handler: Callable = Callable()
-	var chat := false
+	## Tri-state, like DotConCommand.ChatPolicy: "" is the host server's default, and the
+	## other two are the command's own word. A plain bool here would have hidden the
+	## difference the real console now draws.
+	var chat := ""
 	var usage := ""
 	var completer: Callable = Callable()
 
-	func with_chat() -> FakeCommand:
-		chat = true
+	func with_chat(allowed: bool = true) -> FakeCommand:
+		chat = "allowed" if allowed else "refused"
+		return self
+
+	func no_chat() -> FakeCommand:
+		chat = "refused"
 		return self
 
 	func with_usage(text: String) -> FakeCommand:
@@ -1398,12 +1405,24 @@ func _test_commands() -> void:
 	var map_cmd: FakeCommand = host.commands["map"]
 	_check(map_cmd.permission == "changemap", "changing the map needs a permission")
 	_check(
-		not map_cmd.chat,
-		"and is not typable in chat, because a map change destroys every run in progress"
+		map_cmd.chat == "",
+		"and says nothing about chat, leaving `/map` to the permission and the host server"
 	)
 	_check(
-		(host.commands["maps"] as FakeCommand).chat,
-		"while listing them is, since reading changes nothing"
+		(host.commands["maps"] as FakeCommand).chat == "allowed",
+		"while listing them is marked outright, since reading changes nothing"
+	)
+
+	# The records-server deployment: a map change that no flag makes typable, because what
+	# it destroys is every run in progress rather than anything about who is asking.
+	var strict_host := FakeHost.new()
+	var strict := DotMapCommands.new()
+	strict.session = session
+	strict.allow_chat_change = false
+	strict.bind(strict_host)
+	_check(
+		(strict_host.commands["map"] as FakeCommand).chat == "refused",
+		"allow_chat_change off refuses chat outright, which no server setting overrules"
 	)
 	_check(map_cmd.usage != "", "the change has a usage line")
 	_check(

@@ -158,12 +158,7 @@ names no dot-server class and the addon stays installable without it. Pass a
 `DotMapSyncHost` as the third argument when the change has to reach clients rather than
 only the server's own process — it has the same three change methods, deliberately.
 
-**`map` is not `with_chat()` by default and `nextmap` is not registered at all.** The
-first because a map change destroys every run in progress and game-g2gfast's suite asserts
-in so many words that a player may not do that by typing; the second because dot-vote
-already registers `nextmap` and `timeleft` over the same maps, and two commands of one
-name is the last one registered winning silently. `mapinfo` answers both questions without
-taking a name somebody else has.
+**`map` says nothing about chat and `nextmap` is not registered at all.** The first because `admin_permission` — `changemap` — is what decides who may change the map, and it decides it the same way wherever the line was typed; `map` is left at `ChatPolicy.DEFAULT` so a host server's `sv_chat_commands` has the last word, and `allow_chat_change = false` marks it `no_chat()` for a records server that wants a map change to cost a deliberate trip to the console. It was the other way round until `sv_chat_commands` landed, and what the old default produced was an operator holding the flag being told the command cannot be run from chat. The second because dot-vote already registers `nextmap` and `timeleft` over the same maps, and two commands of one name is the last one registered winning silently. `mapinfo` answers both questions without taking a name somebody else has.
 
 ### The host may say *which* map, never *what* the map is
 

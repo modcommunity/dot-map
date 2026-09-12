@@ -41,14 +41,17 @@ const DEFAULTS := {
 	"mapinfo": "mapinfo",
 }
 
-## Which of the above are typable in chat as `!name` by default.
+## Which of the above are marked typable in chat whatever the host server's default is.
 ##
-## [b]`map` is not in it, and that is the whole policy.[/b] A map change destroys every run
-## in progress, and game-g2gfast's suite asserts in so many words that changing the map is
-## not something a player can do by typing. Turn it on per deployment with
-## [member allow_chat_change] if a sandbox wants it — and note that a relay configured with
-## an RCON command source reaches this command regardless, which is the documented way to
-## let a site administrator change the map without letting a connected player do it.
+## Both of the read-only ones. `map` is absent from this list and reachable anyway on a
+## server with `sv_chat_commands` on, which is the default — the difference is that these
+## two survive an operator turning that off, because listing maps is not a thing anybody
+## needs protecting from.
+##
+## [b]What guards the map change is [member admin_permission], and it always did.[/b] The
+## chat gate never asked who was typing; `changemap` does, on the same line, for chat, RCON
+## and the terminal alike. See [member allow_chat_change] for the deployment that wants the
+## change unreachable by typing even from somebody holding the flag.
 const CHAT := ["maps", "mapinfo"]
 
 ## Where the catalogue, the current map and the clock are read from.
@@ -77,8 +80,17 @@ var names: Dictionary = {}
 ## Permission `map` needs. Empty makes it console-only.
 var admin_permission: String = "changemap"
 
-## Whether `map` may be typed in chat. See [constant CHAT].
-var allow_chat_change: bool = false
+## Whether `map` may be typed in chat at all.
+##
+## [b]On.[/b] It is [member admin_permission] that decides whether a particular person may
+## change the map, and a player without `changemap` is refused the same way in chat as
+## anywhere else. Leaving this on means an operator who has the flag can type
+## `/map surf_beginner` in the chat box that is already in front of them.
+##
+## Off marks the command [code]no_chat()[/code], which no server-wide setting overrules:
+## for a records server that wants a map change to cost a deliberate trip to the console or
+## RCON, because it ends every run in progress and a mistyped map id cannot be taken back.
+var allow_chat_change: bool = true
 
 ## How many players are present, for the availability filter. Optional.
 var player_count_fn: Callable = Callable()
@@ -147,9 +159,17 @@ func bind(host: Object) -> DotResult:
 
 		if registered_command is Object:
 			var cmd := registered_command as Object
-			if CHAT.has(role) or (role == "map" and allow_chat_change):
+			if CHAT.has(role):
 				if cmd.has_method("with_chat"):
 					cmd.call("with_chat")
+			elif role == "map" and not allow_chat_change:
+				# Duck-typed, like everything else here: `no_chat()` is dot-server's, and a
+				# host console that predates it simply keeps the host's own default rather
+				# than failing to register the command.
+				if cmd.has_method("no_chat"):
+					cmd.call("no_chat")
+				elif cmd.has_method("with_chat"):
+					cmd.call("with_chat", false)
 			if role == "map":
 				if cmd.has_method("with_usage"):
 					cmd.call("with_usage", "[map_id]")
