@@ -13,7 +13,7 @@ extends Node
 ## running, rather than on nothing. It is the reason the load happens before the
 ## teardown, and it is the step that is easiest to "simplify" back out.
 
-const CHECKS := 176
+const CHECKS := 182
 
 var _passed := 0
 var _failed := 0
@@ -1508,6 +1508,59 @@ func _test_commands() -> void:
 	_check(
 		synced_host.commands.has("map"),
 		"and a sync host stands in for the session without dot-map caring which it got"
+	)
+
+	# --- A catalogue that is not the whole set -------------------------------
+	#
+	# A server whose maps arrive over the network holds what has been FETCHED, and the
+	# id a player just typed is normally not in it. Refusing that id is refusing a map
+	# that exists -- and the refusal happened BEFORE `change_fn`, so the one piece of
+	# code written to go and get it was never reached.
+	var fetched := []
+	var fetching := FakeHost.new()
+	var fetcher := DotMapCommands.new()
+	fetcher.session = session
+	fetcher.may_fetch_unknown = true
+	fetcher.change_fn = func(id: StringName) -> DotResult:
+		fetched.append(id)
+		return DotResult.success(null) if String(id).begins_with("surf_") \
+			else DotResult.fail(DotError.CODE_INVALID, "Nothing to fetch.")
+	fetcher.bind(fetching)
+	var fetch_cmd := fetching.commands["map"] as FakeCommand
+
+	var far_ctx := FakeCtx.new()
+	far_ctx.args = PackedStringArray(["surf_kitsune"])
+	await fetch_cmd.handler.call(far_ctx)
+	_check(
+		fetched == [&"surf_kitsune"],
+		"an id the catalogue has never held reaches the changer that could fetch it"
+	)
+	_check(
+		far_ctx.replies.size() == 2 and far_ctx.replies[1].contains("Now on"),
+		"and is answered as a change rather than as a typo"
+	)
+
+	# The suggestion is not lost, only deferred. A typo is still a typo once the fetch
+	# has failed to find it, and "did you mean" is worth the same then as before.
+	fetched.clear()
+	var typo_ctx := FakeCtx.new()
+	typo_ctx.args = PackedStringArray(["nope_nine"])
+	await fetch_cmd.handler.call(typo_ctx)
+	_check(fetched == [&"nope_nine"], "a typo is tried too, because only the fetch can tell")
+	_check(
+		typo_ctx.replies.size() == 2 and typo_ctx.replies[1].contains("No map called"),
+		"and is refused by name after it comes back empty"
+	)
+
+	# Off is the default and has to be: on a server whose maps are all on disk, an id the
+	# catalogue does not hold IS a typo, and a round trip to find that out is waste.
+	fetched.clear()
+	var strict_fetch := FakeCtx.new()
+	strict_fetch.args = PackedStringArray(["surf_kitsune"])
+	await map_cmd.handler.call(strict_fetch)
+	_check(
+		strict_fetch.replies.size() == 1 and strict_fetch.replies[0].contains("No map called"),
+		"while a catalogue-backed server still refuses an unknown id without asking anybody"
 	)
 
 	sync.queue_free()

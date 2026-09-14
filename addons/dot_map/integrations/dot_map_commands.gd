@@ -95,6 +95,26 @@ var allow_chat_change: bool = true
 ## How many players are present, for the availability filter. Optional.
 var player_count_fn: Callable = Callable()
 
+## Whether `map <id>` may be given an id the catalogue does not hold.
+##
+## [b]Off, and it has to be, because the catalogue is what a map id MEANS on most
+## servers.[/b] A server whose maps are all on disk knows the whole set before anybody
+## types anything, so an id it does not hold is a typo, and answering a typo with "did
+## you mean surf_mesa" is the whole value of checking.
+##
+## [b]On is for a server whose maps arrive over the network.[/b] There, the catalogue
+## holds what has been FETCHED rather than what exists — a freshly booted one holds the
+## boot map and nothing else — and refusing an id because it is not in that set tells an
+## operator "no map called surf_kitsune" about a map sitting on the content origin,
+## which is the one answer that is certainly wrong. game-g2gfast's `change_fn` fetches
+## the map before it loads it, so the fetch is what decides, and this gets out of its
+## way.
+##
+## Nothing is lost when it is on: an id the changer cannot resolve is still refused,
+## one exchange later, and the near-match hint is appended to THAT refusal instead —
+## see [method _refuse_unknown]. What it costs is a network round trip on a typo.
+var may_fetch_unknown: bool = false
+
 ## Names actually registered, for a module that has to remove them again.
 var registered: PackedStringArray = PackedStringArray()
 
@@ -250,15 +270,10 @@ func _cmd_map(ctx: Object) -> void:
 		return
 
 	var id := StringName(args[0])
-	if session.catalogue != null and not session.catalogue.has(id):
-		var near := session.catalogue.search(args[0], 5)
-		var hint := PackedStringArray()
-		for m in near:
-			hint.append(String(m.id))
-		_reply(ctx, "No map called '%s'.%s" % [
-			args[0],
-			" Did you mean: %s" % ", ".join(hint) if not hint.is_empty() else "",
-		])
+	var known := session.catalogue == null or session.catalogue.has(id)
+
+	if not known and not may_fetch_unknown:
+		_reply(ctx, _refuse_unknown(args[0]))
 		return
 
 	_reply(ctx, "Changing to %s…" % args[0])
@@ -274,11 +289,31 @@ func _cmd_map(ctx: Object) -> void:
 		else await changer.call("change_to", id)
 	)
 	if res is DotResult:
-		_reply_result(ctx, res as DotResult, "Now on %s." % args[0])
+		var done := res as DotResult
+		# The hint moves here rather than being dropped. An id that was not in the
+		# catalogue and could not be fetched either is the typo case after all, and the
+		# suggestion is worth exactly as much now as it was worth before the attempt --
+		# it is only the REFUSAL that had to wait for the changer to have its say.
+		if not done.ok and not known:
+			_reply(ctx, _refuse_unknown(args[0]))
+		else:
+			_reply_result(ctx, done, "Now on %s." % args[0])
 	else:
 		# A changer that answered with something else is a wiring mistake, not a refusal,
 		# and saying nothing at all is how it survives.
 		_reply(ctx, "The map change did not report a result.")
+
+
+## "No map called X", with the near matches the catalogue can offer.
+func _refuse_unknown(typed: String) -> String:
+	var hint := PackedStringArray()
+	if session != null and session.catalogue != null:
+		for m in session.catalogue.search(typed, 5):
+			hint.append(String(m.id))
+	return "No map called '%s'.%s" % [
+		typed,
+		" Did you mean: %s" % ", ".join(hint) if not hint.is_empty() else "",
+	]
 
 
 func _cmd_maps(ctx: Object) -> void:
