@@ -16,7 +16,9 @@ extends RefCounted
 ## Nothing here draws a menu, sends a chat message or counts down. A vote is a tally
 ## and a rule; how it is presented is the game's.
 
-const CHANNEL := "map.vote"
+# No log channel: a tally. begin() returns a DotResult and finish() returns the winner;
+# the map change that follows is logged by what makes it (DotMapTimelimit, or
+# dot-vote's DotVoteDirector through its map source).
 
 signal opened(options: Array)
 signal voted(voter: StringName, choice: StringName)
