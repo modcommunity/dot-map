@@ -15,9 +15,17 @@ extends Node
 
 const CHECKS := 182
 
+## Sections entered against sections that ran to their last line, and against this. A
+## runtime error inside a section aborts that function and nothing says so; a section that
+## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
+## total is the other half — see docs/testing.md.
+const SECTIONS := 21
+
 var _passed := 0
 var _failed := 0
 var _failures := PackedStringArray()
+var _entered := 0
+var _completed := 0
 
 
 func _ready() -> void:
@@ -57,6 +65,13 @@ func _run() -> void:
 	for line in _failures:
 		print("  FAIL  %s" % line)
 
+	print("%d of %d sections ran to their last line" % [_completed, _entered])
+	if _entered != SECTIONS or _completed != _entered:
+		print("ERROR: %d sections entered and %d completed, %d expected. One aborted or was skipped." % [
+			_entered, _completed, SECTIONS
+		])
+		get_tree().quit(1)
+		return
 	# The total the section counter cannot be. A runtime error inside a section aborts
 	# that function, and the counter is satisfied because the section had already
 	# announced itself. See docs/testing.md.
@@ -76,6 +91,16 @@ func _check_near(
 		absf(value - expected) <= epsilon, what,
 		"%.4f vs %.4f" % [value, expected]
 	)
+
+
+func _section(title: String) -> void:
+	_entered += 1
+	print(title)
+
+
+## A section reached its last line. See [constant SECTIONS].
+func _done() -> void:
+	_completed += 1
 
 
 func _check(ok: bool, what: String, detail: String = "") -> void:
@@ -112,7 +137,7 @@ func _catalogue(count: int) -> DotMapCatalogue:
 # --- Definitions -----------------------------------------------------------
 
 func _test_map_validation() -> void:
-	print("map definitions")
+	_section("map definitions")
 
 	var good := _map(&"surf_beginner")
 	_check(good.validate().ok, "a well-formed map validates")
@@ -153,10 +178,11 @@ func _test_map_validation() -> void:
 		good.effective_content_version() == "2.0.0",
 		"and can differ when several maps share a pack"
 	)
+	_done()
 
 
 func _test_catalogue() -> void:
-	print("the catalogue")
+	_section("the catalogue")
 
 	var catalogue := _catalogue(12)
 
@@ -176,10 +202,11 @@ func _test_catalogue() -> void:
 	catalogue.remove(&"surf_3")
 	_check(catalogue.size() == 11, "and a map can be removed")
 	_check(not catalogue.has(&"surf_3"), "and is then gone")
+	_done()
 
 
 func _test_catalogue_round_trip() -> void:
-	print("catalogues survive JSON")
+	_section("catalogues survive JSON")
 
 	var catalogue := _catalogue(5)
 	catalogue.get_map(&"surf_1").content_id = &"pack_a"
@@ -207,10 +234,11 @@ func _test_catalogue_round_trip() -> void:
 
 	var newer := DotMapCatalogue.from_dictionary({"format": 999, "maps": []})
 	_check(not newer.ok, "and a newer format is refused")
+	_done()
 
 
 func _test_catalogue_tolerates_a_bad_entry() -> void:
-	print("one bad entry does not condemn the file")
+	_section("one bad entry does not condemn the file")
 
 	# The property that matters on a community server: a hundred and ninety-nine
 	# good maps and one typo should boot on the hundred and ninety-nine.
@@ -230,10 +258,11 @@ func _test_catalogue_tolerates_a_bad_entry() -> void:
 		var catalogue: DotMapCatalogue = parsed.value
 		_check(catalogue.size() == 2, "with the good entries", "%d" % catalogue.size())
 		_check(catalogue.has(&"good_two"), "including the one after the bad ones")
+	_done()
 
 
 func _test_search() -> void:
-	print("searching")
+	_section("searching")
 
 	var catalogue := DotMapCatalogue.new()
 	catalogue.add(_map(&"surf_kitsune"))
@@ -253,12 +282,13 @@ func _test_search() -> void:
 
 	_check(catalogue.search("").is_empty(), "an empty search finds nothing")
 	_check(catalogue.search("zzz").is_empty(), "and so does a miss")
+	_done()
 
 
 # --- Rotation --------------------------------------------------------------
 
 func _test_rotation_sequential() -> void:
-	print("sequential rotation")
+	_section("sequential rotation")
 
 	var catalogue := _catalogue(4)
 	var rotation := DotMapRotation.of(catalogue)
@@ -285,10 +315,11 @@ func _test_rotation_sequential() -> void:
 	var a := rotation.choose()
 	var b := rotation.choose()
 	_check(a == b, "choosing does not consume")
+	_done()
 
 
 func _test_rotation_cooldown() -> void:
-	print("the cooldown")
+	_section("the cooldown")
 
 	var catalogue := _catalogue(10)
 	var rotation := DotMapRotation.of(catalogue)
@@ -329,6 +360,7 @@ func _test_rotation_cooldown() -> void:
 		single.choose() != null,
 		"and a pool of one repeats rather than stopping"
 	)
+	_done()
 
 
 func _check_silent(ok: bool, what: String) -> void:
@@ -338,7 +370,7 @@ func _check_silent(ok: bool, what: String) -> void:
 
 
 func _test_rotation_determinism() -> void:
-	print("rotation determinism")
+	_section("rotation determinism")
 
 	# A client showing the next map must reach the same answer the server will, so
 	# the random mode is seeded and the seed advances deterministically.
@@ -366,10 +398,11 @@ func _test_rotation_determinism() -> void:
 		different.note_played(next.id)
 
 	_check(other != first, "and a different seed gives a different one")
+	_done()
 
 
 func _test_rotation_player_counts() -> void:
-	print("player-count limits")
+	_section("player-count limits")
 
 	var catalogue := DotMapCatalogue.new()
 
@@ -403,12 +436,13 @@ func _test_rotation_player_counts() -> void:
 
 	any.enabled = false
 	_check(rotation.pool(2).size() == 1, "and a disabled map is offered to nobody")
+	_done()
 
 
 # --- Voting ----------------------------------------------------------------
 
 func _test_vote() -> void:
-	print("map votes")
+	_section("map votes")
 
 	var catalogue := _catalogue(10)
 	var vote := DotMapVote.new()
@@ -456,10 +490,11 @@ func _test_vote() -> void:
 	var winner := vote.finish()
 	_check(winner != null and winner.id == vote.options[1].id, "and the winner is right")
 	_check(not vote.open, "the ballot is closed")
+	_done()
 
 
 func _test_vote_ties() -> void:
-	print("vote tie-breaks")
+	_section("vote tie-breaks")
 
 	var catalogue := _catalogue(6)
 	var vote := DotMapVote.new()
@@ -500,10 +535,11 @@ func _test_vote_ties() -> void:
 	extended.cast_vote(&"c", &"surf_1")
 
 	_check(extended.finish() == null, "while an outright extend wins")
+	_done()
 
 
 func _test_time_limit() -> void:
-	print("the map time limit")
+	_section("the map time limit")
 
 	var limit := DotMapTimeLimit.of(600.0)
 	limit.warn_at = 60.0
@@ -564,10 +600,11 @@ func _test_time_limit() -> void:
 		unlimited.advance(1.0)
 
 	_check(not unlimited.is_expired(), "and it never expires")
+	_done()
 
 
 func _test_rock_the_vote() -> void:
-	print("rock the vote")
+	_section("rock the vote")
 
 	var limit := DotMapTimeLimit.of(3600.0)
 	limit.rtv_fraction = 0.6
@@ -623,12 +660,13 @@ func _test_rock_the_vote() -> void:
 
 	quiet.rtv_min_players = 1
 	_check(quiet.rock_the_vote(&"a", 1), "unless the server allows it")
+	_done()
 
 
 # --- Changing maps ---------------------------------------------------------
 
 func _test_change_maps() -> void:
-	print("changing maps")
+	_section("changing maps")
 
 	var session := DotMapSession.new()
 	add_child(session)
@@ -708,10 +746,11 @@ func _test_change_maps() -> void:
 	_check(session.world == null and session.current == null, "and can be unloaded")
 
 	session.queue_free()
+	_done()
 
 
 func _test_change_survives_a_failure() -> void:
-	print("a failed change leaves the server on a working map")
+	_section("a failed change leaves the server on a working map")
 
 	# The property a live server rests on, and the reason the new scene is loaded
 	# BEFORE the old one is freed. Freeing first is simpler, uses less memory, and
@@ -756,10 +795,11 @@ func _test_change_survives_a_failure() -> void:
 	_check(not session.changing_now, "with nothing left latched")
 
 	session.queue_free()
+	_done()
 
 
 func _test_loader_without_cloud() -> void:
-	print("the loader without dot-cloud")
+	_section("the loader without dot-cloud")
 
 	var loader := DotMapLoader.new()
 	var delivered := _map(&"surf_delivered")
@@ -787,6 +827,7 @@ func _test_loader_without_cloud() -> void:
 		loader.is_ready(_map(&"local")),
 		"a local map whose scene exists is ready"
 	)
+	_done()
 
 
 # --- Changing the map for everybody ---------------------------------------
@@ -918,7 +959,7 @@ func _change_and_pump(
 
 
 func _test_sync_a_local_map() -> void:
-	print("changing the map for everybody")
+	_section("changing the map for everybody")
 
 	var pair: SyncPair = await _make_pair(self, _catalogue(3), _catalogue(3))
 
@@ -983,10 +1024,11 @@ func _test_sync_a_local_map() -> void:
 	pair.client.queue_free()
 	pair.host_session.queue_free()
 	pair.client_session.queue_free()
+	_done()
 
 
 func _test_sync_refuses_what_a_host_may_not_send() -> void:
-	print("what a host may not tell a client to load")
+	_section("what a host may not tell a client to load")
 
 	var client := DotMapSyncClient.new()
 	var session := DotMapSession.new()
@@ -1061,10 +1103,11 @@ func _test_sync_refuses_what_a_host_may_not_send() -> void:
 
 	client.queue_free()
 	session.queue_free()
+	_done()
 
 
 func _test_sync_waits_and_times_out() -> void:
-	print("a peer that never answers")
+	_section("a peer that never answers")
 
 	var pair: SyncPair = await _make_pair(self, _catalogue(3), _catalogue(3))
 	pair.host.sync_timeout_sec = 5.0
@@ -1115,6 +1158,7 @@ func _test_sync_waits_and_times_out() -> void:
 	pair.client.queue_free()
 	pair.host_session.queue_free()
 	pair.client_session.queue_free()
+	_done()
 
 
 # --- A map that has to be downloaded ---------------------------------------
@@ -1134,7 +1178,7 @@ func _test_sync_waits_and_times_out() -> void:
 ## content interface", and the only loader test here ran with no cloud client at all —
 ## the branch that falls back to the disk and passes.
 func _test_sync_a_delivered_map() -> void:
-	print("a map the peer has to download")
+	_section("a map the peer has to download")
 
 	var client_script: Variant = load(
 		"res://addons/dot_cloud/client/dot_cloud_client.gd"
@@ -1310,6 +1354,7 @@ func _test_sync_a_delivered_map() -> void:
 	cloud.queue_free()
 	await get_tree().process_frame
 	DotPaths.remove_tree(data)
+	_done()
 
 
 # --- Commands ---------------------------------------------------------------
@@ -1384,7 +1429,7 @@ class FakeCtx:
 
 func _test_commands() -> void:
 	print("")
-	print("-- `map` belongs here, not in dot-server")
+	_section("-- `map` belongs here, not in dot-server")
 
 	var session := DotMapSession.new()
 	session.catalogue = _catalogue(4)
@@ -1565,3 +1610,4 @@ func _test_commands() -> void:
 
 	sync.queue_free()
 	session.queue_free()
+	_done()
