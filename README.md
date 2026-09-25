@@ -111,6 +111,22 @@ session.advance(delta)
 session.rock_the_vote(player_id, player_count)
 ```
 
+## Changing the map for everybody
+
+`DotMapSession` changes the map in one process. `DotMapSyncHost` and `DotMapSyncClient` change it for every connected peer: announce, fetch, ready, then load, over whatever transport you hand them a `send_fn` for.
+
+```gdscript
+var host := DotMapSyncHost.new()
+host.session = session
+host.send_fn = func(peer: int, payload: Dictionary) -> void: link.send_to(peer, payload)
+add_child(host)
+
+host.admit_peer(peer_id)                 # as each client joins; it is told the current map
+await host.change_to(&"surf_kitsune")    # announce, wait for peers, swap, tell them to load
+```
+
+On the client, `DotMapSyncClient.handle(payload)` takes whatever arrives. A host may say which map, never what the map is: a map the client does not have must be delivered content. A game whose maps are data read by one scene in its own build lists that scene in `trusted_template_scenes`, and the delivered requirement then applies to the data instead — see [`CLAUDE.md`](CLAUDE.md) for exactly what that does and does not let a host do.
+
 ## Documentation
 
 [`CLAUDE.md`](CLAUDE.md) has the design reasoning: why the catalogue is not the rotation, the order a map change has to happen in and what breaks when it does not, and why the loader reaches dot-cloud through the registry rather than by name.
@@ -119,7 +135,7 @@ session.rock_the_vote(player_id, player_count)
 
 ```bash
 godot --headless --path . --import
-godot --headless --path . res://examples/map_selftest.tscn   # 176 checks
+godot --headless --path . res://examples/map_selftest.tscn   # 223 checks
 ```
 
 ## Licence

@@ -179,6 +179,20 @@ play and should refuse to be sent anywhere else.
 maps and its clients ship none of them, so a client that only knew its own catalogue
 could join and never load a single map.
 
+**One built-in scene reading a delivered document is the other shape, and `trusted_template_scenes` is for it.** The family's mount constraint says a pack's script cannot extend a class of the build it is mounted into, so a game whose maps are data — a manifest and a mesh, turned into a world by one scene the game ships — can never put that scene in the pack, and the rule above refused every map it had. game-g2gfast found it by being the first to try, and worked around it by fetching by its own convention before dot-map saw the announce. A client that lists a scene in `trusted_template_scenes` (empty by default, which is the strict rule unchanged) accepts an announce naming that exact scene, after `simplify_path`, if the map names a `content_id` and its data — `zones_path`, every key in `template_path_keys` (default `manifest`, at least one required), and every *path-shaped* string anywhere in `meta`, nested or not — resolves inside `res://dot_cloud/<content_id>/<version>/`. The sweep of the whole of `meta` is fail-closed on purpose: a template that one day reads a key nobody listed must not be the day a host can point it at `user://` or a file in the build. What a hostile host can still do is make the client fetch any content from the client's own origin (or from the announce's `manifest_url` — signed manifests are what stop that from mounting anything, exactly as for any delivered map) and instantiate a listed scene over it. So the template is the attack surface: it parses whatever the pack holds and must treat it as untrusted input, and it must take paths only from keys the check covers. The class doc on `trusted_template_scenes` says the same, where the next person to add a key will read it.
+
+### What the first transport found
+
+The protocol ran over a real network for the first time in game-g2gfast (dot-net, a server and a client) and five things in this addon were wrong. All five are fixed here, each with a check in `map_selftest` that was armed by putting the old line back:
+
+- **A joiner was never told to load.** `join_payload()` is an announce, and `load` was only ever sent at the end of a change, so a peer that joined between changes fetched the map, said ready, and waited for ever. **The host now answers a `ready` for the map it is on, while no change is running, with a `load` — once per peer per map.** That was chosen over making `admit_peer` the only way in, because the `ready` is the one moment the host knows the peer has the content, the host is the one end that knows whether it already told that peer to load, and it covers every caller at once: `admit_peer` (new, the one-call join), a host that calls `add_peer` and sends `join_payload` itself, and a straggler whose download landed after the change went ahead without it. The "once" matters: without it the straggler, already sent the change's `load`, is sent a second one and rebuilds its world.
+- **A peer admitted mid-change was waited on**, though `add_peer` said it was not: `_wait_for_peers` counted every entry of `peers` on every poll, so the change was held to its timeout and the joiner reported as a straggler for a map it had never been announced. The peers a change waits on, sends its `load` or `abort` to, and counts as ready are now the ones registered when it began (`_participants`); a peer added during it is announced whatever map the host settled on, finished or abandoned.
+- **The delivered-map rule refused the template shape.** See above.
+- **A refused `load` adopted the map it refused.** `_on_load` set `announced` from the catalogue before checking the version the host asked for.
+- **Progress was unthrottled.** One message per dot-cloud progress signal, into a server that rate-limits a client and drops the excess without choosing, can cost the `ready` behind it. `progress_interval_sec` (0.25 s; 0 turns it off) throttles what is *sent*; the first report of a fetch, a report of 1.0 and every `ready` always go, and the local `fetch_progress` signal is never throttled.
+
+And one found while writing the checks for those: **a `load` that overtook its own fetch was taken at once.** That is exactly the straggler `swap_without_stragglers` makes — the host gives up waiting, swaps, and sends `load` while the peer is still downloading — and taking it meant asking the content client for the same pack a second time mid-download. dot-cloud happens to join the running request, so it worked with dot-cloud and with nothing else. The client now holds such a `load` until its fetch lands (`_load_after_fetch`), and an `abort` drops it.
+
 ### It is transport-agnostic, and that is not laziness
 
 This addon depends on nothing but dot-core, so it cannot know whether the game carrying
@@ -299,7 +313,7 @@ godot --headless --path . --import
 find . -name '*.gd' -not -path './.godot/*' | while read f; do
     godot --headless --path . --check-only --script "res://${f#./}"
 done
-godot --headless --path . res://examples/map_selftest.tscn   # 176 checks
+godot --headless --path . res://examples/map_selftest.tscn   # 223 checks, 27 sections
 ```
 
 **Run the check-only pass first.** This project hit the documented hazard while being
@@ -329,6 +343,9 @@ the outcome on `.valid`, so a `== null` check passes for every string ever writt
 | Where a map's manifest is | `DotMapDef.manifest_url`, or the client's template |
 | How map changes reach clients | `DotMapSyncHost.send_fn` / `DotMapSyncClient.send_fn` |
 | What a client will accept from a host | `DotMapSyncClient.accept_unknown_maps` |
+| A built-in scene a host may name for delivered data | `DotMapSyncClient.trusted_template_scenes` / `template_path_keys` |
+| How often a peer reports download progress | `DotMapSyncClient.progress_interval_sec` |
+| Letting a peer in between changes | `DotMapSyncHost.admit_peer` (or `add_peer` + `join_payload`; the host sends the `load`) |
 | Whether one slow peer holds the server | `DotMapSyncHost.swap_without_stragglers` |
 | Anything else about a map | `DotMapDef.meta` |
 

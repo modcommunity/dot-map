@@ -84,6 +84,56 @@ signal change_aborted(map_id: StringName, reason: String)
 ## client can list where it has been.
 @export var remember_accepted_maps: bool = true
 
+## Scenes in THIS build a host may name for a delivered map, when the map's data — not
+## its scene — is what is delivered. Empty by default, which is the strict rule: a map
+## this client does not have must be a scene inside its own pack.
+##
+## [b]The shape this exists for is one built-in scene that reads a delivered document.[/b]
+## A pack's script cannot extend a class of the build it is mounted into (the family's
+## mount constraint), so a game whose maps are data — a manifest and a mesh, turned into
+## a world by one scene the game ships — can never put that scene inside the pack, and
+## the strict rule refuses every map it has. Listing the scene here moves the delivered
+## requirement from the scene to the data: an announce naming a listed scene is accepted
+## only if it names a [member DotMapDef.content_id], and its [member DotMapDef.zones_path],
+## every key in [member template_path_keys] and every other path-shaped string in its
+## [member DotMapDef.meta] resolve inside [code]res://dot_cloud/<content_id>/<version>/[/code]
+## after [method String.simplify_path].
+##
+## [b]What a hostile host can do with a listed scene, and what it cannot.[/b] It controls
+## every field of the announce. It can make this client fetch any content id and version
+## from this client's own origin (or from the announce's [member DotMapDef.manifest_url] —
+## signed manifests are what stop that from mounting anything, exactly as for any
+## delivered map), and then instantiate one of the listed scenes with data read out of
+## that mount. It cannot name a scene that is not listed, and it cannot point the listed
+## scene at a file outside the mount: not another map's data, not [code]user://[/code],
+## not a path in the build. The check is on the scene path exactly, after simplification,
+## so list the path the build actually loads. [b]What is left is the template itself[/b]:
+## it parses whatever the pack contains, so it must treat that as untrusted input, and it
+## must read paths only from keys this check covers — a template that reads a path out of
+## a meta key that is not path-shaped (a bare relative name joined onto something of its
+## own choosing) is outside this rule and is the template's to validate.
+@export var trusted_template_scenes: PackedStringArray = PackedStringArray()
+
+## The [member DotMapDef.meta] keys a listed template reads its data from.
+##
+## Each must be present and inside the mount; a templated map naming none of them is
+## refused, because a template with no data to read is not a delivered map. Path-shaped
+## values under any OTHER key are held to the same rule regardless — see
+## [member trusted_template_scenes].
+@export var template_path_keys: PackedStringArray = PackedStringArray(["manifest"])
+
+@export_group("Reporting")
+
+## Least seconds between two progress reports sent to the host. 0 sends every one.
+##
+## [b]Throttled because the transport under this may not be.[/b] dot-cloud emits progress
+## for every chunk it writes, and a server that rate-limits a client's messages drops the
+## excess without choosing — so an unthrottled burst of progress can cost the
+## [code]ready[/code] behind it, and a peer that said it was ready is timed out as one that
+## never did. The first report of a fetch and a report of 1.0 always go; a
+## [code]ready[/code] is never throttled. [signal fetch_progress] is local and is not.
+@export_range(0.0, 5.0, 0.05) var progress_interval_sec: float = 0.25
+
 ## The session this drives, assigned directly when there is no [member session_ref].
 var session: DotMapSession = null
 
@@ -97,6 +147,15 @@ var announced: DotMapDef = null
 var is_ready: bool = false
 
 var _fetching: bool = false
+
+## "id@version" of every fetch still running. More than one when a host changes its mind.
+var _in_flight: Dictionary = {}
+
+## "id@version" of a load that arrived while that map's fetch was still running.
+var _load_after_fetch: String = ""
+
+## When the last progress report went to the host, in msec. See [member progress_interval_sec].
+var _progress_sent_at: int = -1
 
 ## The cloud progress subscription, kept so it is only ever made once.
 var _progress_handler: Callable = Callable()
@@ -145,6 +204,7 @@ func handle(payload: Dictionary) -> bool:
 			})
 			announced = null
 			is_ready = false
+			_load_after_fetch = ""
 			change_aborted.emit(id, reason)
 			return true
 
@@ -203,14 +263,21 @@ func _fetch(map: DotMapDef) -> void:
 		_send(DotMapMessage.ready(map.id, map.version))
 		return
 
+	var key := _key_of(map)
+	_in_flight[key] = true
 	_fetching = true
 	_subscribe_to_progress()
 	fetching.emit(map)
+	_progress_sent_at = Time.get_ticks_msec()
 	_send(DotMapMessage.progress(map.id, 0.0))
 
 	var fetched: DotResult = await session.loader.ensure_content(map)
 
-	_fetching = false
+	_in_flight.erase(key)
+	_fetching = not _in_flight.is_empty()
+	var load_waiting := _load_after_fetch == key
+	if load_waiting:
+		_load_after_fetch = ""
 
 	if not fetched.ok:
 		DotLog.error(CHANNEL, "could not get the announced map", {
@@ -219,36 +286,57 @@ func _fetch(map: DotMapDef) -> void:
 		fetch_failed.emit(map, fetched.error)
 		return
 
-	is_ready = true
+	if announced == map:
+		is_ready = true
 	content_ready.emit(map)
 	_send(DotMapMessage.ready(map.id, map.version))
 
+	if load_waiting and announced == map:
+		_load(map)
+
 
 func _on_load(id: StringName, version: String) -> void:
-	if announced == null or announced.id != id:
+	var target := announced
+
+	if target == null or target.id != id:
 		# A load for a map this peer was never announced. It can happen legitimately —
 		# a peer that joined between the announce and the load — so the catalogue is
 		# asked before giving up.
-		var known: DotMapDef = (
+		target = (
 			session.catalogue.get_map(id)
 			if session != null and session.catalogue != null else null
 		)
 
-		if known == null:
+		if target == null:
 			DotLog.warn(CHANNEL, "told to load a map we were never sent", {
 				"map": String(id)
 			})
 			return
 
-		announced = known
-
-	if version != "" and announced.version != version:
+	# [b]Checked before anything is adopted.[/b] This assigned the catalogue's map to
+	# `announced` first and checked its version second, so a refused load left
+	# `announced` naming the map it had just refused — and the next load for that id
+	# found it there and skipped the catalogue lookup that would have been asked.
+	if version != "" and target.version != version:
 		DotLog.warn(CHANNEL, "told to load a different version than announced", {
-			"map": String(id), "announced": announced.version, "asked": version
+			"map": String(id), "announced": target.version, "asked": version
 		})
 		return
 
-	_load(announced)
+	announced = target
+
+	# [b]A load that overtakes its own fetch waits for it.[/b] A straggler — a peer the
+	# host changed without — is sent its load while its download is still running.
+	# Loading now asks the content client for the same pack a second time, concurrently,
+	# and what that does is the content client's business rather than this protocol's.
+	if _in_flight.has(_key_of(target)):
+		_load_after_fetch = _key_of(target)
+		DotLog.debug(CHANNEL, "told to load a map still downloading; loading when it lands", {
+			"map": String(id)
+		})
+		return
+
+	_load(target)
 
 
 func _load(map: DotMapDef) -> void:
@@ -337,22 +425,42 @@ func _accept_delivered(dict: Dictionary, id: StringName) -> DotResult:
 		MOUNT_ROOT, String(map.content_id), map.effective_content_version()
 	]
 
+	# The id and version are the host's, and a version of ".." names a prefix that
+	# simplifies to "res://dot_cloud/", which every pack's files begin with. The checks
+	# below compare a SIMPLIFIED path with this prefix as written, so such a prefix can
+	# never match and they would refuse it anyway — this is here so the refusal names the
+	# actual problem rather than blaming whichever path was checked first, and so the next
+	# person to "tidy" those checks into comparing simplified with simplified does not open
+	# every pack to every host.
+	if prefix.simplify_path() + "/" != prefix:
+		return DotResult.fail(
+			DotError.CODE_FORBIDDEN,
+			"The announced map's content address is not a plain id and version.",
+			prefix
+		)
+
+	var templated := _is_trusted_template(map.scene_path)
+
 	# simplify_path first, because "res://dot_cloud/a/1/../../../addons/x.tscn" does
 	# begin with the prefix. dot-cloud learned this one the same way.
-	if not map.scene_path.simplify_path().begins_with(prefix):
+	if not templated and not _is_under(map.scene_path, prefix):
 		return DotResult.fail(
 			DotError.CODE_FORBIDDEN,
 			"The announced map's scene is outside its own content.",
 			"%s is not under %s" % [map.scene_path, prefix]
 		)
 
-	if map.zones_path != "" \
-		and not map.zones_path.simplify_path().begins_with(prefix):
+	if map.zones_path != "" and not _is_under(map.zones_path, prefix):
 		return DotResult.fail(
 			DotError.CODE_FORBIDDEN,
 			"The announced map's zone file is outside its own content.",
 			"%s is not under %s" % [map.zones_path, prefix]
 		)
+
+	if templated:
+		var data := _check_template_data(map, prefix)
+		if not data.ok:
+			return data
 
 	if remember_accepted_maps and session != null and session.catalogue != null:
 		# Replaces any older entry, because the version check above has already
@@ -361,6 +469,97 @@ func _accept_delivered(dict: Dictionary, id: StringName) -> DotResult:
 		session.catalogue.add(map)
 
 	return DotResult.success(map)
+
+
+## Whether [param path] is one of [member trusted_template_scenes], exactly.
+func _is_trusted_template(path: String) -> bool:
+	if path == "":
+		return false
+	var simple := path.simplify_path()
+	for trusted in trusted_template_scenes:
+		if trusted != "" and trusted.simplify_path() == simple:
+			return true
+	return false
+
+
+## A templated map's data: the named keys present, and every path in its meta inside
+## its own content. See [member trusted_template_scenes] for what this does not cover.
+func _check_template_data(map: DotMapDef, prefix: String) -> DotResult:
+	var named := 0
+
+	for key in template_path_keys:
+		if not map.meta.has(key):
+			continue
+		var value := str(map.meta[key])
+		if value == "":
+			continue
+		named += 1
+		if not _is_under(value, prefix):
+			return DotResult.fail(
+				DotError.CODE_FORBIDDEN,
+				"The announced map's data is outside its own content.",
+				"meta.%s: %s is not under %s" % [key, value, prefix]
+			)
+
+	if named == 0:
+		return DotResult.fail(
+			DotError.CODE_FORBIDDEN,
+			"The announced map names a template scene and no delivered data for it.",
+			"%s: none of meta.%s is set" % [String(map.id), ", meta.".join(template_path_keys)]
+		)
+
+	# Every other value that could be opened as a path, under any key, nested or not.
+	# Fail closed: a template that one day reads a key nobody listed must not be the day a
+	# host can point it at a file in this build.
+	var stray := _stray_path(map.meta, prefix, "meta")
+	if stray != "":
+		return DotResult.fail(
+			DotError.CODE_FORBIDDEN,
+			"The announced map carries a path outside its own content.",
+			stray
+		)
+
+	return DotResult.success(true)
+
+
+## The first path-shaped string under [param value] that is not inside [param prefix],
+## as "where: path", or "" when there is none.
+static func _stray_path(value: Variant, prefix: String, where: String) -> String:
+	if value is Dictionary:
+		for key in (value as Dictionary):
+			var found := _stray_path((value as Dictionary)[key], prefix, "%s.%s" % [where, key])
+			if found != "":
+				return found
+	elif value is Array:
+		var list: Array = value
+		for i in range(list.size()):
+			var found := _stray_path(list[i], prefix, "%s[%d]" % [where, i])
+			if found != "":
+				return found
+	elif value is String or value is StringName:
+		var text := str(value)
+		if _looks_like_path(text) and not _is_under(text, prefix):
+			return "%s: %s is not under %s" % [where, text, prefix]
+	return ""
+
+
+## Whether a string is something [FileAccess] or [method @GDScript.load] would open as it
+## stands: a Godot scheme or an absolute filesystem path.
+static func _looks_like_path(text: String) -> bool:
+	var t := text.strip_edges()
+	return (
+		t.begins_with("res://") or t.begins_with("user://") or t.begins_with("uid://")
+		or t.begins_with("/") or t.begins_with("\\")
+		or (t.length() > 2 and t[1] == ":" and (t[2] == "/" or t[2] == "\\"))
+	)
+
+
+static func _is_under(path: String, prefix: String) -> bool:
+	return path.strip_edges().simplify_path().begins_with(prefix)
+
+
+static func _key_of(map: DotMapDef) -> String:
+	return "%s@%s" % [String(map.id), map.version]
 
 
 func _send(payload: Dictionary) -> void:
@@ -404,11 +603,21 @@ func _on_cloud_progress(p: Dictionary) -> void:
 ##
 ## Called automatically while a fetch is running; public so a game whose content does not
 ## come through dot-cloud can drive it itself.
+##
+## Throttled to one report per [member progress_interval_sec] on the way to the host; the
+## [signal fetch_progress] signal is not.
 func report_progress(fraction: float) -> void:
 	if announced == null:
 		return
-	fetch_progress.emit(clampf(fraction, 0.0, 1.0))
-	_send(DotMapMessage.progress(announced.id, fraction))
+	var clamped := clampf(fraction, 0.0, 1.0)
+	fetch_progress.emit(clamped)
+
+	var now := Time.get_ticks_msec()
+	if clamped < 1.0 and progress_interval_sec > 0.0 and _progress_sent_at >= 0 \
+			and now - _progress_sent_at < int(progress_interval_sec * 1000.0):
+		return
+	_progress_sent_at = now
+	_send(DotMapMessage.progress(announced.id, clamped))
 
 
 func describe() -> Dictionary:
@@ -416,6 +625,8 @@ func describe() -> Dictionary:
 		"announced": String(announced.id) if announced != null else "-",
 		"ready": is_ready,
 		"fetching": _fetching,
+		"load_waiting": _load_after_fetch if _load_after_fetch != "" else "-",
+		"templates": trusted_template_scenes.size(),
 		"map": String(session.current.id) if session != null and session.current != null
 			else "-",
 	}
