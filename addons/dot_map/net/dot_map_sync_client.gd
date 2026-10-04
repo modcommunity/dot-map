@@ -386,6 +386,19 @@ func _accept(dict: Dictionary) -> DotResult:
 				# definition here is safe by the same rule the unknown case uses.
 				return _accept_delivered(dict, id)
 
+			# [b]And so does the PACK's version, which is a different field.[/b] A
+			# republished delivered map keeps its own `version` and changes its
+			# `content_version`, and only the second was compared nowhere: a client
+			# that had mounted the old pack answered the new announce with the map it
+			# already had and played the old geometry (game-g2gfast's headless_net,
+			# "a map republished with different files"). Delivered only -- a map in
+			# this build has no pack to differ.
+			var wanted_pack := str(dict.get("content_version", ""))
+
+			if not known.is_local() and wanted_pack != "" \
+					and wanted_pack != known.effective_content_version():
+				return _accept_delivered(dict, id)
+
 			return DotResult.success(known)
 
 	if not accept_unknown_maps:

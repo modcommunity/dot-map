@@ -368,3 +368,5 @@ the outcome on `.valid`, so a `== null` check passes for every string ever writt
 - **Anything about what is *in* a map.** Spawns, zones, props and lights are the
   scene's and the timer's. This addon knows a map's name, version and where its scene
   is.
+
+**A delivered map is compared by its pack, too (2026-10-04).** `DotMapSyncClient._accept` matched a remembered map on `version` alone; a republished delivered map keeps `version` and changes `content_version`, so a client that had the old pack loaded the old geometry. It now takes the announced definition when a delivered map's `content_version` differs from `effective_content_version()`. `map_selftest`: "a remembered delivered map announced at another pack version is taken as announced" (armed).

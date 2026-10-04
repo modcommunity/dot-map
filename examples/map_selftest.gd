@@ -13,7 +13,7 @@ extends Node
 ## running, rather than on nothing. It is the reason the load happens before the
 ## teardown, and it is the step that is easiest to "simplify" back out.
 
-const CHECKS := 223
+const CHECKS := 224
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -1416,6 +1416,19 @@ func _test_sync_template_trust() -> void:
 		client.announced != null and client.announced.id == &"t_ok"
 			and session.catalogue.has(&"t_ok"),
 		"and becomes the announced map, remembered"
+	)
+
+	# The same delivered map, republished: its own `version` unchanged, its pack's
+	# `content_version` not. Compared nowhere, so the remembered (old) one was answered.
+	var republished: DotMapDef = templated.call("t_ok")
+	republished.content_version = "2.0.0"
+	republished.meta["manifest"] = "res://dot_cloud/data_pack/2.0.0/t_ok.json"
+	client.handle(DotMapMessage.announce(republished))
+	_check(
+		refused.size() == 1 and client.announced != null
+			and client.announced.effective_content_version() == "2.0.0",
+		"a remembered delivered map announced at another pack version is taken as announced",
+		"%s %s" % [refused, client.announced.describe() if client.announced != null else "none"]
 	)
 
 	var outside: DotMapDef = templated.call("t_outside")
