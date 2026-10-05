@@ -77,6 +77,13 @@ await session.change_to(&"surf_beginner")
 
 The second map is delivered: its scene lives inside a dot-cloud pack that is fetched and mounted before the scene is loaded.
 
+A game whose maps are published one pack per map (dot-ci's `release-maps.yml`) lists them in its descriptor's `maps:` as pinned `<owner>/<map id>@<version>` keys, and dot-server hands them back as `DotGameManager.current_maps()`. `DotMapCatalogue.add_delivered(key, scene)` turns each into a delivered map, with the last segment of the content id as the id a player types:
+
+```gdscript
+for key in server.games.current_maps():
+    catalogue.add_delivered(key, "map.tscn")
+```
+
 ## Rotation and voting
 
 ```gdscript
