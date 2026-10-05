@@ -13,7 +13,7 @@ extends Node
 ## running, rather than on nothing. It is the reason the load happens before the
 ## teardown, and it is the step that is easiest to "simplify" back out.
 
-const CHECKS := 224
+const CHECKS := 227
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -208,6 +208,20 @@ func _test_catalogue() -> void:
 	catalogue.remove(&"surf_3")
 	_check(catalogue.size() == 11, "and a map can be removed")
 	_check(not catalogue.has(&"surf_3"), "and is then gone")
+
+	# A delivered map by its pack key, the way a game descriptor's maps: list names it.
+	var delivered := catalogue.add_delivered("gamemann/surf_mesa@0.0.0-d99eeea9e490", "map.tscn")
+	var mesa := catalogue.get_map(&"surf_mesa")
+	_check(delivered.ok and mesa != null and String(mesa.content_id) == "gamemann/surf_mesa"
+			and mesa.content_version == "0.0.0-d99eeea9e490" and not mesa.is_local()
+			and mesa.scene_path == "map.tscn",
+		"a delivered map is added by its pack key, under the id a player types")
+	_check(not catalogue.add_delivered("gamemann/surf_mesa", "map.tscn").ok
+			and not catalogue.add_delivered("surf_mesa@1.0.0", "map.tscn").ok
+			and DotMapDef.from_content_key("gamemann/@1.0.0") == null,
+		"and a key with no version, no owner or no name is refused")
+	_check(not catalogue.add_delivered("gamemann/surf_kitsune@1.0.0", "").ok,
+		"and a delivered map still needs a scene to load")
 	_done()
 
 

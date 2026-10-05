@@ -144,6 +144,34 @@ const KIND_SANDBOX := &"sandbox"
 @export var meta: Dictionary = {}
 
 
+## A map out of a delivered pack key, `<owner>/<map id>@<version>` -- what a game
+## descriptor's `maps:` list holds once the server has installed the game (dot-server's
+## DotGameDescriptor.maps, DotGameManager.current_maps). Null for a key that is not that.
+##
+## The id is the last segment of the content id, so `gamemann/surf_mesa@0.0.0-ab12` is the
+## map `surf_mesa` a player types, delivered as `gamemann/surf_mesa` at that version.
+## [param scene] is the scene to load inside the pack's mount, relative to it, and is the
+## game's to know: a map pack's layout is a game convention, not dot-map's.
+static func from_content_key(key: String, scene: String = "") -> DotMapDef:
+	var at := key.rfind("@")
+	if at <= 0 or at == key.length() - 1:
+		return null
+
+	var content := key.substr(0, at).strip_edges()
+	var content_version_part := key.substr(at + 1).strip_edges()
+	var cut := content.rfind("/")
+
+	if cut <= 0 or cut == content.length() - 1:
+		return null
+
+	var map := DotMapDef.new()
+	map.id = StringName(content.substr(cut + 1))
+	map.content_id = StringName(content)
+	map.content_version = content_version_part
+	map.scene_path = scene
+	return map
+
+
 func effective_content_version() -> String:
 	return content_version if content_version != "" else version
 

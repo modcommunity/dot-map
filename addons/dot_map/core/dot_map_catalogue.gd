@@ -54,6 +54,27 @@ func add(map: DotMapDef) -> DotResult:
 	return DotResult.success(map)
 
 
+## Add a delivered map by its pack key (see [method DotMapDef.from_content_key]), with
+## the scene inside the pack the game loads for it. The usual way to turn a game
+## descriptor's `maps:` list into a catalogue:
+##
+## [codeblock]
+## for key in server.games.current_maps():
+##     catalogue.add_delivered(key, "map.tscn")
+## [/codeblock]
+func add_delivered(key: String, scene: String) -> DotResult:
+	var map := DotMapDef.from_content_key(key, scene)
+
+	if map == null:
+		return DotResult.fail(
+			DotError.CODE_INVALID,
+			"A delivered map is named <owner>/<map id>@<version>.",
+			key
+		)
+
+	return add(map)
+
+
 func remove(id: StringName) -> bool:
 	_reindex()
 
