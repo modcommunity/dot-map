@@ -90,6 +90,13 @@ signal fetching(map: DotMapDef)
 ## Seconds left when [signal time_warning] fires. 0 disables it.
 @export_range(0.0, 3600.0, 10.0) var warn_seconds: float = 120.0
 
+## Whether waking from hibernation starts the map's time limit again from the top.
+##
+## On: the first player into an empty server gets the whole limit, every extend and nobody
+## else's rock-the-vote. Off resumes where hibernation froze it. See
+## [method set_hibernating].
+@export var restart_on_wake: bool = true
+
 var catalogue: DotMapCatalogue = null
 var rotation: DotMapRotation = null
 var loader: DotMapLoader = null
@@ -116,6 +123,9 @@ var zones_json: String = ""
 
 ## Whether a change is in progress. A second one is refused while it is.
 var changing_now: bool = false
+
+## Whether the server is hibernating, and so whether [method advance] counts anything.
+var hibernating: bool = false
 
 var _world_node: Node = null
 
@@ -286,7 +296,56 @@ func change_to_map(map: DotMapDef) -> DotResult:
 ## reason [DotPropSpawner.advance] takes one. A node that ran its own [Timer] would
 ## count wall-clock seconds, and a server that stalled would lose them off its map.
 func advance(delta: float) -> void:
+	if hibernating:
+		return
+
 	time_limit.advance(delta)
+
+
+## Stops (true) or starts (false) the map's time limit, for a server that hibernates while
+## it is empty.
+##
+## [b]An empty room's time is not the map's.[/b] A hibernating server still ticks, only
+## slower, and a host that advances this from its tick used to run the limit out to nobody —
+## the first player in arrived at a map with a minute left. Waking starts it again from the
+## map's own limit when [member restart_on_wake] is on (the default), and resumes it
+## otherwise.
+func set_hibernating(on: bool) -> void:
+	if on == hibernating:
+		return
+
+	hibernating = on
+
+	if on:
+		DotLog.info(CHANNEL, "hibernating; the map's clock waits", {
+			"map": String(current.id) if current != null else "-",
+			"left": time_limit.formatted_remaining(),
+		})
+		return
+
+	if restart_on_wake and current != null:
+		# start() with no override keeps the map's own limit: change_to_map set it as the
+		# duration, so this is the same clock the map began with.
+		time_limit.start()
+		DotLog.info(CHANNEL, "awake; the map's clock starts again", {
+			"map": String(current.id), "limit": time_limit.formatted_remaining(),
+		})
+
+
+## Follows a server's hibernation through its [code]hibernation_changed(bool)[/code] signal,
+## from the state it is in now. Duck-typed: this addon names nothing in dot-server. Returns
+## false for an object without the signal. Safe to call twice.
+func follow_hibernation(server: Object) -> bool:
+	if server == null or not server.has_signal("hibernation_changed"):
+		return false
+
+	if not server.is_connected("hibernation_changed", set_hibernating):
+		server.connect("hibernation_changed", set_hibernating)
+
+	if server.has_method("is_hibernating"):
+		set_hibernating(bool(server.call("is_hibernating")))
+
+	return true
 
 
 ## Registers a player's rock-the-vote. Returns whether it passed.
@@ -347,6 +406,7 @@ func describe() -> Dictionary:
 		"version": current.version if current != null else "-",
 		"loaded": world != null,
 		"changing": changing_now,
+		"hibernating": hibernating,
 		"catalogue": catalogue.size() if catalogue != null else 0,
 		"rotation": rotation.describe() if rotation != null else {},
 		"time_limit": time_limit.describe(),

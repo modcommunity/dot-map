@@ -336,6 +336,7 @@ the outcome on `.valid`, so a `== null` check passes for every string ever writt
 | How many players must rock the vote | `DotMapTimeLimit.rtv_fraction` / `rtv_min_players` |
 | How often a map may be extended | `DotMapTimeLimit.max_extends` |
 | What happens when a map ends | The `map_over` signal. The session never decides |
+| Whether the clock waits while the server sleeps | `DotMapSession.follow_hibernation(server)` (duck-typed on `hibernation_changed(bool)`) or `set_hibernating`; `restart_on_wake` (default on) starts the map's own limit again on waking |
 | What is on a ballot | `DotMapVote.max_options` / `reserved_for_nominations` |
 | Whether a map is offered at all | `DotMapDef.enabled`, `min_players`, `max_players` |
 | What a map is worth | `DotMapDef.tier`, read by `DotTimerStyle.points_for` |

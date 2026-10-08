@@ -13,7 +13,7 @@ extends Node
 ## running, rather than on nothing. It is the reason the load happens before the
 ## teardown, and it is the step that is easiest to "simplify" back out.
 
-const CHECKS := 227
+const CHECKS := 232
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -685,6 +685,21 @@ func _test_rock_the_vote() -> void:
 
 # --- Changing maps ---------------------------------------------------------
 
+## Stands in for a dot-server DotServer: the signal and the question
+## [method DotMapSession.follow_hibernation] duck-types.
+class FakeHibernatingServer extends Node:
+	signal hibernation_changed(hibernating: bool)
+
+	var asleep := false
+
+	func is_hibernating() -> bool:
+		return asleep
+
+	func sleep(on: bool) -> void:
+		asleep = on
+		hibernation_changed.emit(on)
+
+
 func _test_change_maps() -> void:
 	_section("changing maps")
 
@@ -752,6 +767,36 @@ func _test_change_maps() -> void:
 		func(_map: DotMapDef, reason: StringName) -> void:
 			over.append(String(reason))
 	)
+
+	# A hibernating server's map clock waits, and starts again from the map's own limit
+	# when somebody joins. Followed through the duck-typed signal a DotServer emits.
+	_check(session.restart_on_wake, "waking starts the map's clock again by default")
+	var server := FakeHibernatingServer.new()
+	add_child(server)
+	_check(session.follow_hibernation(server), "a server's hibernation can be followed")
+
+	for _i in range(30):
+		session.advance(1.0)
+
+	session.rock_the_vote(&"p1", 10)
+	var left := session.time_limit.remaining
+	server.sleep(true)
+
+	for _i in range(100000):
+		session.advance(1.0)
+
+	_check(
+		is_equal_approx(session.time_limit.remaining, left) and over.is_empty(),
+		"a day asleep does not move the map's clock (%.0f left, was %.0f)" % [session.time_limit.remaining, left]
+	)
+
+	server.sleep(false)
+	_check(
+		is_equal_approx(session.time_limit.remaining, session.time_limit.duration),
+		"and waking starts it again at the map's limit (%.0f of %.0f)" % [session.time_limit.remaining, session.time_limit.duration]
+	)
+	_check(session.time_limit.rtv_votes() == 0, "with nobody's rock-the-vote carried over")
+	server.queue_free()
 
 	for _i in range(int(session.time_limit.remaining) + 2):
 		session.advance(1.0)
