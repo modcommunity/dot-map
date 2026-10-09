@@ -152,6 +152,13 @@ const KIND_SANDBOX := &"sandbox"
 ## map `surf_mesa` a player types, delivered as `gamemann/surf_mesa` at that version.
 ## [param scene] is the scene to load inside the pack's mount, relative to it, and is the
 ## game's to know: a map pack's layout is a game convention, not dot-map's.
+##
+## [b]A relative scene is resolved onto the mount here[/b], `res://dot_cloud/<id>/<ver>/`
+## (dot-cloud's mount_prefix_for, written out because dot-map does not require dot-cloud).
+## It was stored as given, so `add_delivered(key, "map.tscn")` -- the form this comment and
+## the catalogue's example both showed -- made a map the loader looked for at
+## `res://map.tscn` and DotMapSyncClient refused as outside its pack. An absolute path is
+## kept as it is.
 static func from_content_key(key: String, scene: String = "") -> DotMapDef:
 	var at := key.rfind("@")
 	if at <= 0 or at == key.length() - 1:
@@ -169,6 +176,10 @@ static func from_content_key(key: String, scene: String = "") -> DotMapDef:
 	map.content_id = StringName(content)
 	map.content_version = content_version_part
 	map.scene_path = scene
+
+	if scene != "" and not scene.contains("://"):
+		map.scene_path = "res://dot_cloud/%s/%s/%s" % [content, content_version_part, scene.trim_prefix("/")]
+
 	return map
 
 

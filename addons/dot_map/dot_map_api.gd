@@ -8,5 +8,6 @@ extends RefCounted
 
 # 1: everything before this file existed (absent means 1).
 # 2: DotMapDef.from_content_key and DotMapCatalogue.add_delivered.
-const LEVEL := 2
+# 3: a relative scene given to either is resolved onto the pack's mount.
+const LEVEL := 3
 const OLDEST := 1

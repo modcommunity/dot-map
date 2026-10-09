@@ -214,7 +214,7 @@ func _test_catalogue() -> void:
 	var mesa := catalogue.get_map(&"surf_mesa")
 	_check(delivered.ok and mesa != null and String(mesa.content_id) == "gamemann/surf_mesa"
 			and mesa.content_version == "0.0.0-d99eeea9e490" and not mesa.is_local()
-			and mesa.scene_path == "map.tscn",
+			and mesa.scene_path == "res://dot_cloud/gamemann/surf_mesa/0.0.0-d99eeea9e490/map.tscn",
 		"a delivered map is added by its pack key, under the id a player types")
 	_check(not catalogue.add_delivered("gamemann/surf_mesa", "map.tscn").ok
 			and not catalogue.add_delivered("surf_mesa@1.0.0", "map.tscn").ok
