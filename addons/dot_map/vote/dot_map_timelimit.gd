@@ -80,10 +80,11 @@ var rtv_fraction: float = 0.6
 
 ## Fewest players before rocking the vote does anything at all.
 ##
-## On an empty or nearly-empty server one person is always a majority, so without
-## this a single player changes the map at will — which is fine, and is what
-## [member rtv_min_players] of 1 configures. The default of 2 makes it a vote.
-var rtv_min_players: int = 2
+## On an empty or nearly-empty server one person is always a majority, so a single
+## player changes the map at will — which is the default, because the alternative
+## strands somebody alone on a map they cannot leave. 2 or more makes it a vote even
+## on a quiet server.
+var rtv_min_players: int = 1
 
 ## Whether the map is running at all.
 var running: bool = false
