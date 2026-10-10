@@ -132,11 +132,11 @@ host.admit_peer(peer_id)                 # as each client joins; it is told the 
 await host.change_to(&"surf_kitsune")    # announce, wait for peers, swap, tell them to load
 ```
 
-On the client, `DotMapSyncClient.handle(payload)` takes whatever arrives. A host may say which map, never what the map is: a map the client does not have must be delivered content. A game whose maps are data read by one scene in its own build lists that scene in `trusted_template_scenes`, and the delivered requirement then applies to the data instead — see [`CLAUDE.md`](CLAUDE.md) for exactly what that does and does not let a host do.
+On the client, `DotMapSyncClient.handle(payload)` takes whatever arrives. A host may say which map, never what the map is: a map the client does not have must be delivered content. A game whose maps are data read by one scene in its own build lists that scene in `trusted_template_scenes`, and the delivered requirement then applies to the data instead — see [`docs/changing.md`](docs/changing.md#template-scenes) for exactly what that does and does not let a host do.
 
 ## Documentation
 
-[`CLAUDE.md`](CLAUDE.md) has the design reasoning: why the catalogue is not the rotation, the order a map change has to happen in and what breaks when it does not, and why the loader reaches dot-cloud through the registry rather than by name.
+[`docs/`](docs/README.md) has the design reasoning: why the catalogue is not the rotation, the order a map change has to happen in and what breaks when it does not, and why the loader reaches dot-cloud through the registry rather than by name.
 
 ## Validating
 
