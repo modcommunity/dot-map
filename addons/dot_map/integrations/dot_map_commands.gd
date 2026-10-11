@@ -105,7 +105,7 @@ var player_count_fn: Callable = Callable()
 ## [b]On is for a server whose maps arrive over the network.[/b] There, the catalogue
 ## holds what has been FETCHED rather than what exists — a freshly booted one holds the
 ## boot map and nothing else — and refusing an id because it is not in that set tells an
-## operator "no map called surf_kitsune" about a map sitting on the content origin,
+## operator "no map called surf_tidewater" about a map sitting on the content origin,
 ## which is the one answer that is certainly wrong. game-g2gfast's `change_fn` fetches
 ## the map before it loads it, so the fetch is what decides, and this gets out of its
 ## way.

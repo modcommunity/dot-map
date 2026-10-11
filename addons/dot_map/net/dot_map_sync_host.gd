@@ -37,7 +37,7 @@ extends Node
 ## add_child(host)
 ##
 ## host.admit_peer(peer_id)               # as clients join
-## await host.change_to(&"surf_kitsune")  # instead of session.change_to
+## await host.change_to(&"surf_tidewater")  # instead of session.change_to
 ## [/codeblock]
 ##
 ## [b]A peer that joins between changes is announced the current map and then told to

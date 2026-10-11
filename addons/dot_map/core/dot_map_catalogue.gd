@@ -130,7 +130,7 @@ func available(kind: StringName = &"", players: int = 0) -> Array[DotMapDef]:
 ##
 ## An exact id match is returned alone and first. [b]Not merely an ordering
 ## nicety.[/b] A player typing the full name of a map they want must get that map: on
-## a server with [code]surf_kitsune[/code] and [code]surf_kitsune2[/code], a substring
+## a server with [code]surf_tidewater[/code] and [code]surf_tidewater2[/code], a substring
 ## search returns both and whatever picks the first has chosen for them.
 func search(text: String, limit: int = 20) -> Array[DotMapDef]:
 	var needle := text.strip_edges().to_lower()

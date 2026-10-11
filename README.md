@@ -64,12 +64,12 @@ await session.change_to(&"surf_beginner")
       "zones": "res://maps/surf_beginner/zones.json"
     },
     {
-      "id": "surf_kitsune",
+      "id": "surf_tidewater",
       "version": "2.1.0",
       "kind": "surf",
       "tier": 6,
       "content": "surf_pack_2024",
-      "scene": "res://packs/surf_pack_2024/kitsune/map.tscn"
+      "scene": "res://packs/surf_pack_2024/tidewater/map.tscn"
     }
   ]
 }
@@ -91,9 +91,9 @@ session.rotation.mode = DotMapRotation.Mode.RANDOM
 session.rotation.cooldown = 5          # maps recently played that are off the menu
 
 var vote := DotMapVote.new()
-vote.nominate(&"surf_kitsune")
+vote.nominate(&"surf_tidewater")
 vote.begin(session.catalogue, session.rotation.pool(player_count), session.current)
-vote.cast_vote(player_id, &"surf_kitsune")
+vote.cast_vote(player_id, &"surf_tidewater")
 
 var winner := vote.finish()
 if winner != null:
@@ -129,7 +129,7 @@ host.send_fn = func(peer: int, payload: Dictionary) -> void: link.send_to(peer, 
 add_child(host)
 
 host.admit_peer(peer_id)                 # as each client joins; it is told the current map
-await host.change_to(&"surf_kitsune")    # announce, wait for peers, swap, tell them to load
+await host.change_to(&"surf_tidewater")    # announce, wait for peers, swap, tell them to load
 ```
 
 On the client, `DotMapSyncClient.handle(payload)` takes whatever arrives. A host may say which map, never what the map is: a map the client does not have must be delivered content. A game whose maps are data read by one scene in its own build lists that scene in `trusted_template_scenes`, and the delivered requirement then applies to the data instead — see [`docs/changing.md`](docs/changing.md#template-scenes) for exactly what that does and does not let a host do.

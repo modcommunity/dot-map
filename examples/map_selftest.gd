@@ -220,7 +220,7 @@ func _test_catalogue() -> void:
 			and not catalogue.add_delivered("surf_mesa@1.0.0", "map.tscn").ok
 			and DotMapDef.from_content_key("gamemann/@1.0.0") == null,
 		"and a key with no version, no owner or no name is refused")
-	_check(not catalogue.add_delivered("gamemann/surf_kitsune@1.0.0", "").ok,
+	_check(not catalogue.add_delivered("gamemann/surf_tidewater@1.0.0", "").ok,
 		"and a delivered map still needs a scene to load")
 	_done()
 
@@ -285,18 +285,18 @@ func _test_search() -> void:
 	_section("searching")
 
 	var catalogue := DotMapCatalogue.new()
-	catalogue.add(_map(&"surf_kitsune"))
-	catalogue.add(_map(&"surf_kitsune2"))
+	catalogue.add(_map(&"surf_tidewater"))
+	catalogue.add(_map(&"surf_tidewater2"))
 	catalogue.add(_map(&"bhop_arcane"))
 
-	var partial := catalogue.search("kitsune")
+	var partial := catalogue.search("tidewater")
 	_check(partial.size() == 2, "a substring finds both", "%d" % partial.size())
 
 	# The one that matters: typing the full name of a map must get that map.
-	var exact := catalogue.search("surf_kitsune")
+	var exact := catalogue.search("surf_tidewater")
 	_check(exact.size() == 1, "an exact id returns only that map")
 	_check(
-		exact.size() == 1 and exact[0].id == &"surf_kitsune",
+		exact.size() == 1 and exact[0].id == &"surf_tidewater",
 		"and it is the right one"
 	)
 
@@ -2210,10 +2210,10 @@ func _test_commands() -> void:
 	var fetch_cmd := fetching.commands["map"] as FakeCommand
 
 	var far_ctx := FakeCtx.new()
-	far_ctx.args = PackedStringArray(["surf_kitsune"])
+	far_ctx.args = PackedStringArray(["surf_tidewater"])
 	await fetch_cmd.handler.call(far_ctx)
 	_check(
-		fetched == [&"surf_kitsune"],
+		fetched == [&"surf_tidewater"],
 		"an id the catalogue has never held reaches the changer that could fetch it"
 	)
 	_check(
@@ -2237,7 +2237,7 @@ func _test_commands() -> void:
 	# catalogue does not hold IS a typo, and a round trip to find that out is waste.
 	fetched.clear()
 	var strict_fetch := FakeCtx.new()
-	strict_fetch.args = PackedStringArray(["surf_kitsune"])
+	strict_fetch.args = PackedStringArray(["surf_tidewater"])
 	await map_cmd.handler.call(strict_fetch)
 	_check(
 		strict_fetch.replies.size() == 1 and strict_fetch.replies[0].contains("No map called"),
