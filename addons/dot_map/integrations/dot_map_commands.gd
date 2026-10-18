@@ -324,7 +324,12 @@ func _cmd_maps(ctx: Object) -> void:
 	if ids.is_empty():
 		_reply(ctx, "No maps are available right now.")
 		return
-	_reply(ctx, "%d maps: %s" % [ids.size(), ", ".join(ids)])
+	# A subscription's maps carry their pack, so a player sees which are theirs.
+	var shown := PackedStringArray()
+	for id in ids:
+		var def := session.catalogue.get_map(StringName(id))
+		shown.append(id if def == null or def.pack_title == "" else "%s [%s]" % [id, def.pack_title])
+	_reply(ctx, "%d maps: %s" % [ids.size(), ", ".join(shown)])
 
 
 func _cmd_mapinfo(ctx: Object) -> void:

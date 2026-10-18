@@ -143,6 +143,15 @@ const KIND_SANDBOX := &"sandbox"
 ## Free-form, for whatever a game keeps about a map.
 @export var meta: Dictionary = {}
 
+## The title of the Workshop pack this map came from, or "" for a map the game or its server
+## names. Runtime only (never written to a catalogue file): a menu marks a map with it so a
+## player can tell their own subscription from the game's maps. [method label] is that mark.
+var pack_title: String = ""
+
+## The [DotContentEntry] key this map was built from, or "" for any other map. A catalogue
+## that follows a content index uses it to tell its own rows from the operator's.
+var entry_key: String = ""
+
 
 ## A map out of a delivered pack key, `<owner>/<map id>@<version>` -- what a game
 ## descriptor's `maps:` list holds once the server has installed the game (dot-server's
@@ -189,6 +198,14 @@ func effective_content_version() -> String:
 
 func name_or_id() -> String:
 	return display_name if display_name != "" else String(id)
+
+
+## What a menu, ballot or list prints: the name, marked with the pack when a subscription
+## provided it. A map the game names is printed bare.
+func label() -> String:
+	if pack_title == "":
+		return name_or_id()
+	return "%s [%s]" % [name_or_id(), pack_title]
 
 
 ## Whether the map ships inside the game's own build.

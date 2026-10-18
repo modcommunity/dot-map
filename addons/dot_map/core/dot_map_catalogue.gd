@@ -26,6 +26,10 @@ const FORMAT_VERSION := 1
 ## Fast lookup by id. Rebuilt on every mutation rather than maintained.
 var _by_id: Dictionary = {}
 
+var _index: DotContentIndex = null
+var _accepted_kinds: PackedStringArray = PackedStringArray()
+var _followed: Array[StringName] = []
+
 
 func add(map: DotMapDef) -> DotResult:
 	if map == null:
@@ -73,6 +77,109 @@ func add_delivered(key: String, scene: String) -> DotResult:
 		)
 
 	return add(map)
+
+
+## Follow a [DotContentIndex]: every map entry of a mounted pack, in the index's current
+## session, becomes a [DotMapDef] here, and the rows are rebuilt whenever a pack arrives or the
+## session changes. This is how a Workshop subscription reaches the map menu without the menu
+## naming a pack.
+##
+## [param accepted_kinds] is the game's [code]accepts.map_kinds[/code]. [b]Empty means none,
+## not any[/b]: the Workshop is opt-in per game, so a game that states no kinds must not have a
+## map pack it cannot load pushed into its menu. [code]"*"[/code] accepts every kind. An entry's
+## [code]map_kind[/code] is an open set; one this game does not accept is left in the index and
+## offered to nobody.
+##
+## A map the catalogue already holds under the same id (the game's own, an operator's) always
+## wins: a pack cannot replace a map by claiming its id. Nothing is ever removed from the index,
+## so a session change drops this catalogue's followed rows and re-adds the visible ones.
+func follow_content(index: DotContentIndex, accepted_kinds: PackedStringArray = PackedStringArray()) -> void:
+	unfollow_content()
+	if index == null:
+		return
+	_index = index
+	_accepted_kinds = accepted_kinds
+	index.pack_added.connect(_on_index_pack_added)
+	index.session_changed.connect(_on_index_session_changed)
+	refresh_content()
+
+
+## Stop following. The rows already added stay until the next refresh; call
+## [method refresh_content] afterwards to drop them.
+func unfollow_content() -> void:
+	if _index != null:
+		if _index.pack_added.is_connected(_on_index_pack_added):
+			_index.pack_added.disconnect(_on_index_pack_added)
+		if _index.session_changed.is_connected(_on_index_session_changed):
+			_index.session_changed.disconnect(_on_index_session_changed)
+	_index = null
+	_drop_followed()
+
+
+## Rebuild the followed rows from the index now. Needed after
+## [method DotContentIndex.tag_pack], which adds a session to a pack without announcing it.
+func refresh_content() -> void:
+	_drop_followed()
+	if _index == null:
+		return
+	for entry in _index.entries(&"map"):
+		var map := _def_from_entry(entry)
+		if map == null:
+			continue
+		if get_map(map.id) != null:
+			DotLog.debug(CHANNEL, "a pack map lost its id to an existing map", {
+				"id": String(map.id), "pack": entry.content_id
+			})
+			continue
+		if add(map).ok:
+			_followed.append(map.id)
+
+
+func _drop_followed() -> void:
+	for id in _followed:
+		var held := get_map(id)
+		# Only a row this follower made; an operator may have replaced the id since.
+		if held != null and held.entry_key != "":
+			remove(id)
+	_followed.clear()
+
+
+func _on_index_pack_added(_pack: Dictionary, _entries: Array[DotContentEntry]) -> void:
+	refresh_content()
+
+
+func _on_index_session_changed(_session: StringName) -> void:
+	refresh_content()
+
+
+func _def_from_entry(entry: DotContentEntry) -> DotMapDef:
+	var raw_kind := str(entry.raw.get("map_kind", ""))
+	if raw_kind == "" or not (_accepted_kinds.has("*") or _accepted_kinds.has(raw_kind)):
+		return null
+
+	var map := DotMapDef.new()
+	map.id = StringName(entry.id)
+	map.version = entry.version if DotSemVer.parse(entry.version).valid else "1.0.0"
+	map.display_name = entry.name
+	map.kind = StringName(raw_kind)
+	map.scene_path = entry.path("scene")
+	map.zones_path = entry.path("zones")
+	map.content_id = StringName(entry.content_id)
+	map.content_version = entry.version
+	map.tier = clampi(int(entry.raw.get("tier", 1)), 1, 10)
+	map.min_players = maxi(int(entry.raw.get("min_players", 0)), 0)
+	map.max_players = maxi(int(entry.raw.get("max_players", 0)), 0)
+	map.meta = entry.meta.duplicate(true)
+	map.pack_title = entry.pack_title if entry.pack_title != "" else entry.content_id
+	map.entry_key = entry.key
+
+	var valid := map.validate()
+	if not valid.ok:
+		DotLog.debug(CHANNEL, "a pack map was refused", {
+			"key": entry.key, "why": valid.error.message
+		})
+		return null
+	return map
 
 
 func remove(id: StringName) -> bool:

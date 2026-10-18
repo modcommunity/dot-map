@@ -208,6 +208,17 @@ func finish() -> DotMapDef:
 	return winner
 
 
+## The ballot as text, one label per option (a subscription's map carries its pack), in
+## option order. What a ballot screen prints; [method tally] stays keyed by id.
+func option_labels() -> PackedStringArray:
+	var out := PackedStringArray()
+	for map in options:
+		out.append(map.label())
+	if allow_extend:
+		out.append("Extend")
+	return out
+
+
 func voter_count() -> int:
 	return ballots.size()
 

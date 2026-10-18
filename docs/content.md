@@ -41,6 +41,10 @@ So `DotMapLoader.require_cloud` exists. A deployment that *knows* its maps are d
 
 **Zones come back from `load_zones` as text**, not as a parsed `DotTimerZoneSet`. dot-timer is optional; naming the class here would make every map load in a game without a timer fail to parse. The host, which has dot-timer, calls `DotTimerZoneSet.from_json`.
 
+## Workshop maps: following the content index
+
+`DotMapCatalogue.follow_content(index, accepted_kinds)` adds the `map` entries of mounted packs (dot-core's `DotContentIndex`, filled by dot-cloud on mount) as delivered `DotMapDef`s, and rebuilds them whenever a pack arrives or the index changes session, so a subscription appears in solo and an online session never sees it. `accepted_kinds` is the game's `accepts.map_kinds`; empty means none, because the Workshop is opt-in per game, and `"*"` means every kind. A map the catalogue already holds under an id always wins over a pack's. `tag_pack` is silent, so call `refresh_content()` after it. A pack map carries `pack_title`; `DotMapDef.label()`, `DotMapVote.option_labels()` and the `maps` command print it as `Name [Pack]`. The menu that draws the list belongs to the game or dot-menu and should print `label()`.
+
 ## Deliberately not here
 
 - **A map downloader UI.** `fetching` says a fetch has started; dot-cloud reports progress; drawing a bar is the game's.

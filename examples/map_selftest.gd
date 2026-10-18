@@ -13,13 +13,13 @@ extends Node
 ## running, rather than on nothing. It is the reason the load happens before the
 ## teardown, and it is the step that is easiest to "simplify" back out.
 
-const CHECKS := 232
+const CHECKS := 247
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 27
+const SECTIONS := 28
 
 var _passed := 0
 var _failed := 0
@@ -64,6 +64,7 @@ func _run() -> void:
 	await _test_sync_a_delivered_map()
 	await _test_sync_a_delivered_template_and_a_straggler()
 	await _test_commands()
+	_test_workshop_maps()
 
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
@@ -2001,6 +2002,115 @@ func _test_sync_a_delivered_template_and_a_straggler() -> void:
 ## must not be, and the point of `DotMapCommands` is that it names no dot-server class.
 ## A fake host is what proves the duck-typing rather than hiding it -- the games' own
 ## suites run the same commands on a real console.
+## A fixture pack as the index holds it after a mount: the dictionary DotCloudClient hands
+## add_pack. Two maps of two kinds, a weapon, and a map of a kind no game here accepts.
+func _workshop_pack(cid: String, version: String, session: StringName, map_id := "utopia_one") -> Dictionary:
+	return {
+		"content_id": cid, "version": version, "session": session, "source": "subscription",
+		"prefix": "res://dot_cloud/%s/%s" % [cid, version],
+		"provides": {
+			"schema": 1, "title": "Utopia surf maps", "kinds": ["map", "weapon"],
+			"entries": [
+				{"kind": "map", "id": map_id, "name": "Utopia One", "scene": "maps/one.tscn",
+					"map_kind": "surf", "tier": 4, "max_players": 12},
+				{"kind": "map", "id": "utopia_bhop", "name": "Utopia Hop", "scene": "maps/hop.tscn",
+					"map_kind": "bhop", "zones": "maps/hop_zones.json"},
+				{"kind": "map", "id": "utopia_odd", "name": "Odd", "scene": "maps/odd.tscn",
+					"map_kind": "teleporter_golf"},
+				{"kind": "weapon", "id": "utopia_gun", "name": "Gun", "def": "gun.tres"},
+			],
+		},
+	}
+
+
+func _test_workshop_maps() -> void:
+	print("")
+	_section("-- Workshop maps follow the content index")
+
+	var index := DotContentIndex.new()
+	index.set_session(DotContentIndex.SESSION_SOLO)
+	var catalogue := _catalogue(3)
+	catalogue.follow_content(index, PackedStringArray(["surf", "bhop"]))
+	_check(catalogue.size() == 3, "an empty index adds nothing")
+
+	index.add_pack(_workshop_pack("alice/utopia", "1.0.0", DotContentIndex.SESSION_SOLO))
+	var one := catalogue.get_map(&"utopia_one")
+	var hop := catalogue.get_map(&"utopia_bhop")
+	_check(one != null and hop != null and catalogue.size() == 5,
+		"a pack mounted afterwards adds its maps, only the kinds the game accepts",
+		"%d maps" % catalogue.size())
+	_check(catalogue.get_map(&"utopia_odd") == null and catalogue.get_map(&"utopia_gun") == null,
+		"a map kind the game does not accept, and a weapon, are offered to nobody")
+	_check(one.scene_path == "res://dot_cloud/alice/utopia/1.0.0/maps/one.tscn"
+			and hop.zones_path.ends_with("/maps/hop_zones.json")
+			and one.kind == &"surf" and one.tier == 4 and one.max_players == 12
+			and String(one.content_id) == "alice/utopia" and one.content_version == "1.0.0"
+			and not one.is_local(),
+		"the entry's paths resolve onto the mount and its fields carry over")
+	_check(one.pack_title == "Utopia surf maps" and one.label() == "Utopia One [Utopia surf maps]"
+			and catalogue.get_map(&"surf_0").label() == "Surf 0",
+		"a pack map is marked with its pack and the game's own maps are not")
+
+	# The places a player sees the list.
+	var vote := DotMapVote.new()
+	vote.max_options = 5
+	vote.begin(catalogue, [one, hop])
+	_check("Utopia One [Utopia surf maps]" in vote.option_labels(),
+		"the vote ballot shows the pack name")
+	var session := DotMapSession.new()
+	session.catalogue = catalogue
+	session.initial_map = &""
+	add_child(session)
+	var host := FakeHost.new()
+	DotMapCommands.install(host, session)
+	var ctx := FakeCtx.new()
+	(host.commands["maps"] as FakeCommand).handler.call(ctx)
+	_check(ctx.replies.size() == 1 and ctx.replies[0].contains("utopia_one [Utopia surf maps]")
+			and ctx.replies[0].contains("surf_0,"),
+		"/maps lists them marked, the game's own bare")
+	session.queue_free()
+
+	# A pack cannot take a map's id from the game.
+	index.add_pack(_workshop_pack("bob/clash", "1.0.0", DotContentIndex.SESSION_SOLO, "surf_1"))
+	_check(catalogue.get_map(&"surf_1").pack_title == "",
+		"a pack map under an id the game already holds does not replace it")
+
+	# Online never sees a solo entry; solo again brings them back.
+	index.set_session(DotContentIndex.SESSION_ONLINE)
+	_check(catalogue.get_map(&"utopia_one") == null and catalogue.size() == 3,
+		"in an online session no solo entry appears")
+	index.set_session(DotContentIndex.SESSION_SOLO)
+	_check(catalogue.get_map(&"utopia_one") != null,
+		"and solo shows them again, since nothing was ever removed")
+
+	# A pack the server also requires is tagged online; tag_pack is silent, so refresh.
+	index.tag_pack(&"alice/utopia", "1.0.0", DotContentIndex.SESSION_ONLINE)
+	index.set_session(DotContentIndex.SESSION_ONLINE)
+	catalogue.refresh_content()
+	_check(catalogue.get_map(&"utopia_one") != null, "a pack the server also requires shows online")
+	index.set_session(DotContentIndex.SESSION_SOLO)
+
+	# Accepts: none by default, "*" for all.
+	var none := _catalogue(1)
+	none.follow_content(index)
+	_check(none.size() == 1, "a game that states no map kinds takes no subscribed maps")
+	var all := _catalogue(1)
+	all.follow_content(index, PackedStringArray(["*"]))
+	_check(all.get_map(&"utopia_odd") != null, "and a star takes every kind")
+
+	# A map the operator replaced under a followed id is not removed with the followers.
+	catalogue.add(_map(&"utopia_one"))
+	catalogue.refresh_content()
+	_check(catalogue.get_map(&"utopia_one") != null and catalogue.get_map(&"utopia_one").pack_title == "",
+		"a row the operator replaced is theirs and survives a refresh")
+
+	catalogue.unfollow_content()
+	index.add_pack(_workshop_pack("carol/late", "1.0.0", DotContentIndex.SESSION_SOLO, "late_map"))
+	_check(catalogue.get_map(&"late_map") == null and catalogue.get_map(&"utopia_bhop") == null,
+		"an unfollowed catalogue drops the pack maps and hears no more")
+	_done()
+
+
 class FakeCommand:
 	extends RefCounted
 
