@@ -18,3 +18,6 @@ Thumbs.db
 # Editors
 .vscode/
 /addons/dot_cloud
+
+# Python
+__pycache__/
