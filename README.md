@@ -22,6 +22,12 @@ The obvious way to ship a hundred surf maps is a hundred Godot projects. At map 
 
 A map here is an id, a version, a scene path and optionally a content pack. The server switches between them; the client fetches the one it needs; the leaderboard spans all of them.
 
+## Surface materials
+
+`DotMapSurfaces` gives a map generator a photo material per surface kind (`&"brick"`, `&"asphalt"`, `&"tile_dark"`...), mapped in world space so code-built boxes need no UVs, and drawn the same in Forward+ and the browser's Compatibility renderer. Details in [docs/surfaces.md](docs/surfaces.md).
+
+Textures: fifteen photographic PBR materials from [ambientCG](https://ambientcg.com) (Lennart Demes and contributors), **CC0 1.0**, one asset per kind; asset ids, pages and licence in [addons/dot_map/surfaces/CREDITS.md](addons/dot_map/surfaces/CREDITS.md).
+
 ## Installing
 
 Copy `addons/dot_map/` and [`dot-core`](https://github.com/modcommunity/dot-core)'s `addons/dot_core/` into your project and enable dot-map in *Project → Project Settings → Plugins*.

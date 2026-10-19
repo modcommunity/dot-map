@@ -8,3 +8,4 @@ The reasoning behind maps as content, one subject per file. [CLAUDE.md](../CLAUD
 | [changing.md](changing.md) | The order of a change, the five-message sync protocol and its rules, game vs map changes, the commands, what a host may name, template scenes, transport |
 | [rotation.md](rotation.md) | The rotation's cooldown and seed, `DotMapVote`, `DotMapTimeLimit`, `map_over`, hibernation |
 | [history.md](history.md) | The bugs, and how each looked |
+| [surfaces.md](surfaces.md) | `DotMapSurfaces`: a material per surface kind, world-space triplanar, loaded by path for packs, sizes and credits |
