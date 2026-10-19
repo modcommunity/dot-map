@@ -77,6 +77,11 @@ var root: String = DEFAULT_ROOT
 ## ([code]func(path: String) -> String[/code]).
 var path_fn: Callable = Callable()
 
+## Scales every kind's metallic value. A game that lays baked light over its map sets this to 0
+## on the instance it bakes with: a lightmap holds diffuse light only, and a metallic surface has
+## almost no diffuse, so a baked corrugated roof drew nearly black.
+var metallic_scale: float = 1.0
+
 ## Triplanar blend sharpness: higher is a harder seam on a bevel, lower a smeared one.
 var sharpness: float = 4.0
 
@@ -138,7 +143,7 @@ func try_material(kind: StringName, tint: Color = Color.WHITE) -> DotResult:
 	m.roughness_texture = rough
 	m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
 	m.roughness = float(spec["rough"])
-	m.metallic = float(spec["metal"])
+	m.metallic = float(spec["metal"]) * metallic_scale
 	m.uv1_triplanar = true
 	m.uv1_world_triplanar = true
 	m.uv1_triplanar_sharpness = sharpness
