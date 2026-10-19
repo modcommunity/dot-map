@@ -62,8 +62,10 @@ for k in "${KINDS[@]}"; do
             mkdir -p "$OUT/$k"
             cmp -s "$from" "$to" 2>/dev/null || cp "$from" "$to"
             if [ ! -f "$to.import" ]; then
-                # Source path rewritten; Godot fills in the rest (uid, dest hash) on its first import.
-                sed -e "s#res://addons/dot_map/surfaces/#res://$DEST/#g" "$from.import" > "$to.import"
+                # Source path rewritten and the uid and dest lines dropped: a copied uid would be the
+                # addon's own, and a game that links dot-map then has two resources under one uid.
+                # Godot writes a fresh uid and dest hash on its first import.
+                sed -e "s#res://addons/dot_map/surfaces/#res://$DEST/#g" -e '/^uid=/d' -e '/^path=/d' -e '/^dest_files=/d' "$from.import" > "$to.import"
             fi
         fi
     done
