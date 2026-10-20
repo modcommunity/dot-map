@@ -9,3 +9,4 @@ The reasoning behind maps as content, one subject per file. [CLAUDE.md](../CLAUD
 | [rotation.md](rotation.md) | The rotation's cooldown and seed, `DotMapVote`, `DotMapTimeLimit`, `map_over`, hibernation |
 | [history.md](history.md) | The bugs, and how each looked |
 | [surfaces.md](surfaces.md) | `DotMapSurfaces`: a material per surface kind, world-space triplanar, loaded by path for packs, sizes and credits |
+| [brushes.md](brushes.md) | `DotMapBrush`: map-building solids as data, convex collision, UVs in metres |

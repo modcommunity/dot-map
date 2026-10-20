@@ -24,17 +24,19 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | `addons/dot_map/runtime/` | `DotMapLoader` (def to `PackedScene`, fetching first), `DotMapRotation`, `DotMapSession` (the node a game adds) |
 | `addons/dot_map/net/` | `DotMapMessage` (the five messages), `DotMapSyncHost` (announce, wait, swap; read its class doc), `DotMapSyncClient` (fetch, ready, load; owns the trust rules) |
 | `addons/dot_map/surfaces/` | `DotMapSurfaces`: a surface kind (`&"brick"`) to a world-space triplanar material; 15 CC0 photo kinds, credits beside them. [surfaces](docs/surfaces.md) |
+| `addons/dot_map/brushes/` | `DotMapBrush`: box, wedge, stairs, cylinder, cone, spike, arch, quarter_pipe, slab_holes from a dictionary; convex collision, UVs in metres, a material slot. [brushes](docs/brushes.md) |
 | `addons/dot_map/vote/` | `DotMapVote`, `DotMapTimeLimit` |
 | `addons/dot_map/integrations/` | `DotMapCommands`: `map`, `maps`, `mapinfo` on any host |
 | `tools/sync-surfaces.sh` | copies the kinds a game uses into the game (`--check` for CI); the addon's own textures never ship to players |
 | `examples/surfaces_demo.tscn` | the surfaces suite (headless) and, with `-- --shot=<prefix>`, three frames of every kind on boxes |
+| `examples/brushes_demo.tscn` | the brushes suite (62 checks, headless) and, under `xvfb-run` with `-- --shot=<prefix>`, three frames |
 | `examples/map_selftest.tscn` | the suite; includes a real signed pack fetched by a peer |
 | `tools/bsp/` | the family's one converter for community VBSP maps: reader, brush-to-box cutting, the intermediate JSON every game's adapter reads, `list` for a conversion queue. Python, outside the addon so it never ships. [tools/bsp/README.md](tools/bsp/README.md) |
 
 ## Running and testing
 
 - `tools/bsp/`: `python3 -I tools/bsp/tests/test_dotbsp.py`, then re-convert a migrated game's maps (zombie-zone-maps, game-g2gfast) and compare; a fix there reaches every converting game.
-- The family's two steps ([game-dev/CLAUDE.md](../../CLAUDE.md#validating-anything)), then `godot --headless --path . res://examples/map_selftest.tscn`. Run the check-only pass first: a missing `await` is a parse error and the scene then hangs.
+- The family's two steps ([game-dev/CLAUDE.md](../../CLAUDE.md#validating-anything)), then `godot --headless --path . res://examples/map_selftest.tscn` and `res://examples/brushes_demo.tscn`. Run the check-only pass first: a missing `await` is a parse error and the scene then hangs.
 - A change to the sync protocol is not done until game-g2gfast's `headless_net` passes; the protocol's first real transport found five bugs here. [history](docs/history.md#what-the-first-transport-found)
 - A change to the cloud calls (`ensure`, `is_mounted`) must keep `_test_sync_a_delivered_map` meeting a real dot-cloud client: a by-name interface is one nobody else checks.
 
