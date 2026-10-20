@@ -13,7 +13,7 @@ extends Node
 ## running, rather than on nothing. It is the reason the load happens before the
 ## teardown, and it is the step that is easiest to "simplify" back out.
 
-const CHECKS := 297
+const CHECKS := 298
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -2645,6 +2645,10 @@ func _test_rotation_paths() -> void:
 	rf_cat3.refresh_content()
 	_check(rf_cat3.get_map(&"utopia_bhop").in_rotation and rf_cat3.get_map(&"m_a").in_rotation,
 		"no file still means every map after a refresh")
+
+	# A leading "!" or "/" on a command name is the chat prefix, not part of the name.
+	var bang := _file([{"defaults": {"commands": {"names": {"maps": ["!ml", "/listmaps", "Bad-Name", "!"]}}}}]).commands()
+	_check(Array(bang["names"]["maps"]) == ["ml", "listmaps"], "a leading ! or / is stripped from a command name, bad names dropped (%s)" % [bang["names"].get("maps")])
 
 	# find() looks in the host's config directory first, and says nothing is there otherwise.
 	var dir := OS.get_temp_dir().path_join("dot_map_find_%d" % Time.get_ticks_usec())
