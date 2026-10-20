@@ -13,5 +13,7 @@ extends RefCounted
 # 5: DotMapRotationFile (cfg/maps.yml: rotations, wildcards, `commands:`), DotMapDef.in_rotation,
 #    DotMapRotation.reset_cursor, DotMapCommands.spec_fn / chat_prefix / skipped / typed (names
 #    that take aliases). Needs dot-core API level 12 (DotYaml, DotRotationSpec, DotCommandNames).
-const LEVEL := 5
+# 6: DotMapCatalogue.content_refreshed; DotMapRotationFile re-applies its marks on it, so a
+#    content refresh no longer puts unlisted pack maps back in rotation.
+const LEVEL := 6
 const OLDEST := 1

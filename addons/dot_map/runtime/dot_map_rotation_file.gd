@@ -59,6 +59,11 @@ var _last_name: String = ""
 var fallback_in: Callable = Callable()
 var _fell_back: bool = false
 
+## The rotation [method apply] last marked, held weakly: the catalogue's signal holds this file,
+## and a strong reference back would be a cycle nothing frees.
+var _bound: WeakRef = null
+var _bound_catalogue: DotMapCatalogue = null
+
 
 ## Where a path given as [param stem] (with or without extension) is: in [param config_dir]
 ## first when one is given (the directory the host was started with, a plain filesystem path),
@@ -192,6 +197,7 @@ func apply(rotation: DotMapRotation, name: String = "") -> DotResult:
 		if not _warned.has(key):
 			_warned[key] = true
 			DotLog.warn(CHANNEL, "the map rotation is empty; every installed map plays", {"rotation": use})
+	_bind(rotation)
 	var order: Array[StringName] = []
 	for id in ids:
 		order.append(StringName(id))
@@ -210,6 +216,29 @@ func apply(rotation: DotMapRotation, name: String = "") -> DotResult:
 	_last = ids
 	_last_name = use
 	return DotResult.success(ids)
+
+
+## Follows the catalogue of the rotation last applied, so a content refresh (a pack installed,
+## a session turned) re-applies the marks to the fresh defs it just made. Applying to another
+## rotation moves the connection; the old catalogue is no longer followed.
+func _bind(rotation: DotMapRotation) -> void:
+	_bound = weakref(rotation)
+	var catalogue := rotation.catalogue
+	if catalogue == _bound_catalogue:
+		return
+	if _bound_catalogue != null and _bound_catalogue.content_refreshed.is_connected(_on_content_refreshed):
+		_bound_catalogue.content_refreshed.disconnect(_on_content_refreshed)
+	_bound_catalogue = catalogue
+	catalogue.content_refreshed.connect(_on_content_refreshed)
+
+
+func _on_content_refreshed() -> void:
+	var rotation := _bound.get_ref() as DotMapRotation if _bound != null else null
+	if rotation == null or rotation.catalogue != _bound_catalogue:
+		return
+	# The name last applied, so a game that applied a named rotation keeps it; a live switch
+	# has already moved it through [member requested].
+	apply(rotation, _last_name)
 
 
 ## Whether the last [method apply] found its rotation empty and so left every map in.

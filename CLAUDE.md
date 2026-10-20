@@ -64,7 +64,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 **Rotation and time**
 
 - The cooldown is clamped to half the pool when choosing; the random mode's seed advances deterministically; vote ties are deterministic. [rotation](docs/rotation.md)
-- `maps.yml` decides rotation through `DotMapDef.in_rotation` (runtime, never saved), which `available_for` reads; `enabled` stays the catalogue's own switch. Every offer path (pool, `set_next`, ballot, nominations) must read it, never `enabled` alone. The matcher is dot-core's `DotRotationSpec`, shared with the server's games.yml. [rotation](docs/rotation.md#the-rotation-file)
+- `maps.yml` decides rotation through `DotMapDef.in_rotation` (runtime, never saved), which `available_for` reads; `enabled` stays the catalogue's own switch. Every offer path (pool, `set_next`, ballot, nominations) must read it, never `enabled` alone. `refresh_content()` makes fresh defs (in_rotation true) and emits `content_refreshed`; the file re-applies on it (API level 6), so do not add a second place that re-marks. The matcher is dot-core's `DotRotationSpec`, shared with the server's games.yml. [rotation](docs/rotation.md#the-rotation-file)
 - Time limits run on simulated seconds; expiry is latched; extends are bounded and clear rtv; rtv is idempotent and leaves with the player. [rotation](docs/rotation.md#the-map-has-to-end-on-its-own)
 - The session emits `map_over` and never changes the map itself. [rotation](docs/rotation.md#the-map-has-to-end-on-its-own)
 

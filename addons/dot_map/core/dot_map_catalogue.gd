@@ -18,6 +18,12 @@ const CHANNEL := "map.catalogue"
 
 const FORMAT_VERSION := 1
 
+## Emitted at the end of [method refresh_content], after the followed pack maps were dropped and
+## re-added as fresh defs (whose [member DotMapDef.in_rotation] is true). Whatever marks maps
+## in or out of play ([DotMapRotationFile]) re-applies itself here, so a pack installed or a
+## session turned after boot does not put unlisted maps back into the draw.
+signal content_refreshed
+
 @export var maps: Array[DotMapDef] = []
 
 ## Free-form: who maintains it, where it came from.
@@ -133,6 +139,7 @@ func refresh_content() -> void:
 			continue
 		if add(map).ok:
 			_followed.append(map.id)
+	content_refreshed.emit()
 
 
 func _drop_followed() -> void:

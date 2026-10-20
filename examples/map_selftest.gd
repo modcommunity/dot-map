@@ -13,7 +13,7 @@ extends Node
 ## running, rather than on nothing. It is the reason the load happens before the
 ## teardown, and it is the step that is easiest to "simplify" back out.
 
-const CHECKS := 291
+const CHECKS := 297
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -2598,6 +2598,53 @@ func _test_rotation_paths() -> void:
 	empty.apply(fb)
 	_check(fb_cat.get_map(&"m_a").in_rotation and not fb_cat.get_map(&"m_b").in_rotation and empty.fell_back(),
 		"an empty rotation applies the game's fallback rule instead of admitting every map")
+
+	# A content refresh makes fresh defs (in_rotation true); the file's marks must follow them.
+	var rf_index := DotContentIndex.new()
+	rf_index.set_session(DotContentIndex.SESSION_SOLO)
+	var rf_cat := _named_catalogue(["m_a", "m_b"])
+	rf_cat.follow_content(rf_index, PackedStringArray(["surf", "bhop"]))
+	var rf_rot := DotMapRotation.of(rf_cat)
+	var rf_file := _file([{"defaults": {"rotation": "main", "rotations": {
+		"main": {"maps": ["m_a", "utopia_one"]}, "alt": {"maps": ["m_b"]}}}}])
+	rf_file.apply(rf_rot)
+	rf_index.add_pack(_workshop_pack("alice/utopia", "1.0.0", DotContentIndex.SESSION_SOLO))
+	_check(rf_cat.get_map(&"utopia_one").in_rotation and not rf_cat.get_map(&"utopia_bhop").in_rotation
+		and not rf_cat.get_map(&"m_b").in_rotation,
+		"a pack added after the rotation was applied is in rotation only where the file lists it")
+	rf_index.set_session(DotContentIndex.SESSION_ONLINE)
+	rf_index.set_session(DotContentIndex.SESSION_SOLO)
+	_check(not rf_cat.get_map(&"utopia_bhop").in_rotation and rf_cat.get_map(&"utopia_one").in_rotation,
+		"and a session change keeps the marks")
+	rf_file.switch(rf_rot, "alt")
+	rf_cat.refresh_content()
+	_check(rf_cat.get_map(&"m_b").in_rotation and not rf_cat.get_map(&"utopia_one").in_rotation,
+		"a switched rotation still wins after a refresh")
+	var rf_other := _named_catalogue(["o_a"])
+	var rf_other_rot := DotMapRotation.of(rf_other)
+	rf_file.apply(rf_other_rot)
+	rf_cat.refresh_content()
+	_check(rf_cat.get_map(&"utopia_bhop").in_rotation,
+		"a file applied to another catalogue stops marking the first")
+	rf_file.apply(rf_rot)
+	# fallback_in applies to maps a refresh adds when the rotation is empty.
+	var rf_empty := _file([{"defaults": {"maps": ["nothing_*"]}}])
+	rf_empty.fallback_in = func(m: DotMapDef) -> bool: return m.id != &"utopia_bhop"
+	var rf_cat2 := _named_catalogue(["m_a"])
+	rf_cat2.follow_content(rf_index, PackedStringArray(["surf", "bhop"]))
+	var rf_rot2 := DotMapRotation.of(rf_cat2)
+	rf_empty.apply(rf_rot2)
+	rf_cat2.refresh_content()
+	_check(rf_cat2.get_map(&"utopia_one").in_rotation and not rf_cat2.get_map(&"utopia_bhop").in_rotation,
+		"fallback_in decides pack maps a refresh adds under an empty rotation")
+	var rf_none := _file([])
+	var rf_cat3 := _named_catalogue(["m_a"])
+	rf_cat3.follow_content(rf_index, PackedStringArray(["surf", "bhop"]))
+	var rf_rot3 := DotMapRotation.of(rf_cat3)
+	rf_none.apply(rf_rot3)
+	rf_cat3.refresh_content()
+	_check(rf_cat3.get_map(&"utopia_bhop").in_rotation and rf_cat3.get_map(&"m_a").in_rotation,
+		"no file still means every map after a refresh")
 
 	# find() looks in the host's config directory first, and says nothing is there otherwise.
 	var dir := OS.get_temp_dir().path_join("dot_map_find_%d" % Time.get_ticks_usec())
