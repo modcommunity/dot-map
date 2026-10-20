@@ -51,23 +51,50 @@ var warnings: PackedStringArray = PackedStringArray()
 var _warned: Dictionary = {}
 var _last: PackedStringArray = PackedStringArray()
 var _last_name: String = ""
+
+## `(DotMapDef) -> bool`, asked per map when a rotation is empty and so nothing is listed. The
+## default is every map; a game that keeps some out when there is no file gives the same rule
+## here, so an empty rotation and an absent file mean the same thing. Applies on every
+## [method apply], including the re-apply after a map change and [method switch].
+var fallback_in: Callable = Callable()
 var _fell_back: bool = false
 
 
-## Where a path given as [param stem] (with or without extension) is: beside the project,
-## in `user://`, beside the executable. "" when there is none.
-static func find(stem: String) -> String:
+## Where a path given as [param stem] (with or without extension) is: in [param config_dir]
+## first when one is given (the directory the host was started with, a plain filesystem path),
+## then beside the project, in `user://`, beside the executable. "" when there is none.
+##
+## [param config_dir] exists because a server started with `--config /etc/x` keeps its files
+## there, and a lookup that only tried the project's own `cfg/` skipped them without a word.
+static func find(stem: String, config_dir: String = "") -> String:
 	if stem.strip_edges().is_empty():
 		return ""
+	var names := PackedStringArray([stem]) if stem.get_extension() != "" \
+		else PackedStringArray(EXTENSIONS.map(func(e: String) -> String: return "%s.%s" % [stem, e]))
+	if config_dir != "":
+		for n in names:
+			var beside := config_dir.path_join(n.get_file())
+			if FileAccess.file_exists(beside):
+				return beside
 	var bases := PackedStringArray([""])
 	if stem.is_relative_path() and not stem.begins_with("res://") and not stem.begins_with("user://"):
 		bases = PackedStringArray(["res://", "user://", OS.get_executable_path().get_base_dir() + "/"])
-	var names := PackedStringArray([stem]) if stem.get_extension() != "" \
-		else PackedStringArray(EXTENSIONS.map(func(e: String) -> String: return "%s.%s" % [stem, e]))
 	for base in bases:
 		for n in names:
 			if FileAccess.file_exists(base + n):
 				return base + n
+	return ""
+
+
+## The `--config DIR` (or `--config=DIR`) the process was started with, or "". A game cannot
+## ask the host for it, and the flag is the one thing the host and the game both see.
+static func config_dir_arg() -> String:
+	var args := OS.get_cmdline_user_args() + OS.get_cmdline_args()
+	for i in args.size():
+		if args[i] == "--config" and i + 1 < args.size():
+			return args[i + 1]
+		if args[i].begins_with("--config="):
+			return args[i].substr(9)
 	return ""
 
 
@@ -169,7 +196,10 @@ func apply(rotation: DotMapRotation, name: String = "") -> DotResult:
 	for id in ids:
 		order.append(StringName(id))
 	for m in rotation.catalogue.maps:
-		m.in_rotation = ids.is_empty() or ids.has(String(m.id))
+		if ids.is_empty():
+			m.in_rotation = bool(fallback_in.call(m)) if fallback_in.is_valid() else true
+		else:
+			m.in_rotation = ids.has(String(m.id))
 	rotation.order = order
 	if has_rotations() and use != "" and (spec["rotations"] as Dictionary).has(use):
 		rotation.mode = DotMapRotation.Mode.SEQUENTIAL if DotRotationSpec.mode_of(spec, use) == "cycle" \
@@ -180,6 +210,13 @@ func apply(rotation: DotMapRotation, name: String = "") -> DotResult:
 	_last = ids
 	_last_name = use
 	return DotResult.success(ids)
+
+
+## Whether the last [method apply] found its rotation empty and so left every map in.
+## A game that keeps some maps out by default (a kind that is another mode's) puts its own
+## rule back when this is true.
+func fell_back() -> bool:
+	return _fell_back
 
 
 ## Switches the live rotation (`sv_map_rotation <name>`). An unknown name changes nothing.

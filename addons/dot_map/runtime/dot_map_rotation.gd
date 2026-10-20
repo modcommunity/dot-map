@@ -140,7 +140,14 @@ func choose(players: int = 0) -> DotMapDef:
 		Mode.SEQUENTIAL:
 			# The whole pool, not the cooldown's remainder: a fixed cycle is the written
 			# order, and skipping the maps just played would turn a three-map cycle into two.
-			return candidates[_cursor % candidates.size()]
+			# But never the map just played: a forced or voted map moves the cursor under the
+			# cycle, and the cycle can land on it again. Walk on to the next one instead.
+			var n := candidates.size()
+			for i in n:
+				var pick := candidates[(_cursor + i) % n]
+				if history.is_empty() or pick.id != history[0] or n == 1:
+					return pick
+			return candidates[_cursor % n]
 		Mode.MANUAL:
 			return null
 		_:

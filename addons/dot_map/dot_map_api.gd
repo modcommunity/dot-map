@@ -10,5 +10,8 @@ extends RefCounted
 # 2: DotMapDef.from_content_key and DotMapCatalogue.add_delivered.
 # 3: a relative scene given to either is resolved onto the pack's mount.
 # 4: DotMapSurfaces, the surface-kind material library (and its textures in surfaces/).
-const LEVEL := 4
+# 5: DotMapRotationFile (cfg/maps.yml: rotations, wildcards, `commands:`), DotMapDef.in_rotation,
+#    DotMapRotation.reset_cursor, DotMapCommands.spec_fn / chat_prefix / skipped / typed (names
+#    that take aliases). Needs dot-core API level 12 (DotYaml, DotRotationSpec, DotCommandNames).
+const LEVEL := 5
 const OLDEST := 1

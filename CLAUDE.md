@@ -4,7 +4,7 @@ Maps as content rather than as builds: one game, many maps, switched under live 
 
 Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is specific to maps. The reasoning is in [docs/](docs/README.md).
 
-**Only dot-core is a dependency.** dot-cloud, dot-timer, dot-server and dot-net are all optional and none is named anywhere in the source: dot-cloud is found in `DotRegistry`, zones come back as text, commands are installed duck-typed, and messages go out through a `send_fn`. [content](docs/content.md#reaching-dot-cloud-without-naming-it)
+**Only dot-core is a dependency, at API level 12 or later (`DotYaml`, `DotRotationSpec`, `DotCommandNames`).** dot-cloud, dot-timer, dot-server and dot-net are all optional and none is named anywhere in the source: dot-cloud is found in `DotRegistry`, zones come back as text, commands are installed duck-typed, and messages go out through a `send_fn`. [content](docs/content.md#reaching-dot-cloud-without-naming-it)
 
 ## Read before
 

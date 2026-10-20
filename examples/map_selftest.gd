@@ -13,7 +13,7 @@ extends Node
 ## running, rather than on nothing. It is the reason the load happens before the
 ## teardown, and it is the step that is easiest to "simplify" back out.
 
-const CHECKS := 282
+const CHECKS := 291
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -2168,6 +2168,18 @@ class FakeHost:
 		return c
 
 
+## What a DotModule looks like to a commands class: add_command, a console, and no has_name.
+class ModuleHost:
+	extends RefCounted
+
+	var console := FakeHost.new()
+
+	func add_command(
+		name: String, handler: Callable, help: String, permission: String
+	) -> FakeCommand:
+		return console.add_command(name, handler, help, permission)
+
+
 class FakeCtx:
 	extends RefCounted
 
@@ -2389,6 +2401,11 @@ func _test_rotation_file() -> void:
 
 	# The reader is dot-core's: the file's own text, not a hand-built tree.
 	var parsed := DotYaml.parse("defaults:\n  maps: [surf_*]\n")
+	var comment := DotYaml.parse("name: Bob's map # c\ntabbed: x\t# t\nquoted: \"a # b\" # c\nmaps:\n- a\n- b\nafter: 1\n")
+	var tree: Dictionary = comment.value if comment.ok else {}
+	_check(comment.ok and tree.get("name") == "Bob's map" and tree.get("tabbed") == "x" and tree.get("quoted") == "a # b",
+		"an apostrophe inside a plain scalar opens no quote, a tab before # starts a comment, a quoted # is data (%s)" % [tree])
+	_check(tree.get("maps") == ["a", "b"] and tree.get("after") == 1, "a list at the key's own indent is that key's list (%s)" % [tree])
 	var plain := _file([parsed.value])
 	plain.apply(rotation)
 	_check(plain.active_name() == "main" and rotation.order.size() == 3 and not cat.get_map(&"bhop_x").in_rotation,
@@ -2488,6 +2505,16 @@ func _test_command_names() -> void:
 	var dup := FakeHost.new()
 	twice.bind(dup)
 	_check(twice.skipped.has("mapinfo") and dup.commands["mapinfo"].handler == twice._cmd_maps, "two roles on one name: the first keeps it")
+
+	# A DotModule host has no has_name of its own; the check must go through its console.
+	var mod := ModuleHost.new()
+	mod.console.taken = ["status"]
+	var grab := DotMapCommands.new()
+	grab.session = session
+	grab.names = {"maps": ["status", "ml"]}
+	grab.bind(mod)
+	_check(not mod.console.commands.has("status") and mod.console.commands.has("ml"), "a host without has_name is checked through its console: the server's own name is not taken")
+	_check(grab.skipped.has("status"), "and the skip is recorded for it")
 	session.free()
 	_done()
 
@@ -2550,6 +2577,38 @@ func _test_rotation_paths() -> void:
 	commands._cmd_rotations(ctx)
 	_check(lines.size() == 1 and str(lines[0]).contains("main"), "maps_rotations lists the rotations")
 	host.free()
+
+	# A sequential cycle never plays the map it just played, even when a forced map moved it.
+	var seq_cat := _named_catalogue(["a", "b", "c", "d"])
+	var seq := DotMapRotation.of(seq_cat)
+	seq.mode = DotMapRotation.Mode.SEQUENTIAL
+	seq.cooldown = 0
+	seq.note_played(&"a")
+	_check(seq.choose().id == &"b", "the cycle continues with the next map")
+	seq.set_next(&"c")
+	seq.note_played(seq.choose().id)
+	_check(seq.choose().id != &"c", "after a forced c at cursor 2 the cycle does not offer c again (%s)" % seq.choose().id)
+
+	# An empty rotation uses the game's own fallback rule, on every re-apply.
+	var fb_cat := _named_catalogue(["m_a", "m_b"])
+	fb_cat.get_map(&"m_b").kind = DotMapDef.KIND_ARENA
+	var fb := DotMapRotation.of(fb_cat)
+	var empty := _file([{"defaults": {"maps": ["nothing_*"]}}])
+	empty.fallback_in = func(m: DotMapDef) -> bool: return m.kind != DotMapDef.KIND_ARENA
+	empty.apply(fb)
+	_check(fb_cat.get_map(&"m_a").in_rotation and not fb_cat.get_map(&"m_b").in_rotation and empty.fell_back(),
+		"an empty rotation applies the game's fallback rule instead of admitting every map")
+
+	# find() looks in the host's config directory first, and says nothing is there otherwise.
+	var dir := OS.get_temp_dir().path_join("dot_map_find_%d" % Time.get_ticks_usec())
+	DirAccess.make_dir_recursive_absolute(dir)
+	var f := FileAccess.open(dir.path_join("maps.yml"), FileAccess.WRITE)
+	f.store_string("maps: [a]\n")
+	f.close()
+	_check(DotMapRotationFile.find("cfg/maps.yml", dir) == dir.path_join("maps.yml"), "find() prefers the --config directory")
+	_check(DotMapRotationFile.find("cfg/nothing_here.yml", dir) == "", "and returns nothing for a file no directory has")
+	DirAccess.remove_absolute(dir.path_join("maps.yml"))
+	DirAccess.remove_absolute(dir)
 	session.free()
 	_done()
 
