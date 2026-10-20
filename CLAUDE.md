@@ -31,11 +31,11 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | `examples/surfaces_demo.tscn` | the surfaces suite (headless) and, with `-- --shot=<prefix>`, three frames of every kind on boxes |
 | `examples/brushes_demo.tscn` | the brushes suite (62 checks, headless) and, under `xvfb-run` with `-- --shot=<prefix>`, three frames |
 | `examples/map_selftest.tscn` | the suite; includes a real signed pack fetched by a peer |
-| `tools/bsp/` | the family's one converter for community VBSP maps: reader, brush-to-box cutting, the intermediate JSON every game's adapter reads, `list` for a conversion queue. Python, outside the addon so it never ships. [tools/bsp/README.md](tools/bsp/README.md) |
+| `tools/bsp/` | the family's one converter for community VBSP maps: reader, brush-to-box cutting, the intermediate JSON every game's adapter reads, `list` for a conversion queue, and the pieces every adapter repeated: `Flood` (reachable space), the entity and brush classifiers, prop matching, lights, `.gma` through fastgmad, the open-wall room plan, teleport destinations, the 0.0254 scale. Python, outside the addon so it never ships. [tools/bsp/README.md](tools/bsp/README.md) |
 
 ## Running and testing
 
-- `tools/bsp/`: `python3 -I tools/bsp/tests/test_dotbsp.py`, then re-convert a migrated game's maps (zombie-zone-maps, game-g2gfast) and compare; a fix there reaches every converting game.
+- `tools/bsp/`: `python3 -I tools/bsp/tests/test_dotbsp.py` and `python3 -I tools/bsp/tests/test_lift.py`, then re-convert a migrated game's maps (zombie-zone-maps, game-g2gfast) and compare; a fix there reaches every converting game.
 - The family's two steps ([game-dev/CLAUDE.md](../../CLAUDE.md#validating-anything)), then `godot --headless --path . res://examples/map_selftest.tscn` and `res://examples/brushes_demo.tscn`. Run the check-only pass first: a missing `await` is a parse error and the scene then hangs.
 - A change to the sync protocol is not done until game-g2gfast's `headless_net` passes; the protocol's first real transport found five bugs here. [history](docs/history.md#what-the-first-transport-found)
 - A change to the cloud calls (`ensure`, `is_mounted`) must keep `_test_sync_a_delivered_map` meeting a real dot-cloud client: a by-name interface is one nobody else checks.
