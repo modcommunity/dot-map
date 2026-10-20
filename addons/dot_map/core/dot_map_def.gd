@@ -128,6 +128,15 @@ const KIND_SANDBOX := &"sandbox"
 ## catalogue also removes the leaderboard nobody asked to lose.
 @export var enabled: bool = true
 
+## Whether the server's ACTIVE rotation lists this map (maps.yml). Runtime state, never saved.
+##
+## Separate from [member enabled] on purpose: [member enabled] is the catalogue author's
+## statement about the map, and a rotation file that flipped it would undo an operator's
+## `"enabled": false` the moment the map was listed. A map that is not in rotation stays
+## installed and loadable by `map <id>`; it is only left out of [method available_for], and
+## so out of the rotation's pool, every ballot and every nomination.
+var in_rotation: bool = true
+
 ## Players below this many, and the map is not offered.
 ##
 ## A forty-slot arena map on a server with three people on it is an empty map, and
@@ -215,9 +224,15 @@ func is_local() -> bool:
 
 ## Whether the map may be offered at this player count.
 func available_for(players: int) -> bool:
-	if not enabled:
+	if not enabled or not in_rotation:
 		return false
 
+	return available_for_players(players)
+
+
+## The player-count half of [method available_for], for a list that shows maps the
+## rotation does not play.
+func available_for_players(players: int) -> bool:
 	if min_players > 0 and players < min_players:
 		return false
 

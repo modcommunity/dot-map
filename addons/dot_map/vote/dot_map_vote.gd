@@ -100,7 +100,9 @@ func begin(
 
 		var map := catalogue.get_map(id)
 
-		if map == null or chosen.has(id):
+		# A nomination of a map outside the rotation is dropped here as well as at the
+		# nominate call: the rotation can be switched between the two.
+		if map == null or chosen.has(id) or not map.in_rotation:
 			continue
 
 		options.append(map)
@@ -113,7 +115,7 @@ func begin(
 		# The current map is never an ordinary option: "play this again" is what the
 		# extend option is for, and having both on the ballot splits the vote of the
 		# people who want exactly the same thing.
-		if chosen.has(map.id) or (current != null and map.id == current.id):
+		if chosen.has(map.id) or not map.in_rotation or (current != null and map.id == current.id):
 			continue
 
 		options.append(map)

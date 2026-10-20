@@ -13,13 +13,13 @@ extends Node
 ## running, rather than on nothing. It is the reason the load happens before the
 ## teardown, and it is the step that is easiest to "simplify" back out.
 
-const CHECKS := 247
+const CHECKS := 282
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 28
+const SECTIONS := 31
 
 var _passed := 0
 var _failed := 0
@@ -64,7 +64,10 @@ func _run() -> void:
 	await _test_sync_a_delivered_map()
 	await _test_sync_a_delivered_template_and_a_straggler()
 	await _test_commands()
+	_test_command_names()
 	_test_workshop_maps()
+	_test_rotation_file()
+	await _test_rotation_paths()
 
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
@@ -2147,6 +2150,12 @@ class FakeHost:
 
 	var commands: Dictionary = {}
 
+	## Names some other command already holds, as a console's has_name would say.
+	var taken: Array = []
+
+	func has_name(name: String) -> bool:
+		return commands.has(name) or taken.has(name)
+
 	func add_command(
 		name: String, handler: Callable, help: String, permission: String
 	) -> FakeCommand:
@@ -2185,7 +2194,7 @@ func _test_commands() -> void:
 	var host := FakeHost.new()
 	var commands := DotMapCommands.install(host, session)
 
-	_check(commands.registered.size() == 3, "three commands register on a duck-typed host")
+	_check(commands.registered.size() == 5, "five commands register on a duck-typed host")
 	_check(host.commands.has("map"), "including the plain name dot-server used to hold")
 	_check(host.commands.has("maps") and host.commands.has("mapinfo"), "and the two beside it")
 	_check(
@@ -2357,3 +2366,198 @@ func _test_commands() -> void:
 	sync.queue_free()
 	session.queue_free()
 	_done()
+
+## A catalogue of named maps, three of them owned (`owner/<id>` content ids).
+func _named_catalogue(ids: Array) -> DotMapCatalogue:
+	var catalogue := DotMapCatalogue.new()
+	for id: Variant in ids:
+		var map := _map(StringName(str(id)))
+		if str(id).begins_with("bhop_"):
+			map.content_id = StringName("zed/%s" % str(id))
+		catalogue.add(map)
+	return catalogue
+
+
+func _file(trees: Array, game: String = "game-x") -> DotMapRotationFile:
+	return DotMapRotationFile.from_trees(trees, game).value
+
+
+func _test_rotation_file() -> void:
+	_section("maps.yml rotations")
+	var cat := _named_catalogue(["surf_a", "surf_b", "surf_c", "bhop_x", "bhop_y", "lobby"])
+	var rotation := DotMapRotation.of(cat)
+
+	# The reader is dot-core's: the file's own text, not a hand-built tree.
+	var parsed := DotYaml.parse("defaults:\n  maps: [surf_*]\n")
+	var plain := _file([parsed.value])
+	plain.apply(rotation)
+	_check(plain.active_name() == "main" and rotation.order.size() == 3 and not cat.get_map(&"bhop_x").in_rotation,
+		"a plain maps: list is the main rotation, a glob matched by name")
+	_check(cat.get_map(&"bhop_x") != null and cat.has(&"lobby"), "and the others stay installed")
+
+	var named := _file([{"defaults": {"rotation": "party", "mode": "random", "cooldown": 2,
+		"rotations": {"main": {"maps": ["surf_a"]}, "party": {"mode": "cycle", "maps": ["surf_c", "bhop_y", "surf_a"]}}}}])
+	named.apply(rotation)
+	_check(rotation.mode == DotMapRotation.Mode.SEQUENTIAL and rotation.cooldown == 2,
+		"named rotations: the rotation: key picks one, its mode and the shared cooldown apply")
+	var order := PackedStringArray()
+	for i in range(4):
+		var next := rotation.choose()
+		order.append(String(next.id))
+		rotation.note_played(next.id)
+	_check(order == PackedStringArray(["surf_c", "bhop_y", "surf_a", "surf_c"]), "cycle order is the written order, and wraps", str(order))
+	_check(named.switch(rotation, "main").ok and rotation.order == [&"surf_a"] and cat.get_map(&"surf_c").in_rotation == false,
+		"switching live changes the list")
+	_check(not named.switch(rotation, "nope").ok and named.active_name() == "main", "an unknown rotation name changes nothing")
+
+	# Layering: shipped < server defaults < games:<game>; a list replaces a list, scalars merge.
+	var shipped := {"defaults": {"mode": "cycle", "maps": ["surf_a", "surf_b"]}, "games": {"game-x": {"cooldown": 9}}}
+	var server := {"defaults": {"maps": ["surf_c"]}, "games": {"gamemann/game-x": {"rotations": {"main": {"maps": ["bhop_*"]}}}}}
+	var layered := _file([shipped, server])
+	layered.apply(rotation)
+	_check(rotation.order == [&"bhop_x", &"bhop_y"] and rotation.mode == DotMapRotation.Mode.SEQUENTIAL and rotation.cooldown == 9,
+		"layering: the game's section wins, the list replaced, the shipped mode and cooldown kept (owner/name and name half match)")
+	_file([shipped, server], "game-other").apply(rotation)
+	_check(rotation.order == [&"surf_c"], "another game sees only the defaults")
+
+	# Wildcard shapes.
+	var shapes := _file([{"defaults": {"maps": ["zed/bhop_x", "lobby", "zed/*", "*_y", "zed/pack/*", "nothing_*"]}}])
+	shapes.collections = {"zed/pack": ["zed/bhop_x", "zed/bhop_y"]}
+	shapes.apply(rotation)
+	var ids := shapes.resolve(cat)
+	_check(ids == PackedStringArray(["bhop_x", "lobby", "bhop_y"]), "owner/map, a bare name, owner/*, a name glob and owner/collection/* all resolve, once each, in written order", str(ids))
+	_check(shapes.resolve(cat, "main").size() == 3, "and an entry matching nothing is only skipped")
+	_check(_file([{"defaults": {"maps": ["*"]}}]).resolve(cat).size() == 6, "* is every installed map")
+
+	# Empty falls back to the whole catalogue; maps: with rotations: main, main wins.
+	var empty := _file([{"defaults": {"maps": ["zzz_*"]}}])
+	empty.apply(rotation)
+	_check(rotation.pool().size() == 6 and rotation.order.is_empty(), "an empty result plays every installed map")
+	var both := DotMapRotationFile.from_trees([{"defaults": {"maps": ["surf_a"], "rotations": {"main": {"maps": ["surf_b"]}}}}], "g")
+	_check(both.value.warnings.size() == 1 and both.value.resolve(cat) == PackedStringArray(["surf_b"]),
+		"maps: beside rotations: main warns once and rotations: main wins")
+	var none := _file([{}])
+	none.apply(rotation)
+	_check(not none.has_rotations() and rotation.pool().size() == 6, "no file content is today's behaviour: everything plays")
+	_check(plain.describe_lines().size() == 1 and plain.describe().has("active"), "describe works")
+	_done()
+
+
+## Every way a map is offered or picked: a map installed but outside the active rotation
+## must appear in none of them, and must still load by name.
+func _test_command_names() -> void:
+	_section("maps.yml renames the commands")
+	var file := _file([
+		{"defaults": {"commands": {"prefix": "sv_", "names": {"maps": ["maplist", "ml"], "mapinfo": "where"}}}},
+		{"games": {"game-x": {"commands": {"names": {"maps": "listmaps"}}}}},
+	])
+	var spec := file.commands()
+	_check(spec.get("prefix") == "sv_", "the prefix reads from defaults")
+	_check(Array(spec["names"]["maps"]) == ["listmaps"], "a game's list replaces the default list (%s)" % [spec["names"]["maps"]])
+	_check(Array(spec["names"]["mapinfo"]) == ["where"], "and a name that is not repeated survives the layering")
+
+	var session := DotMapSession.new()
+	session.catalogue = _catalogue(2)
+	session.initial_map = &""
+	add_child(session)
+
+	var wide := _file([{"defaults": {"commands": {"prefix": "sv_", "names": {"maps": ["maplist", "ml"], "mapinfo": "where"}}}}])
+	var host := FakeHost.new()
+	var commands := DotMapCommands.new()
+	commands.session = session
+	commands.spec_fn = wide.commands
+	commands.bind(host)
+	_check(host.commands.has("sv_maplist") and host.commands.has("sv_ml"), "a rename registers the name and its alias, behind the prefix (%s)" % [host.commands.keys()])
+	_check(host.commands.has("sv_where") and host.commands.has("sv_map") and not host.commands.has("maps"), "the prefix moves every command, and the old name is gone")
+	_check(commands.command_name("maps") == "sv_maplist" and commands.typed("maps") == "!sv_maplist", "help and hints show the first name behind the chat prefix (%s)" % commands.typed("maps"))
+	commands.chat_prefix = "/"
+	_check(commands.typed("maps") == "/sv_maplist", "and the server's first chat prefix, whichever it is")
+
+	# A collision is a WARN and a skip, never a steal.
+	var held := FakeHost.new()
+	held.taken = ["maplist"]
+	var clash := DotMapCommands.new()
+	clash.session = session
+	clash.names = {"maps": ["maplist", "ml"]}
+	clash.bind(held)
+	_check(not held.commands.has("maplist") and held.commands.has("ml"), "a name another command holds is skipped and the alias still registers")
+	_check(clash.skipped == PackedStringArray(["maplist"]), "and the skip is recorded (%s)" % [clash.skipped])
+	var twice := DotMapCommands.new()
+	twice.session = session
+	twice.names = {"maps": "mapinfo"}
+	var dup := FakeHost.new()
+	twice.bind(dup)
+	_check(twice.skipped.has("mapinfo") and dup.commands["mapinfo"].handler == twice._cmd_maps, "two roles on one name: the first keeps it")
+	session.free()
+	_done()
+
+
+func _test_rotation_paths() -> void:
+	_section("paths obey the rotation")
+	var cat := _named_catalogue(["surf_a", "surf_b", "surf_c", "surf_off"])
+	var session := DotMapSession.new()
+	session.catalogue = cat
+	session.rotation = DotMapRotation.of(cat)
+	session.rotation.mode = DotMapRotation.Mode.RANDOM
+	session.rotation.cooldown = 0
+	var file := _file([{"defaults": {"maps": ["surf_a", "surf_b", "surf_c"]}}])
+	file.apply(session.rotation)
+	var off := cat.get_map(&"surf_off")
+
+	_check(not off.in_rotation and cat.has(&"surf_off"), "surf_off is installed and not in rotation")
+	_check(not session.rotation.pool().has(off) and not cat.available().has(off), "the pool and the available list leave it out")
+
+	var picked := {}
+	for i in range(30):
+		session.rotation.seed_value = i * 7919
+		picked[String(session.rotation.choose().id)] = true
+	_check(not picked.has("surf_off"), "next map, over 30 seeds, is never it")
+
+	_check(not session.rotation.set_next(&"surf_off") and session.rotation.set_next(&"surf_a"), "a vote result cannot force it as the next map")
+	session.rotation.clear_next()
+
+	var vote := DotMapVote.new()
+	vote.nominate(&"surf_off")
+	vote.nominate(&"surf_b")
+	var opened := vote.begin(cat, session.rotation.pool())
+	var on_ballot := false
+	for m in vote.options:
+		if m.id == &"surf_off":
+			on_ballot = true
+	_check(opened.ok and not on_ballot and vote.options.size() == 3, "a nomination of it is dropped and the ballot never lists it")
+	var raw := DotMapVote.new()
+	raw.begin(cat, cat.maps)
+	var raw_has := false
+	for m in raw.options:
+		raw_has = raw_has or m.id == &"surf_off"
+	_check(not raw_has, "even a ballot fed the whole catalogue drops it")
+
+	var host := DotMapSyncHost.new()
+	host.session = session
+	var next := session.rotation.choose()
+	_check(next != null and next.in_rotation, "the sync host's and session's next map come from the same choose()")
+
+	var commands := DotMapCommands.new()
+	commands.session = session
+	commands.rotation_file = file
+	_check(commands.map_ids().has("surf_off"), "the map list and completer still offer it (map <id> works)")
+	var lines := []
+	var ctx := _FakeCtx.new(lines)
+	commands._cmd_maps(ctx)
+	_check(lines.size() == 1 and str(lines[0]).contains("surf_off (not in rotation)") and not str(lines[0]).contains("surf_a (not"),
+		"and marks only it as not in rotation")
+	lines.clear()
+	commands._cmd_rotations(ctx)
+	_check(lines.size() == 1 and str(lines[0]).contains("main"), "maps_rotations lists the rotations")
+	host.free()
+	session.free()
+	_done()
+
+
+class _FakeCtx extends RefCounted:
+	var args := PackedStringArray()
+	var out: Array
+	func _init(sink: Array) -> void:
+		out = sink
+	func reply(text: String) -> void:
+		out.append(text)

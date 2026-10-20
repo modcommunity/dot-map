@@ -33,3 +33,26 @@ The commands (`rtv`, `nominate`, `nextmap`, `timeleft`) and the ballot on screen
 `DotMapSession` emits `map_over` and **does not change the map itself**. What happens when a map ends is a game's decision (run a vote, take the next in the rotation, end the round first, show a scoreboard), and a session that decided would have to be fought by every game that wanted any of those.
 
 The clock can wait while the server hibernates: `DotMapSession.follow_hibernation(server)` (duck-typed on `hibernation_changed(bool)`) or `set_hibernating`; `restart_on_wake` (default on) starts the map's own limit again on waking.
+
+## The rotation file
+
+`cfg/maps.yml` says which installed maps rotate, in the shape of the server's content.yml: `defaults:` for every game and `games: <game>:` for one, read by `DotMapRotationFile`. Layers, weakest first: the game's shipped file, the server's defaults, the game's own entry. A list replaces a list; scalars merge.
+
+```yaml
+defaults:
+  rotation: surf
+  rotations:
+    surf:
+      mode: random        # random or cycle (written order)
+      cooldown: 3
+      maps: [bhop_intro, "surf_*", owner/collection/*]
+    all:
+      maps: ["*"]
+games:
+  game-example:
+    rotation: all
+```
+
+A bare `maps:` list is shorthand for a rotation called `main`; if `rotations: main` is also written it wins, with one WARN. Entries are `owner/map`, a bare name, `owner/collection/*`, or a name glob against the installed catalogue (quote a glob that starts with `*`: YAML refuses it bare). An id or pattern that matches nothing logs a WARN; a rotation that resolves to nothing plays the whole catalogue.
+
+An unlisted map stays installed and loadable (`map <id>`, the map list marks it "not in rotation") but is out of the rotation's pool, `set_next`, the ballot and nominations: all read `DotMapDef.in_rotation`. `sv_map_rotation <name>` switches the active rotation at run time (admin), `maps_rotations` lists them. A host calls `DotMapRotationFile.load_files`, then `attach(session)` so a catalogue change re-applies it; `collections` must be filled by a host that has them for `owner/collection/*` to match.

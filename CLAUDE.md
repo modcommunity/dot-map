@@ -21,7 +21,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | Path | What |
 | --- | --- |
 | `addons/dot_map/core/` | `DotMapDef` (id, version, scene, pack, tier, player range), `DotMapCatalogue` (the JSON an operator edits) |
-| `addons/dot_map/runtime/` | `DotMapLoader` (def to `PackedScene`, fetching first), `DotMapRotation`, `DotMapSession` (the node a game adds) |
+| `addons/dot_map/runtime/` | `DotMapLoader` (def to `PackedScene`, fetching first), `DotMapRotation`, `DotMapRotationFile` (`cfg/maps.yml`), `DotMapSession` (the node a game adds) |
 | `addons/dot_map/net/` | `DotMapMessage` (the five messages), `DotMapSyncHost` (announce, wait, swap; read its class doc), `DotMapSyncClient` (fetch, ready, load; owns the trust rules) |
 | `addons/dot_map/surfaces/` | `DotMapSurfaces`: a surface kind (`&"brick"`) to a world-space triplanar material; 15 CC0 photo kinds, credits beside them. [surfaces](docs/surfaces.md) |
 | `addons/dot_map/brushes/` | `DotMapBrush`: box, wedge, stairs, cylinder, cone, spike, arch, quarter_pipe, slab_holes from a dictionary; convex collision, UVs in metres, a material slot. [brushes](docs/brushes.md) |
@@ -64,6 +64,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 **Rotation and time**
 
 - The cooldown is clamped to half the pool when choosing; the random mode's seed advances deterministically; vote ties are deterministic. [rotation](docs/rotation.md)
+- `maps.yml` decides rotation through `DotMapDef.in_rotation` (runtime, never saved), which `available_for` reads; `enabled` stays the catalogue's own switch. Every offer path (pool, `set_next`, ballot, nominations) must read it, never `enabled` alone. The matcher is dot-core's `DotRotationSpec`, shared with the server's games.yml. [rotation](docs/rotation.md#the-rotation-file)
 - Time limits run on simulated seconds; expiry is latched; extends are bounded and clear rtv; rtv is idempotent and leaves with the player. [rotation](docs/rotation.md#the-map-has-to-end-on-its-own)
 - The session emits `map_over` and never changes the map itself. [rotation](docs/rotation.md#the-map-has-to-end-on-its-own)
 

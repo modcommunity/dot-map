@@ -114,7 +114,7 @@ func on_cooldown(id: StringName, pool_size: int = 0) -> bool:
 func choose(players: int = 0) -> DotMapDef:
 	if _forced != &"" and catalogue != null:
 		var forced := catalogue.get_map(_forced)
-		if forced != null:
+		if forced != null and forced.in_rotation:
 			return forced
 
 	var candidates := pool(players)
@@ -138,7 +138,9 @@ func choose(players: int = 0) -> DotMapDef:
 
 	match mode:
 		Mode.SEQUENTIAL:
-			return eligible[_cursor % eligible.size()]
+			# The whole pool, not the cooldown's remainder: a fixed cycle is the written
+			# order, and skipping the maps just played would turn a three-map cycle into two.
+			return candidates[_cursor % candidates.size()]
 		Mode.MANUAL:
 			return null
 		_:
@@ -163,9 +165,17 @@ func note_played(id: StringName) -> void:
 	seed_value = int(hash(String(id)) ^ (seed_value * 1103515245 + 12345)) & 0x7FFFFFFF
 
 
+## Starts a cycle from its first map again, for a rotation that was just switched.
+func reset_cursor() -> void:
+	_cursor = 0
+
+
 ## Forces the next map, overriding the mode. What a vote's result does.
 func set_next(id: StringName) -> bool:
-	if catalogue == null or not catalogue.has(id):
+	# Not a map outside the active rotation: a vote result or a nomination reaches here, and
+	# the file's whole promise is that those never pick an unlisted map. Staff change to one
+	# with `map <id>`, which does not come through here.
+	if catalogue == null or not catalogue.has(id) or not catalogue.get_map(id).in_rotation:
 		return false
 
 	_forced = id

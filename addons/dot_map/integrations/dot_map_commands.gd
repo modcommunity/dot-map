@@ -39,6 +39,8 @@ const DEFAULTS := {
 	"map": "map",
 	"maps": "maps",
 	"mapinfo": "mapinfo",
+	"rotation": "sv_map_rotation",
+	"rotations": "maps_rotations",
 }
 
 ## Which of the above are marked typable in chat whatever the host server's default is.
@@ -52,7 +54,15 @@ const DEFAULTS := {
 ## chat gate never asked who was typing; `changemap` does, on the same line, for chat, RCON
 ## and the terminal alike. See [member allow_chat_change] for the deployment that wants the
 ## change unreachable by typing even from somebody holding the flag.
-const CHAT := ["maps", "mapinfo"]
+const CHAT := ["maps", "mapinfo", "rotations"]
+
+## The server's maps.yml, for `sv_map_rotation` and `maps_rotations`. Optional: without one
+## those two say there is no rotation file and `maps` lists every map unmarked.
+var rotation_file: DotMapRotationFile = null
+
+## `() -> DotMapRotationFile`, for a game that re-reads maps.yml and so replaces the object.
+## Takes precedence over [member rotation_file].
+var rotation_file_fn: Callable = Callable()
 
 ## Where the catalogue, the current map and the clock are read from.
 var session: DotMapSession = null
@@ -76,6 +86,18 @@ var prefix: String = ""
 
 ## Per-role name overrides, e.g. `{"maps": "maplist"}`.
 var names: Dictionary = {}
+
+## Where an operator's `commands:` block comes from: `() -> Dictionary` with `prefix` and
+## `names` (a name or a list of names per role; the rest are aliases). Read once by [method bind],
+## so the file wins over the game's own settings. A game points it at its rotation file
+## (`file.commands`) and names nothing itself.
+var spec_fn: Callable = Callable()
+
+## What a player types before a command in chat, for text shown to players.
+var chat_prefix: String = "!"
+
+## Names refused because something else had them.
+var skipped: PackedStringArray = PackedStringArray()
 
 ## Permission `map` needs. Empty makes it console-only.
 var admin_permission: String = "changemap"
@@ -141,8 +163,19 @@ static func install_with(
 	return commands
 
 
+## The name help and hints show for a role: the primary, prefix included.
 func command_name(role: String) -> String:
-	return prefix + str(names.get(role, DEFAULTS.get(role, role)))
+	return DotCommandNames.all_of(prefix, names, DEFAULTS, role)[0]
+
+
+## Every name a role answers to, the primary first.
+func command_names(role: String) -> PackedStringArray:
+	return DotCommandNames.all_of(prefix, names, DEFAULTS, role)
+
+
+## What a player types in chat for a role.
+func typed(role: String) -> String:
+	return DotCommandNames.typed(chat_prefix, command_name(role))
 
 
 ## Registers everything on [param host].
@@ -153,6 +186,11 @@ func bind(host: Object) -> DotResult:
 		)
 	if changer == null:
 		changer = session
+
+	if spec_fn.is_valid():
+		var from_file: Variant = spec_fn.call()
+		if from_file is Dictionary:
+			DotCommandNames.apply(self, from_file)
 
 	var adder := ""
 	if host.has_method("add_command"):
@@ -170,39 +208,48 @@ func bind(host: Object) -> DotResult:
 		"map": [_cmd_map, "Change the map, or list what there is", admin_permission],
 		"maps": [_cmd_maps, "List the maps this server can load", ""],
 		"mapinfo": [_cmd_mapinfo, "What is running, what is next, and how long is left", ""],
+		"rotations": [_cmd_rotations, "List the map rotations in maps.yml", ""],
+		"rotation": [_cmd_rotation, "Show or switch the active map rotation", admin_permission],
 	}
 
 	for role: Variant in table:
 		var entry: Array = table[role]
-		var full := command_name(str(role))
-		var registered_command: Variant = host.call(adder, full, entry[0], entry[1], entry[2])
 
-		if registered_command is Object:
-			var cmd := registered_command as Object
-			if CHAT.has(role):
-				if cmd.has_method("with_chat"):
-					cmd.call("with_chat")
-			elif role == "map" and not allow_chat_change:
-				# Duck-typed, like everything else here: `no_chat()` is dot-server's, and a
-				# host console that predates it simply keeps the host's own default rather
-				# than failing to register the command.
-				if cmd.has_method("no_chat"):
-					cmd.call("no_chat")
-				elif cmd.has_method("with_chat"):
-					cmd.call("with_chat", false)
-			if role == "map":
-				if cmd.has_method("with_usage"):
-					cmd.call("with_usage", "[map_id]")
-				# A completer, because a map id is the one argument nobody remembers. The
-				# lambda reads the catalogue at completion time rather than closing over a
-				# list: a catalogue that gains a map after boot is the normal case on a
-				# server that mounts delivered content.
-				if cmd.has_method("with_completer"):
-					cmd.call("with_completer", func(_p: String, _i: int) -> PackedStringArray:
-						return map_ids()
-					)
+		for full in command_names(str(role)):
+			if not DotCommandNames.available(host, full, registered, str(role), "map"):
+				skipped.append(full)
+				continue
 
-		registered.append(full)
+			var registered_command: Variant = host.call(adder, full, entry[0], entry[1], entry[2])
+
+			if registered_command is Object:
+				var cmd := registered_command as Object
+				if role == "rotation" and cmd.has_method("with_usage"):
+					cmd.call("with_usage", "[rotation]")
+				if CHAT.has(role):
+					if cmd.has_method("with_chat"):
+						cmd.call("with_chat")
+				elif role == "map" and not allow_chat_change:
+					# Duck-typed, like everything else here: `no_chat()` is dot-server's, and a
+					# host console that predates it simply keeps the host's own default rather
+					# than failing to register the command.
+					if cmd.has_method("no_chat"):
+						cmd.call("no_chat")
+					elif cmd.has_method("with_chat"):
+						cmd.call("with_chat", false)
+				if role == "map":
+					if cmd.has_method("with_usage"):
+						cmd.call("with_usage", "[map_id]")
+					# A completer, because a map id is the one argument nobody remembers. The
+					# lambda reads the catalogue at completion time rather than closing over a
+					# list: a catalogue that gains a map after boot is the normal case on a
+					# server that mounts delivered content.
+					if cmd.has_method("with_completer"):
+						cmd.call("with_completer", func(_p: String, _i: int) -> PackedStringArray:
+							return map_ids()
+						)
+
+			registered.append(full)
 
 	DotLog.info(CHANNEL, "commands registered", {"count": registered.size()})
 	return DotResult.success(registered)
@@ -217,8 +264,11 @@ func map_ids() -> PackedStringArray:
 	var out := PackedStringArray()
 	if session == null or session.catalogue == null:
 		return out
-	for m in session.catalogue.available(&"", _players()):
-		out.append(String(m.id))
+	# Every ENABLED map, in rotation or not: `map <id>` loads either, and the completer and
+	# the list must say so. What the rotation plays is DotMapRotation.pool().
+	for m in session.catalogue.maps:
+		if m.enabled and m.available_for_players(_players()):
+			out.append(String(m.id))
 	out.sort()
 	return out
 
@@ -328,9 +378,39 @@ func _cmd_maps(ctx: Object) -> void:
 	var shown := PackedStringArray()
 	for id in ids:
 		var def := session.catalogue.get_map(StringName(id))
-		shown.append(id if def == null or def.pack_title == "" else "%s [%s]" % [id, def.pack_title])
+		var label := id if def == null or def.pack_title == "" else "%s [%s]" % [id, def.pack_title]
+		# Installed and loadable, just not played: said, not hidden.
+		if def != null and not def.in_rotation:
+			label += " (not in rotation)"
+		shown.append(label)
 	_reply(ctx, "%d maps: %s" % [ids.size(), ", ".join(shown)])
 
 
 func _cmd_mapinfo(ctx: Object) -> void:
 	_reply_lines(ctx, session.describe_lines())
+
+
+func _file() -> DotMapRotationFile:
+	if rotation_file_fn.is_valid():
+		return rotation_file_fn.call() as DotMapRotationFile
+	return rotation_file
+
+
+func _cmd_rotations(ctx: Object) -> void:
+	var rotation_file := _file()
+	if rotation_file == null or not rotation_file.has_rotations():
+		_reply(ctx, "No map rotation file; every map plays.")
+		return
+	_reply_lines(ctx, rotation_file.describe_lines())
+
+
+func _cmd_rotation(ctx: Object) -> void:
+	var rotation_file := _file()
+	if rotation_file == null or not rotation_file.has_rotations():
+		_reply(ctx, "No map rotation file; every map plays.")
+		return
+	var args := _args(ctx)
+	if args.is_empty():
+		_reply(ctx, "Rotation %s (of: %s)." % [rotation_file.active_name(), ", ".join(rotation_file.rotation_names())])
+		return
+	_reply_result(ctx, rotation_file.switch(session.rotation, args[0]), "Now playing rotation %s." % args[0])
