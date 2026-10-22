@@ -199,10 +199,7 @@ func resolve(catalogue: DotMapCatalogue, name: String = "") -> PackedStringArray
 	var rots: Dictionary = spec.get("rotations", {})
 	if use == "" or not rots.has(use) or catalogue == null:
 		return PackedStringArray()
-	var candidates: Array = []
-	for m in catalogue.maps:
-		var content := String(m.content_id)
-		candidates.append({"id": String(m.id), "ref": content if content.count("/") == 1 else ""})
+	var candidates := _candidates(catalogue)
 	var unmatched := PackedStringArray()
 	var ids := DotRotationSpec.expand((rots[use] as Dictionary)["entries"], candidates, collections, unmatched)
 	if not removed.is_empty():
@@ -217,6 +214,23 @@ func resolve(catalogue: DotMapCatalogue, name: String = "") -> PackedStringArray
 			_warned[key] = true
 			DotLog.warn(CHANNEL, "a map rotation entry matches no installed map", {"rotation": use, "entry": entry})
 	return ids
+
+
+func _candidates(catalogue: DotMapCatalogue) -> Array:
+	var candidates: Array = []
+	for m in catalogue.maps:
+		var content := String(m.content_id)
+		candidates.append({"id": String(m.id), "ref": content if content.count("/") == 1 else ""})
+	return candidates
+
+
+## The per-map settings the rotation [param name] (default: the active one) gives [param id]
+## (`{waves: easy}` from a mapping entry), empty for a bare entry or no match.
+func settings_for(catalogue: DotMapCatalogue, id: StringName, name: String = "") -> Dictionary:
+	var use := name if name != "" else active_name()
+	if use == "" or catalogue == null or not (spec.get("rotations", {}) as Dictionary).has(use):
+		return {}
+	return DotRotationSpec.settings_for(spec, use, String(id), _candidates(catalogue), collections)
 
 
 ## Marks every catalogue map in or out of rotation and sets the rotation's order, mode and
@@ -243,6 +257,7 @@ func apply(rotation: DotMapRotation, name: String = "") -> DotResult:
 			m.in_rotation = bool(fallback_in.call(m)) if fallback_in.is_valid() else true
 		else:
 			m.in_rotation = ids.has(String(m.id))
+		m.play = settings_for(rotation.catalogue, m.id, use) if m.in_rotation and not ids.is_empty() else {}
 	rotation.order = order
 	if has_rotations() and use != "" and (spec["rotations"] as Dictionary).has(use):
 		rotation.mode = DotMapRotation.Mode.SEQUENTIAL if DotRotationSpec.mode_of(spec, use) == "cycle" \

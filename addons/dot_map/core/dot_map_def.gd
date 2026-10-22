@@ -137,6 +137,21 @@ const KIND_SANDBOX := &"sandbox"
 ## so out of the rotation's pool, every ballot and every nomination.
 var in_rotation: bool = true
 
+## The settings the active rotation's entry gives this map (`{waves: "easy", profile: "night"}`),
+## opaque to dot-map. Runtime state set by [DotMapRotationFile.apply], never saved; empty for a bare entry.
+var play: Dictionary = {}
+
+
+## The values to try for [param key], best first: [param override] (a server command such as
+## `sv_waves`), then the rotation entry's, then [param fallback] (the map document's, the game's
+## default). Empty ones are skipped, so a game tries each and warns on a missing id instead of failing.
+func play_candidates(key: String, override: Variant = "", fallback: Variant = "") -> Array:
+	var out: Array = []
+	for v: Variant in [override, play.get(key, ""), fallback]:
+		if str(v) != "" and not out.has(v):
+			out.append(v)
+	return out
+
 ## Players below this many, and the map is not offered.
 ##
 ## A forty-slot arena map on a server with three people on it is an empty map, and

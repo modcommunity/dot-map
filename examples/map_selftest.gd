@@ -13,13 +13,13 @@ extends Node
 ## running, rather than on nothing. It is the reason the load happens before the
 ## teardown, and it is the step that is easiest to "simplify" back out.
 
-const CHECKS := 319
+const CHECKS := 326
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 33
+const SECTIONS := 34
 
 var _passed := 0
 var _failed := 0
@@ -70,6 +70,7 @@ func _run() -> void:
 	await _test_rotation_paths()
 	_test_rotation_file_layout()
 	_test_zero_config_rotation()
+	_test_rotation_play()
 
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
@@ -2748,6 +2749,25 @@ func _test_zero_config_rotation() -> void:
 	rot.sort_unordered = false
 	ids = rot.pool().map(func(m: DotMapDef) -> String: return String(m.id))
 	_check(ids == ["m_c", "m_a", "m_b"], "sort_unordered = false keeps catalogue order (%s)" % [ids])
+	_done()
+
+
+func _test_rotation_play() -> void:
+	_section("rotation entries carry per-map settings")
+	var cat := _named_catalogue(["zz_camp_a", "zz_camp_b", "zz_plain", "other"])
+	var rot := DotMapRotation.of(cat)
+	var f := _file([{"defaults": {"maps": ["zz_plain", {"zz_camp_*": {"waves": "camp_nights"}}, {"map": "other", "waves": "hard", "profile": "night"}]}}])
+	f.apply(rot)
+	_check(cat.get_map(&"zz_camp_a").play == {"waves": "camp_nights"} and cat.get_map(&"zz_camp_b").play == {"waves": "camp_nights"},
+		"a glob entry carries its settings to every match (%s)" % [cat.get_map(&"zz_camp_a").play])
+	_check(cat.get_map(&"other").play == {"waves": "hard", "profile": "night"}, "the single-key form carries several keys")
+	_check(cat.get_map(&"zz_plain").play.is_empty() and rot.order.size() == 4, "a bare string entry has none and still rotates")
+	var d := cat.get_map(&"other")
+	_check(d.play_candidates("waves", "admin", "doc") == ["admin", "hard", "doc"], "override > entry > fallback")
+	_check(cat.get_map(&"zz_plain").play_candidates("waves", "", "default") == ["default"], "empty ones are skipped")
+	_check(f.settings_for(cat, &"other") == {"waves": "hard", "profile": "night"}, "settings_for on the file answers per id")
+	_file([{"defaults": {"maps": ["zz_plain"]}}]).apply(rot)
+	_check(cat.get_map(&"zz_camp_a").play.is_empty(), "applying another rotation clears the settings")
 	_done()
 
 

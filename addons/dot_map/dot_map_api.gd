@@ -21,5 +21,7 @@ extends RefCounted
 # 8: find_layers(config_dir, game) reads the game tier and the mirrored cfg/server/addons and cfg/server/game
 #    tiers; an operator maps.yml replaces the shipped one unless it starts `merge: true`; `remove: [ids]`;
 #    DotMapRotation.sort_unordered (no file: installed maps sorted by id). Needs dot-core API level 17.
-const LEVEL := 8
+# 9: DotMapDef.play and play_candidates, DotMapRotationFile.settings_for: a rotation entry may carry
+#    settings ({pattern: {waves: easy}}, dot-core 9fc12e1). Needs that dot-core.
+const LEVEL := 9
 const OLDEST := 1
