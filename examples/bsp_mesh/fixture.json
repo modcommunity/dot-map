@@ -1,0 +1,286 @@
+{
+ "bin": {
+  "bytes": 3312,
+  "compression": "gzip",
+  "file": "fixture.bin",
+  "sha256": "63dbb506329bd98b1ac8e06b0e0122d9652e071aba1587aac661e94d667579e0",
+  "stored_bytes": 501
+ },
+ "counts": {
+  "hulls": 3,
+  "models": 2,
+  "surfaces": 5,
+  "triangles": 36,
+  "vertices": 72
+ },
+ "credit": {
+  "author": "dot-map tests"
+ },
+ "format": "dot-bsp-mesh",
+ "hulls": [
+  {
+   "brush": 0,
+   "entity": null,
+   "kind": "solid",
+   "model": 0,
+   "plane_count": 6,
+   "plane_offset": 2832,
+   "point_count": 8,
+   "point_offset": 2736
+  },
+  {
+   "brush": 1,
+   "entity": null,
+   "kind": "solid",
+   "model": 0,
+   "plane_count": 6,
+   "plane_offset": 3024,
+   "point_count": 8,
+   "point_offset": 2928
+  },
+  {
+   "brush": 2,
+   "entity": 4,
+   "kind": "solid",
+   "model": 1,
+   "plane_count": 6,
+   "plane_offset": 3216,
+   "point_count": 8,
+   "point_offset": 3120
+  }
+ ],
+ "movers": [
+  {
+   "classname": "func_door",
+   "direction": [
+    0.0,
+    1.0,
+    -0.0
+   ],
+   "distance": 1.9431,
+   "entity": 4,
+   "kind": "slide",
+   "locked": false,
+   "maxs": [
+    4.953,
+    2.4384,
+    -4.2672
+   ],
+   "mins": [
+    4.8006,
+    0.3048,
+    -5.4864
+   ],
+   "model": 1,
+   "opened_by": [
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 5,
+     "input": "Open",
+     "output": "OnPressed",
+     "targetname": "b"
+    }
+   ],
+   "origin": [
+    4.8768,
+    0.3048,
+    -4.8768
+   ],
+   "outputs": [],
+   "solid": true,
+   "spawnflags": 0,
+   "speed": 1.905,
+   "start_open": false,
+   "targetname": "gate",
+   "toggle": false,
+   "touch": false,
+   "use": false,
+   "wait": 4.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 5,
+   "kind": "button",
+   "locked": false,
+   "model": null,
+   "opened_by": [],
+   "origin": [
+    0.0,
+    0.0,
+    -0.0
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "Open",
+     "output": "OnPressed",
+     "param": "",
+     "target": "gate",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 0,
+   "speed": 1.905,
+   "start_open": false,
+   "targetname": "b",
+   "toggle": false,
+   "touch": false,
+   "use": true,
+   "wait": 1.0
+  }
+ ],
+ "name": "fixture",
+ "notes": [],
+ "skipped": {},
+ "sky3d": null,
+ "source": {
+  "bsp_version": 20,
+  "bytes": 4896,
+  "file": "fixture.bsp",
+  "sha256": "04d298a5b49338d4d293ec527eed7206ff5809880af56dd10ff82aab5a54f08f"
+ },
+ "surfaces": [
+  {
+   "chunk": [
+    0,
+    -1
+   ],
+   "classname": "worldspawn",
+   "colour": [
+    0.7354,
+    0.7354,
+    0.7354
+   ],
+   "entity": null,
+   "generic": "concrete",
+   "index_count": 36,
+   "index_offset": 768,
+   "material": "concrete/concretefloor001",
+   "model": 0,
+   "normal_offset": 288,
+   "position_offset": 0,
+   "texels": [
+    64,
+    64
+   ],
+   "uv_offset": 576,
+   "vertex_count": 24
+  },
+  {
+   "chunk": [
+    0,
+    -1
+   ],
+   "classname": "worldspawn",
+   "colour": [
+    0.7354,
+    0.7354,
+    0.7354
+   ],
+   "entity": null,
+   "generic": "metal",
+   "index_count": 30,
+   "index_offset": 1552,
+   "material": "metal/metalwall001",
+   "model": 0,
+   "normal_offset": 1152,
+   "position_offset": 912,
+   "texels": [
+    64,
+    64
+   ],
+   "uv_offset": 1392,
+   "vertex_count": 20
+  },
+  {
+   "chunk": [
+    0,
+    0
+   ],
+   "classname": "worldspawn",
+   "colour": [
+    0.7354,
+    0.7354,
+    0.7354
+   ],
+   "entity": null,
+   "generic": "metal",
+   "index_count": 6,
+   "index_offset": 1800,
+   "material": "metal/metalwall001",
+   "model": 0,
+   "normal_offset": 1720,
+   "position_offset": 1672,
+   "texels": [
+    64,
+    64
+   ],
+   "uv_offset": 1768,
+   "vertex_count": 4
+  },
+  {
+   "classname": "func_door",
+   "colour": [
+    0.7354,
+    0.7354,
+    0.7354
+   ],
+   "entity": 4,
+   "generic": "concrete",
+   "index_count": 18,
+   "index_offset": 2208,
+   "material": "concrete/concretefloor001",
+   "model": 1,
+   "normal_offset": 1968,
+   "position_offset": 1824,
+   "targetname": "gate",
+   "texels": [
+    64,
+    64
+   ],
+   "uv_offset": 2112,
+   "vertex_count": 12
+  },
+  {
+   "classname": "func_door",
+   "colour": [
+    0.7354,
+    0.7354,
+    0.7354
+   ],
+   "entity": 4,
+   "generic": "metal",
+   "index_count": 18,
+   "index_offset": 2664,
+   "material": "metal/metalwall001",
+   "model": 1,
+   "normal_offset": 2424,
+   "position_offset": 2280,
+   "targetname": "gate",
+   "texels": [
+    64,
+    64
+   ],
+   "uv_offset": 2568,
+   "vertex_count": 12
+  }
+ ],
+ "units": {
+  "axes": "Godot (x, z, -y) of the map's",
+  "length": "metres",
+  "metres_per_unit": 0.01905,
+  "uv": "source texture coordinate / source texture size",
+  "vertex": "per surface: vertex_count float32 xyz positions, then normals, then float32 uv pairs, then index_count uint32",
+  "y0": 0.0
+ },
+ "version": 1,
+ "volumes": []
+}
