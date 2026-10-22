@@ -23,7 +23,7 @@ The rest of this page is the original design, kept for the reasoning; where it n
 ## Survey: what exists today
 
 - **dot-core `DotAddonConfig`** already reads every `*.yml` in `cfg/addons/<addon_name>/`, sorted by file name, over four roots (`res://cfg`, `<exe>/cfg`, `user://cfg`, `--config DIR`), with env `<ADDON>_<PATH>` and cli `--<addon>.<path>=v`, and refuses secret-named keys from both. One adopter: game-zombie-zone (`zz_packs.gd`, `cfg/addons/zombie_zone/packs.yml`). **Gap: the directory is the addon name as passed**, so `"dot-map"` reads `cfg/addons/dot-map/`, while the packs already use underscores (`zz_medieval_weapons`, `zz_modern_weapons`, `zz_historical_monsters`, `zombie_zone`). Normalise `-` to `_` in `_candidate_dirs`.
-- **dot-core `DotProfileSet`** (`docs/profiles.md`) already has the tiers `cfg/addons/<addon>/<kind>/<id>.yml` < `cfg/game/<game>/<kind>/<id>.yml` < `cfg/server/<kind>/<id>.yml`. No adopter yet. **Gap: its server tier is the directory `cfg/server/`**, which collides with a file `cfg/server.yml` only by name, not by path, but it must be decided (see Precedence).
+- **dot-core `DotProfileSet`** (`docs/profiles.md`) already has the tiers `cfg/addons/<addon>/<kind>/<id>.yml` < `cfg/game/<game>/<kind>/<id>.yml` < `cfg/server/addons/<addon>/<kind>/<id>.yml` < `cfg/server/game/<game>/<kind>/<id>.yml` (the old `cfg/server/<kind>/` is shimmed).
 - **dot-server-deploy `cfg/`** (what an operator edits, via `--config DIR`): flat files read by `host/tmc_config.gd` `FILES`: `server.yml`, `net.yml`, `log.yml`, `rcon.yml`, `auth.yml`, `groups.yml`, `permissions.yml`, `vote.yml`, `security.yml`, `party.yml`, `matchmaking.yml`, `replay.yml`, `admin_menu.yml`, `loading.yml`; plus `content.yml` (per-game overrides, `TmcGameConfig`), `addons.yml` (extra packs, `TmcAddonsConfig`), `games.yml` (`TmcGameRotation`). `server.yml` today mixes generic keys (`sv_name`, `sv_maxplayers`, timeouts) with whole subsystems.
 - **dot-server**: `cfg/server.cfg` and `autoexec.cfg` (console cvar scripts), `user://cfg/server.json`, `admins.json`, `bans.json`. Console scripts are not yaml settings and stay.
 - **dot-server-security**: `cfg/*.example.json` (ban feeds, rules), shipped as examples only.
@@ -70,7 +70,7 @@ Ask in order; the first yes decides.
 Weakest first, every setting, one order:
 
 ```
-code defaults  <  cfg/addons/<addon>  <  cfg/game/<game>  <  cfg/server.yml (generic) / cfg/server/ (operator profile overrides)  <  environment  <  command line
+code defaults  <  cfg/addons/<addon>  <  cfg/game/<game>  <  cfg/server.yml (generic) / cfg/server/addons/ and cfg/server/game/ (operator profile overrides)  <  environment  <  command line
 ```
 
 - Within a tier the four roots merge weakest first (`res://cfg`, `<exe>/cfg`, `user://cfg`, `--config DIR`), so a game ships its tier in the pack and the operator changes it in `--config DIR` without editing shipped files. Within one root, files merge in name order. Maps merge key by key; lists and scalars replace whole.
@@ -143,6 +143,6 @@ The two-line `defaults:`/`games:` shape of `maps.yml` and `content.yml` is kept 
 
 ## Open questions
 
-- Is `cfg/server/` (operator layer for settings and profiles) acceptable beside `cfg/server.yml`, or should the operator layer be named something else to avoid two "server" entries?
+- Is `cfg/server/` (operator layer for settings and profiles) acceptable beside `cfg/server.yml`, or should the operator layer be named something else to avoid two "server" entries? (Settled: it mirrors `addons/` and `game/`.)
 - Game key: directory name (`mg-deathrun`) as proposed, or the content id half (`deathrun`)?
 - Does the web client (no `--config`, `user://` only) need any of the operator layer, or is it server-only?
