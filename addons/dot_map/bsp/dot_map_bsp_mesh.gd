@@ -263,6 +263,234 @@ func build_node(material_for: Callable = Callable()) -> Node3D:
 	return root
 
 
+## Where [method build_sounds] and [method build_props] look for a stand-in by id when the
+## game gives no callable: this addon's own free Kenney set, then dot-audio's stock beds.
+const DEFAULT_SOUND_DIRS: PackedStringArray = [
+	"res://addons/dot_map/sounds", "res://addons/dot_audio/stock/ambience"]
+const DEFAULT_PROP_DIRS: PackedStringArray = ["res://addons/dot_map/props"]
+
+## The stand-in models face +Z; a Source model faces +X at yaw 0.
+const PROP_FACING_DEGREES := 90.0
+
+
+## The manifest's [code]licence[/code] block (every free replacement with URL, author, licence), or {}.
+func licence() -> Dictionary:
+	return manifest.get("licence", {})
+
+
+## True when the map went through the licence pass: a licence block and [code]free[/code] on every surface.
+func is_free() -> bool:
+	if licence().is_empty():
+		return false
+	for rec: Dictionary in surfaces:
+		if not rec.has("free"):
+			return false
+	return true
+
+
+## The [code]environment[/code] block (sky, sun, fog, tonemap, cubemaps), or {}.
+func environment_data() -> Dictionary:
+	return manifest.get("environment", {})
+
+
+## The [code]sounds[/code] block (ambient, soundscapes, triggers, files), or {}.
+func sounds_data() -> Dictionary:
+	return manifest.get("sounds", {})
+
+
+static func _col(v: Variant, fallback: Color) -> Color:
+	if v is Array and (v as Array).size() >= 3 and float(v[0]) >= 0.0 and float(v[1]) >= 0.0 and float(v[2]) >= 0.0:
+		return Color(float(v[0]), float(v[1]), float(v[2]))
+	return fallback
+
+
+static func _key(keys: Dictionary, name: String, fallback: float) -> float:
+	for k: String in keys:
+		if k.to_lower() == name:
+			return float(str(keys[k]).split(" ")[0])
+	return fallback
+
+
+## The map's outdoors as nodes: a [WorldEnvironment] (procedural sky from the sun and ambient
+## colours, fog, filmic tonemap) and a [DirectionalLight3D] sun, plus with [param max_probes]
+## above 0 a [ReflectionProbe] at that many cubemap points. Null when the map carries no
+## environment. Nodes are named [code]Environment[/code], [code]Sun[/code], [code]Probes[/code];
+## the caller places the result and may edit anything in it.
+func build_environment(max_probes: int = 8, sun_shadows: bool = true) -> Node3D:
+	var env := environment_data()
+	if env.is_empty():
+		return null
+	var root := Node3D.new()
+	root.name = "MapEnvironment"
+	var sun: Dictionary = env.get("sun", {})
+	var amb := _col(sun.get("ambient_hdr"), _col(sun.get("ambient"), Color(0.4, 0.42, 0.46)))
+	var e := Environment.new()
+	var sky := Sky.new()
+	var sm := ProceduralSkyMaterial.new()
+	var sky_name := str(env.get("sky", {}).get("name", "")).to_lower()
+	var night := false
+	for w in ["night", "dark", "black", "space", "star"]:
+		night = night or sky_name.contains(w)
+	if night:
+		sm.sky_top_color = Color(0.02, 0.03, 0.08)
+		sm.sky_horizon_color = Color(0.06, 0.07, 0.12)
+		sm.ground_bottom_color = Color(0.01, 0.01, 0.02)
+	else:
+		sm.sky_top_color = Color(0.25, 0.45, 0.75).lerp(amb, 0.2)
+		sm.sky_horizon_color = Color(0.65, 0.72, 0.8).lerp(amb, 0.2)
+		sm.ground_bottom_color = Color(0.2, 0.19, 0.17)
+	sm.ground_horizon_color = sm.sky_horizon_color
+	sky.sky_material = sm
+	e.background_mode = Environment.BG_SKY
+	e.sky = sky
+	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	e.ambient_light_color = amb.lerp(Color(0.4, 0.4, 0.4), 0.25)
+	e.ambient_light_energy = 0.35 if night else 0.8
+	if env.has("tonemap") or env.has("sun"):
+		e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+		var tm: Dictionary = env.get("tonemap", {}).get("keys", {})
+		e.tonemap_exposure = clampf(_key(tm, "tonemapscale", 1.0), 0.5, 2.0)
+	for f: Dictionary in env.get("fog", []):
+		if not f.get("enabled", false):
+			continue
+		e.fog_enabled = true
+		e.fog_light_color = _col(f.get("colour"), Color(0.5, 0.5, 0.5))
+		e.fog_density = clampf(3.0 / maxf(float(f.get("end", 60.0)), 1.0), 0.002, 0.2) * float(f.get("max_density", 1.0))
+		break
+	var we := WorldEnvironment.new()
+	we.name = "Environment"
+	we.environment = e
+	root.add_child(we)
+	if not sun.is_empty():
+		var light := DirectionalLight3D.new()
+		light.name = "Sun"
+		light.rotation_degrees = Vector3(float(sun.get("pitch", -45.0)), float(sun.get("yaw", 0.0)) - 90.0, 0.0)
+		var lc: Variant = sun.get("colour_hdr")
+		if not (lc is Array and float(lc[0]) >= 0.0):
+			lc = sun.get("colour")
+		light.light_color = _col(lc, Color(1, 0.96, 0.9))
+		var power := 200.0
+		if lc is Array and (lc as Array).size() > 3:
+			power = float(lc[3])
+		light.light_energy = clampf(power / 200.0, 0.2, 2.0)
+		light.shadow_enabled = sun_shadows and not bool(env.get("shadows", {}).get("disabled", false))
+		root.add_child(light)
+	var cubes: Array = env.get("cubemaps", [])
+	if max_probes > 0 and not cubes.is_empty():
+		var probes := Node3D.new()
+		probes.name = "Probes"
+		root.add_child(probes)
+		for i in mini(max_probes, cubes.size()):
+			var at: Array = cubes[i].get("at", [0, 0, 0])
+			var p := ReflectionProbe.new()
+			p.position = Vector3(at[0], at[1], at[2])
+			p.size = Vector3(16, 8, 16)
+			p.update_mode = ReflectionProbe.UPDATE_ONCE
+			probes.add_child(p)
+	return root
+
+
+## The first resource named [param id] with one of [param exts] in [param dirs], or null.
+static func find_resource(id: String, dirs: PackedStringArray, exts: PackedStringArray) -> Resource:
+	if id.is_empty():
+		return null
+	for d in dirs:
+		for x in exts:
+			var path := d.path_join(id + x)
+			if ResourceLoader.exists(path):
+				return load(path)
+	return null
+
+
+## The map's ambient sounds as nodes under [code]Sounds[/code]: each [code]ambient_generic[/code]
+## with a free [code]stand_in[/code] becomes a player at its place with its radius, volume and
+## pitch, started unless the map starts it silent. [param stream_for] takes the stand-in id and
+## returns an [AudioStream] (default: [constant DEFAULT_SOUND_DIRS]). [param make_node] takes
+## [code](record, stream)[/code] and returns the node to add, for a game that plays through its
+## own audio layer; null falls back to an [AudioStreamPlayer3D]. A sound with no stand-in is
+## silent on purpose: music and voices are never replaced.
+func build_sounds(stream_for: Callable = Callable(), make_node: Callable = Callable(), level: float = 1.0) -> Node3D:
+	var root := Node3D.new()
+	root.name = "Sounds"
+	for rec: Dictionary in sounds_data().get("ambient", []):
+		var id := str(rec.get("stand_in", ""))
+		if id.is_empty():
+			continue
+		var found: Variant = stream_for.call(id) if stream_for.is_valid() \
+				else find_resource(id, DEFAULT_SOUND_DIRS, PackedStringArray([".ogg", ".wav"]))
+		if not found is AudioStream:
+			continue
+		var stream := (found as AudioStream).duplicate() as AudioStream
+		if bool(rec.get("looped", true)):
+			if "loop" in stream:
+				stream.set("loop", true)
+			elif "loop_mode" in stream:
+				stream.set("loop_mode", AudioStreamWAV.LOOP_FORWARD)
+		var node: Node = null
+		if make_node.is_valid():
+			node = make_node.call(rec, stream)
+		if node == null:
+			node = _default_player(rec, stream, level)
+		var at: Array = rec.get("at", [0, 0, 0])
+		if node is Node3D:
+			(node as Node3D).position = Vector3(at[0], at[1], at[2])
+		root.add_child(node)
+	return root
+
+
+func _default_player(rec: Dictionary, stream: AudioStream, level: float) -> Node:
+	var db := linear_to_db(clampf(float(rec.get("volume", 1.0)) * level, 0.001, 4.0))
+	var pitch := clampf(float(rec.get("pitch", 100.0)) / 100.0, 0.25, 4.0)
+	var autoplay := not bool(rec.get("start_silent", false))
+	var p: Node
+	if bool(rec.get("everywhere", false)):
+		var g := AudioStreamPlayer.new()
+		g.stream = stream
+		g.volume_db = db
+		g.pitch_scale = pitch
+		g.autoplay = autoplay
+		p = g
+	else:
+		var a := AudioStreamPlayer3D.new()
+		a.stream = stream
+		a.volume_db = db
+		a.pitch_scale = pitch
+		a.max_distance = maxf(float(rec.get("radius", 20.0)), 1.0)
+		a.unit_size = clampf(a.max_distance * 0.25, 1.0, 20.0)
+		a.autoplay = autoplay
+		p = a
+	var tn := str(rec.get("targetname", ""))
+	p.name = (tn if not tn.is_empty() else "amb_%d" % int(rec.get("entity", 0))).validate_node_name()
+	return p
+
+
+## The free stand-in models the converter placed for the map's own, as nodes under
+## [code]Props[/code]. [param scene_for] takes the stand-in id and returns a [PackedScene]
+## (default: [constant DEFAULT_PROP_DIRS], [code].glb[/code]). Drawing only, no collision: the
+## map's own hulls are what players stand on. An id with no scene is skipped.
+func build_props(scene_for: Callable = Callable()) -> Node3D:
+	var root := Node3D.new()
+	root.name = "Props"
+	var cache := {}
+	for rec: Dictionary in manifest.get("props", []):
+		var id := str(rec.get("stand_in", ""))
+		if not cache.has(id):
+			cache[id] = scene_for.call(id) if scene_for.is_valid() \
+					else find_resource(id, DEFAULT_PROP_DIRS, PackedStringArray([".glb", ".tscn"]))
+		var scene: Variant = cache[id]
+		if not scene is PackedScene:
+			continue
+		var n := (scene as PackedScene).instantiate() as Node3D
+		if n == null:
+			continue
+		var at: Array = rec.get("at", [0, 0, 0])
+		n.position = Vector3(at[0], at[1], at[2])
+		n.rotation_degrees.y = float(rec.get("yaw", 0.0)) + PROP_FACING_DEGREES
+		n.scale = Vector3.ONE * float(rec.get("scale", 1.0))
+		root.add_child(n)
+	return root
+
+
 func counts() -> Dictionary:
 	var tris := 0
 	var verts := 0

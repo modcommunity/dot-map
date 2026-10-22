@@ -11,8 +11,8 @@ extends Node3D
 ## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
 ## thick at (256, 256, 16), at 0.01905 m per unit.
 
-const CHECKS := 26
-const SECTIONS := 3
+const CHECKS := 38
+const SECTIONS := 4
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const U := 0.01905
 
@@ -33,6 +33,7 @@ func _run() -> void:
 	var world := _test_read()
 	if world != null:
 		_test_build(world)
+		_test_environment(world)
 		await _test_collide(world)
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
@@ -129,6 +130,48 @@ func _test_build(world: DotMapBspMesh) -> void:
 	var a := m.surface_get_arrays(0)
 	_check((a[Mesh.ARRAY_TEX_UV] as PackedVector2Array).size() == (a[Mesh.ARRAY_VERTEX] as PackedVector3Array).size(),
 			"one uv per vertex")
+	_done()
+
+
+func _test_environment(world: DotMapBspMesh) -> void:
+	_section("environment, sounds and free stand-ins")
+	_check(not world.is_free() and world.build_environment() == null, "a map with no licence pass is not free and has no environment")
+	world.manifest["licence"] = {"textures": []}
+	world.manifest["environment"] = {"sky": {"name": "sky_day01"}, "sun": {"pitch": -45.0, "yaw": 90.0, "colour": [1, 0.9, 0.8, 400.0], "ambient": [0.2, 0.2, 0.3]},
+			"fog": [{"enabled": true, "colour": [0.5, 0.5, 0.6], "start": 5.0, "end": 60.0, "max_density": 1.0}],
+			"cubemaps": [{"at": [1, 2, 3]}, {"at": [4, 5, 6]}]}
+	world.manifest["sounds"] = {"ambient": [
+			{"entity": 1, "at": [1, 2, 3], "stand_in": "machine", "volume": 0.5, "radius": 20.0, "pitch": 100.0, "looped": true, "start_silent": false, "everywhere": false},
+			{"entity": 2, "at": [0, 0, 0], "stand_in": "", "looped": true},
+			{"entity": 3, "at": [0, 0, 0], "stand_in": "no_such_sound", "looped": true}]}
+	world.manifest["props"] = [{"stand_in": "chair", "at": [2, 0, -3], "yaw": 90.0, "scale": 1.0}, {"stand_in": "no_such_prop", "at": [0, 0, 0], "yaw": 0.0, "scale": 1.0}]
+	var env := world.build_environment(1)
+	var e := (env.get_node("Environment") as WorldEnvironment).environment
+	_check(e.fog_enabled and e.sky != null and e.tonemap_mode == Environment.TONE_MAPPER_FILMIC, "sky, fog and tonemap are applied")
+	var sun := env.get_node("Sun") as DirectionalLight3D
+	_check(is_equal_approx(sun.light_energy, 2.0) and is_equal_approx(sun.rotation_degrees.x, -45.0), "the sun's energy and pitch")
+	var fwd := -sun.basis.z
+	_check(absf(fwd.x) < 0.01 and fwd.z < -0.5 and fwd.y < -0.5, "yaw 90 (source +y) shines towards -z: %s" % fwd)
+	_check(env.get_node("Probes").get_child_count() == 1, "max_probes limits the reflection probes")
+	env.free()
+	var snd := world.build_sounds()
+	_check(snd.get_child_count() == 1 and snd.get_child(0) is AudioStreamPlayer3D, "one sound: the others have no stand-in or no file")
+	var pl := snd.get_child(0) as AudioStreamPlayer3D
+	_check(pl.position == Vector3(1, 2, 3) and is_equal_approx(pl.max_distance, 20.0) and pl.stream != null, "placed with its radius and stream")
+	_check(absf(pl.volume_db - linear_to_db(0.5)) < 0.01, "volume carried")
+	snd.free()
+	var hooked := []
+	var snd2 := world.build_sounds(func(_id: String) -> AudioStream: return AudioStreamGenerator.new(),
+			func(rec: Dictionary, _s: AudioStream) -> Node:
+				hooked.append(rec["entity"])
+				return Node3D.new())
+	_check(hooked == [1, 3] and snd2.get_child_count() == 2, "stream and node hooks replace the defaults: %s" % [hooked])
+	snd2.free()
+	var props := world.build_props()
+	_check(props.get_child_count() == 1 and absf((props.get_child(0) as Node3D).rotation_degrees.y - 180.0) < 0.01, "the chair stand-in is placed and turned to face +X at yaw 90")
+	_check((props.get_child(0) as Node3D).position == Vector3(2, 0, -3), "at its place")
+	props.free()
+	_check(world.is_free() == false, "a surface with no free key keeps the map from being called free")
 	_done()
 
 
