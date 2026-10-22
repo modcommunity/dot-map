@@ -1,6 +1,24 @@
 # The `cfg/` layout: per addon, per game, one generic `server.yml`
 
-Design for task `cfg-layout-split`. Nothing here is built yet except what the survey marks as existing. It lives in dot-map because the rotation file (`maps.yml`) is the first setting to move, but the rule is family-wide and the code is in dot-core and dot-server-deploy.
+Design for task `cfg-layout-split`. It lives in dot-map because the rotation file (`maps.yml`) is the first setting to move, but the rule is family-wide and the code is in dot-core and dot-server-deploy.
+
+## What is built for the rotation file
+
+The operator edits `cfg/server/` only; the shipped tiers are the author's. For `maps.yml`, weakest first, each in every root (`res://cfg`, beside the executable, `user://cfg`, `--config DIR`):
+
+| Tier | Path |
+| --- | --- |
+| addon | `cfg/addons/dot_map/maps.yml` |
+| game | `cfg/game/<game>/dot_map/maps.yml` (ships with the game, e.g. `cfg/game/mg-deathrun/dot_map/maps.yml`) |
+| operator | `cfg/server/addons/dot_map/maps.yml` |
+| operator, one game | `cfg/server/game/<game>/dot_map/maps.yml` |
+
+- **An operator file replaces the shipped list.** A file that starts with `merge: true` is layered over the weaker ones instead (a rotation of the same name still replaces its list). `remove: [map_id, ...]` at the top of any file takes those maps out of every rotation. `DotMapRotationFile.find_layers(config_dir, game)` returns the files that apply, from `DotAddonConfig.replace_aware_layers`, and `load_files` reads them.
+- **No file at all** is the zero-config case: every installed map rotates, sorted by id (`DotMapRotation.sort_unordered`). The game rotation and `cfg/content/games.yml` `maps:` lists are dot-server-deploy's and are not read here.
+- The old `cfg/server/dot_map/maps.yml` and the flat `cfg/maps.yml` are read through `DotCfgLegacy` (one WARN each, until 2026-12-31); the new path wins whole when both exist.
+- A game sets `DotAddonConfig.game` (or passes its name to `find_layers`) so the game tiers are read.
+
+The rest of this page is the original design, kept for the reasoning; where it names `cfg/server/<addon>/`, read `cfg/server/addons/<addon>/`.
 
 ## Survey: what exists today
 

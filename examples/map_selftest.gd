@@ -13,13 +13,13 @@ extends Node
 ## running, rather than on nothing. It is the reason the load happens before the
 ## teardown, and it is the step that is easiest to "simplify" back out.
 
-const CHECKS := 309
+const CHECKS := 319
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 32
+const SECTIONS := 33
 
 var _passed := 0
 var _failed := 0
@@ -69,6 +69,7 @@ func _run() -> void:
 	_test_rotation_file()
 	await _test_rotation_paths()
 	_test_rotation_file_layout()
+	_test_zero_config_rotation()
 
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
@@ -2673,14 +2674,17 @@ func _put(path: String, text: String) -> void:
 
 
 func _test_rotation_file_layout() -> void:
-	_section("maps.yml: cfg/addons/dot_map, the operator tier, the legacy shim")
+	_section("maps.yml: tiers, replace by default, merge: true, remove:, the legacy shims")
 	var base := OS.get_temp_dir().path_join("dot_map_layout_%d" % Time.get_ticks_usec())
 	var addon_f := base.path_join("addons/dot_map/maps.yml")
-	var server_f := base.path_join("server/dot_map/maps.yml")
+	var game_f := base.path_join("game/g/dot_map/maps.yml")
+	var server_f := base.path_join("server/addons/dot_map/maps.yml")
+	var server_game_f := base.path_join("server/game/g/dot_map/maps.yml")
+	var old_server_f := base.path_join("server/dot_map/maps.yml")
 	var flat_f := base.path_join("maps.yml")
 	DotCfgLegacy.reset()
 	_check(DotMapRotationFile.find("cfg/maps.yml", base) == "" or not DotMapRotationFile.find("cfg/maps.yml", base).begins_with(base), "nothing in an empty config directory")
-	_check(DotMapRotationFile.find_layers(base).is_empty(), "find_layers is empty with no file")
+	_check(DotMapRotationFile.find_layers(base).is_empty(), "find_layers is empty with no file (the default: every installed map)")
 	_put(flat_f, "defaults:\n  maps: [a]\n")
 	_check(DotMapRotationFile.find("cfg/maps.yml", base) == flat_f, "the flat file is still found")
 	_check(DotCfgLegacy.warned_count() == 1, "and warned once through the shim")
@@ -2688,21 +2692,62 @@ func _test_rotation_file_layout() -> void:
 	_check(DotCfgLegacy.warned_count() == 1, "not twice")
 	_put(addon_f, "defaults:\n  maps: [b]\n")
 	_check(DotMapRotationFile.find("cfg/maps.yml", base) == addon_f, "cfg/addons/dot_map/maps.yml beats the flat file")
+	_put(game_f, "defaults:\n  maps: [g]\n")
+	_check(DotMapRotationFile.find_layers(base).size() == 1, "a game's file is not read until the game is known")
+	var layers := DotMapRotationFile.find_layers(base, "g")
+	_check(layers.size() == 1 and layers[0] == game_f, "the game's file replaces the addon's (new path wins)")
 	_put(server_f, "defaults:\n  maps: [c]\n")
-	_check(DotMapRotationFile.find("cfg/maps.yml", base) == server_f, "the operator's cfg/server/dot_map/maps.yml beats the addon's")
-	var layers := DotMapRotationFile.find_layers(base)
-	_check(layers.size() == 2 and layers[0] == addon_f and layers[1] == server_f, "find_layers lists addon then server, weakest first")
-	var loaded := DotMapRotationFile.load_files(layers, "g")
-	_check(loaded.ok, "the layers load")
+	layers = DotMapRotationFile.find_layers(base, "g")
+	_check(layers.size() == 1 and layers[0] == server_f, "the operator's cfg/server/addons/dot_map/maps.yml replaces the shipped lists")
+	_check(DotMapRotationFile.find("cfg/maps.yml", base) == server_f, "and find() returns it")
+	_put(server_f, "merge: true\ndefaults:\n  maps: [c]\n")
+	layers = DotMapRotationFile.find_layers(base, "g")
+	_check(layers.size() == 2 and layers[0] == game_f and layers[1] == server_f, "merge: true keeps the shipped file under it, weakest first")
+	_put(server_game_f, "merge: true\ndefaults:\n  maps: [d]\n")
+	_check(DotMapRotationFile.find_layers(base, "g").size() == 3, "the operator's per-game file is the strongest layer")
+	var loaded := DotMapRotationFile.load_files(DotMapRotationFile.find_layers(base, "g"), "g")
+	_check(loaded.ok and (loaded.value as DotMapRotationFile).sources.size() == 3, "the layers load")
+	# Legacy operator path: read, warned once, new path wins whole when both exist.
+	DirAccess.remove_absolute(server_f)
+	DirAccess.remove_absolute(server_game_f)
+	DotCfgLegacy.reset()
+	_put(old_server_f, "defaults:\n  maps: [old]\n")
+	layers = DotMapRotationFile.find_layers(base, "g")
+	_check(layers.size() == 1 and layers[0] == old_server_f, "the old cfg/server/dot_map/maps.yml is still read")
+	DotMapRotationFile.find_layers(base, "g")
+	_check(DotCfgLegacy.warned_count() == 1, "and warns once")
+	_put(server_f, "defaults:\n  maps: [c]\n")
+	_check(DotMapRotationFile.find_layers(base, "g")[0] == server_f, "the new path wins over the old when both exist")
 	_check(DotMapRotationFile.find("cfg/other.yml", base) == "", "another stem is not routed through the new layout")
+	# remove: drops ids from every rotation.
+	var rm := DotMapRotationFile.from_trees([{"defaults": {"maps": ["m_a", "m_b", "m_c"]}}, {"merge": true, "remove": ["m_b"]}], "g").value as DotMapRotationFile
+	var rm_cat := _named_catalogue(["m_a", "m_b", "m_c"])
+	_check(Array(rm.resolve(rm_cat)) == ["m_a", "m_c"], "remove: takes a map out of the rotation (%s)" % [rm.resolve(rm_cat)])
 	_put(addon_f, "defaults:\n\tmaps: [b\n  - broken: [\n")
+	DirAccess.remove_absolute(game_f)
+	DirAccess.remove_absolute(server_f)
+	DirAccess.remove_absolute(old_server_f)
 	var bad := DotMapRotationFile.load_files(DotMapRotationFile.find_layers(base), "g")
 	_check(not bad.ok, "a bad maps.yml fails to load rather than rotating nothing")
 	DotCfgLegacy.reset()
-	for p in [addon_f, server_f, flat_f]:
+	for p in [addon_f, game_f, server_f, server_game_f, old_server_f, flat_f]:
 		DirAccess.remove_absolute(p)
-	for d in ["addons/dot_map", "addons", "server/dot_map", "server", ""]:
+	for d in ["addons/dot_map", "addons", "game/g/dot_map", "game/g", "game", "server/addons/dot_map", "server/addons", "server/game/g/dot_map", "server/game/g", "server/game", "server/dot_map", "server", ""]:
 		DirAccess.remove_absolute(base.path_join(d) if d != "" else base)
+	_done()
+
+
+func _test_zero_config_rotation() -> void:
+	_section("no rotation file: installed maps rotate sorted by id")
+	var cat := _named_catalogue(["m_c", "m_a", "m_b"])
+	var rot := DotMapRotation.of(cat)
+	rot.mode = DotMapRotation.Mode.SEQUENTIAL
+	DotMapRotationFile.from_trees([]).value.apply(rot)
+	var ids: Array = rot.pool().map(func(m: DotMapDef) -> String: return String(m.id))
+	_check(ids == ["m_a", "m_b", "m_c"], "pool is sorted by id (%s)" % [ids])
+	rot.sort_unordered = false
+	ids = rot.pool().map(func(m: DotMapDef) -> String: return String(m.id))
+	_check(ids == ["m_c", "m_a", "m_b"], "sort_unordered = false keeps catalogue order (%s)" % [ids])
 	_done()
 
 

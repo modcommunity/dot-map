@@ -36,7 +36,7 @@ The clock can wait while the server hibernates: `DotMapSession.follow_hibernatio
 
 ## The rotation file
 
-`cfg/addons/dot_map/maps.yml` says which installed maps rotate (the operator's `cfg/server/dot_map/maps.yml` over it; the flat `cfg/maps.yml` is still found through `DotCfgLegacy` with one WARN until 2026-12-31, and `DotMapRotationFile.find("cfg/maps.yml")` does all of that; `find_layers` lists the new-layout files weakest first), in the shape of the server's content.yml: `defaults:` for every game and `games: <game>:` for one, read by `DotMapRotationFile`. Layers, weakest first: the game's shipped file, the server's defaults, the game's own entry. A list replaces a list; scalars merge.
+`cfg/addons/dot_map/maps.yml` says which installed maps rotate (the game's `cfg/game/<game>/dot_map/maps.yml` over it, then the operator's `cfg/server/addons/dot_map/maps.yml` and `cfg/server/game/<game>/dot_map/maps.yml`; an operator file replaces the shipped list unless it starts `merge: true`, and `remove: [ids]` drops maps; [layout](cfg-layout.md#what-is-built-for-the-rotation-file); with no file every installed map rotates, sorted by id; the old `cfg/server/dot_map/maps.yml` is read through the shim too; the flat `cfg/maps.yml` is still found through `DotCfgLegacy` with one WARN until 2026-12-31, and `DotMapRotationFile.find("cfg/maps.yml")` does all of that; `find_layers` lists the new-layout files weakest first), in the shape of the server's content.yml: `defaults:` for every game and `games: <game>:` for one, read by `DotMapRotationFile`. Layers, weakest first: the game's shipped file, the server's defaults, the game's own entry. A list replaces a list; scalars merge.
 
 ```yaml
 defaults:

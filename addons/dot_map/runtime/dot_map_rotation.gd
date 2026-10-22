@@ -27,13 +27,16 @@ enum Mode {
 
 var catalogue: DotMapCatalogue = null
 
-## Ids in rotation order. Empty means "every enabled map in the catalogue".
+## Ids in rotation order. Empty means "every enabled map in the catalogue", sorted by id (see [member sort_unordered]).
 ##
 ## Separate from the catalogue for the reason in [DotMapCatalogue]: a server knows
 ## about two hundred maps and rotates twelve.
 var order: Array[StringName] = []
 
 var mode: Mode = Mode.RANDOM
+
+## With no [member order] (no rotation file) the pool is every installed map sorted by id, so a cycle is the same on every server; false keeps the catalogue's own order.
+var sort_unordered: bool = true
 
 ## How many recently played maps are excluded from a choice.
 ##
@@ -79,6 +82,8 @@ func pool(players: int = 0) -> Array[DotMapDef]:
 		for map in catalogue.maps:
 			if map.available_for(players):
 				out.append(map)
+		if sort_unordered:
+			out.sort_custom(func(a: DotMapDef, b: DotMapDef) -> bool: return String(a.id) < String(b.id))
 		return out
 
 	for id in order:

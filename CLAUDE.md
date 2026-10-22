@@ -21,7 +21,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | Path | What |
 | --- | --- |
 | `addons/dot_map/core/` | `DotMapDef` (id, version, scene, pack, tier, player range), `DotMapCatalogue` (the JSON an operator edits) |
-| `addons/dot_map/runtime/` | `DotMapLoader` (def to `PackedScene`, fetching first), `DotMapRotation`, `DotMapRotationFile` (`cfg/addons/dot_map/maps.yml`, legacy `cfg/maps.yml` via `DotCfgLegacy`), `DotMapSession` (the node a game adds) |
+| `addons/dot_map/runtime/` | `DotMapLoader` (def to `PackedScene`, fetching first), `DotMapRotation`, `DotMapRotationFile` (`cfg/addons/dot_map/maps.yml`, the game and operator tiers, `merge: true`, `remove:`, legacy `cfg/maps.yml` via `DotCfgLegacy`), `DotMapSession` (the node a game adds) |
 | `addons/dot_map/net/` | `DotMapMessage` (the five messages), `DotMapSyncHost` (announce, wait, swap; read its class doc), `DotMapSyncClient` (fetch, ready, load; owns the trust rules) |
 | `addons/dot_map/surfaces/` | `DotMapSurfaces`: a surface kind (`&"brick"`) to a world-space triplanar material; 15 CC0 photo kinds, credits beside them. [surfaces](docs/surfaces.md) |
 | `addons/dot_map/brushes/` | `DotMapBrush`: box, wedge, stairs, cylinder, cone, spike, arch, quarter_pipe, slab_holes from a dictionary; convex collision, UVs in metres, a material slot. [brushes](docs/brushes.md) |

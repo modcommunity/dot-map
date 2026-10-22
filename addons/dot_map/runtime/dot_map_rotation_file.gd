@@ -1,7 +1,7 @@
 class_name DotMapRotationFile
 extends RefCounted
 
-## The maps a server PLAYS, read from `cfg/maps.yml`; the catalogue is what is merely installed.
+## The maps a server PLAYS, read from `cfg/addons/dot_map/maps.yml` and its tiers; the catalogue is what is merely installed.
 ##
 ## An operator keeping forty maps installed and rotating twelve should not have to delete
 ## twenty-eight to say so. A map the active rotation does not list stays installed and
@@ -22,6 +22,7 @@ extends RefCounted
 ##       main: {maps: ...}     # written as block lists in a real file
 ## [/codeblock]
 ##
+## No file at all is fine: every installed map rotates, sorted by id ([member DotMapRotation.sort_unordered]). An operator file replaces the shipped one, `merge: true` at its top adds to it, `remove: [ids]` drops maps.
 ## Layers, weakest first: the game's shipped file, the server's `defaults:`, the server's
 ## `games: <game>`. The parsing, layering and matching are dot-core's [DotRotationSpec],
 ## which games.yml uses too; this class only supplies the catalogue as the candidates.
@@ -46,6 +47,9 @@ var collections: Dictionary = {}
 
 ## Where the layers were read from, weakest first.
 var sources: PackedStringArray = PackedStringArray()
+
+## Map ids (or the last segment of a ref) taken out of every rotation, from a top-level `remove: [ids]` in any layer.
+var removed: PackedStringArray = PackedStringArray()
 
 var warnings: PackedStringArray = PackedStringArray()
 var _warned: Dictionary = {}
@@ -79,14 +83,18 @@ static func find(stem: String, config_dir: String = "") -> String:
 	if stem.strip_edges().is_empty():
 		return ""
 	if stem.trim_suffix(".yml").trim_suffix(".yaml") == DEFAULT_STEM.trim_suffix(".yml"):
-		return DotCfgLegacy.find(_find_flat(stem, config_dir), _strongest(find_layers(config_dir)))
+		return DotCfgLegacy.find(_find_flat(stem, config_dir), _strongest(DotAddonConfig.file_layers("dot-map", "maps.yml", config_dir)))
 	return _find_flat(stem, config_dir)
 
 
-## Every `maps.yml` of the new layout, weakest first: `cfg/addons/dot_map/` then the operator's
-## `cfg/server/dot_map/`, over the shipped, executable, `user://` and `--config` roots.
-static func find_layers(config_dir: String = "") -> PackedStringArray:
-	return DotAddonConfig.file_layers("dot-map", "maps.yml", config_dir)
+## The `maps.yml` files that apply, weakest first: `cfg/addons/dot_map/`, the game's `cfg/game/<game>/dot_map/`, the operator's `cfg/server/addons/dot_map/` and `cfg/server/game/<game>/dot_map/`. An operator file replaces every weaker one unless it starts `merge: true` ([method DotAddonConfig.replace_aware_layers]). [param p_game] stands in for [member DotAddonConfig.game] when that is unset.
+static func find_layers(config_dir: String = "", p_game: String = "") -> PackedStringArray:
+	var had := DotAddonConfig.game
+	if had == "" and p_game != "":
+		DotAddonConfig.game = p_game
+	var out := DotAddonConfig.replace_aware_layers("dot-map", "maps.yml", config_dir)
+	DotAddonConfig.game = had
+	return out
 
 
 static func _strongest(paths: PackedStringArray) -> String:
@@ -131,6 +139,9 @@ static func from_trees(trees: Array, p_game: String = "", p_sources: PackedStrin
 	var layers: Array = []
 	for t: Variant in trees:
 		var tree := t as Dictionary
+		if tree.get("remove") is Array:
+			for r: Variant in (tree["remove"] as Array):
+				file.removed.append(str(r))
 		var where := "maps.yml"
 		if tree.get("defaults") is Dictionary:
 			layers.append(DotRotationSpec.normalize(tree["defaults"], "maps", file.warnings, where + " defaults"))
@@ -194,6 +205,12 @@ func resolve(catalogue: DotMapCatalogue, name: String = "") -> PackedStringArray
 		candidates.append({"id": String(m.id), "ref": content if content.count("/") == 1 else ""})
 	var unmatched := PackedStringArray()
 	var ids := DotRotationSpec.expand((rots[use] as Dictionary)["entries"], candidates, collections, unmatched)
+	if not removed.is_empty():
+		var kept := PackedStringArray()
+		for id in ids:
+			if not removed.has(id):
+				kept.append(id)
+		ids = kept
 	for entry in unmatched:
 		var key := "%s|%s" % [use, entry]
 		if not _warned.has(key):

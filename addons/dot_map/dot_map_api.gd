@@ -18,5 +18,8 @@ extends RefCounted
 # 7: DotMapRotationFile.find_layers; find("cfg/maps.yml") reads cfg/addons/dot_map/maps.yml (and
 #    the operator's cfg/server/dot_map/), the flat cfg/maps.yml through DotCfgLegacy until
 #    2026-12-31. Needs dot-core API level 15.
-const LEVEL := 7
+# 8: find_layers(config_dir, game) reads the game tier and the mirrored cfg/server/addons and cfg/server/game
+#    tiers; an operator maps.yml replaces the shipped one unless it starts `merge: true`; `remove: [ids]`;
+#    DotMapRotation.sort_unordered (no file: installed maps sorted by id). Needs dot-core API level 17.
+const LEVEL := 8
 const OLDEST := 1
