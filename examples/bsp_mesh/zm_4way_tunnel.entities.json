@@ -1,0 +1,5050 @@
+{
+ "entities": [
+  {
+   "classname": "phys_hinge",
+   "entity": 9,
+   "keys": {
+    "SystemLoadScale": "1",
+    "attach1": "Upper_Trap03",
+    "hingeaxis": "706.84 -832 5410.1",
+    "spawnflags": "0",
+    "targetname": "Upper_Trap03_hinge01"
+   },
+   "model": null,
+   "origin": [
+    12.7034,
+    103.0224,
+    15.8496
+   ],
+   "target": "",
+   "targetname": "Upper_Trap03_hinge01",
+   "treatment": "data"
+  },
+  {
+   "classname": "phys_hinge",
+   "entity": 10,
+   "keys": {
+    "SystemLoadScale": "1",
+    "attach1": "Upper_Trap03",
+    "hingeaxis": "810.85 -832 5408",
+    "spawnflags": "0",
+    "targetname": "Upper_Trap03_hinge02"
+   },
+   "model": null,
+   "origin": [
+    16.2086,
+    103.0224,
+    15.8496
+   ],
+   "target": "",
+   "targetname": "Upper_Trap03_hinge02",
+   "treatment": "data"
+  },
+  {
+   "classname": "env_shake",
+   "entity": 106,
+   "keys": {
+    "amplitude": "14",
+    "duration": "6",
+    "frequency": "50",
+    "parentname": "lift01_plate",
+    "radius": "80",
+    "spawnflags": "0",
+    "targetname": "lift01_shaker"
+   },
+   "model": null,
+   "origin": [
+    12.192,
+    0.7811,
+    24.6888
+   ],
+   "target": "",
+   "targetname": "lift01_shaker",
+   "treatment": "data"
+  },
+  {
+   "classname": "env_entity_maker",
+   "entity": 116,
+   "keys": {
+    "EntityTemplate": "break_roof_template",
+    "PostSpawnDirection": "0 0 0",
+    "PostSpawnDirectionVariance": "0.15",
+    "angles": "0 0 0",
+    "spawnflags": "0",
+    "targetname": "break_roof_spawn"
+   },
+   "model": null,
+   "origin": [
+    4.8768,
+    16.1544,
+    67.056
+   ],
+   "target": "",
+   "targetname": "break_roof_spawn",
+   "treatment": "data"
+  },
+  {
+   "classname": "env_entity_maker",
+   "entity": 117,
+   "keys": {
+    "EntityTemplate": "break_rooffloor_template",
+    "PostSpawnDirection": "0 0 0",
+    "PostSpawnDirectionVariance": "0.15",
+    "angles": "0 0 0",
+    "spawnflags": "0",
+    "targetname": "break_rooffloor_spawn"
+   },
+   "model": null,
+   "origin": [
+    7.3152,
+    14.7828,
+    67.056
+   ],
+   "target": "",
+   "targetname": "break_rooffloor_spawn",
+   "treatment": "data"
+  },
+  {
+   "classname": "env_entity_maker",
+   "entity": 119,
+   "keys": {
+    "EntityTemplate": "break_4f_template",
+    "PostSpawnDirection": "0 0 0",
+    "PostSpawnDirectionVariance": "0.15",
+    "angles": "0 0 0",
+    "spawnflags": "0",
+    "targetname": "break_4f_spawn"
+   },
+   "model": null,
+   "origin": [
+    7.3152,
+    10.8204,
+    67.056
+   ],
+   "target": "",
+   "targetname": "break_4f_spawn",
+   "treatment": "data"
+  },
+  {
+   "classname": "env_entity_maker",
+   "entity": 120,
+   "keys": {
+    "EntityTemplate": "break_3f_template",
+    "PostSpawnDirection": "0 0 0",
+    "PostSpawnDirectionVariance": "0.15",
+    "angles": "0 0 0",
+    "spawnflags": "0",
+    "targetname": "break_3f__spawn"
+   },
+   "model": null,
+   "origin": [
+    7.3152,
+    7.1628,
+    67.056
+   ],
+   "target": "",
+   "targetname": "break_3f__spawn",
+   "treatment": "data"
+  },
+  {
+   "classname": "env_entity_maker",
+   "entity": 121,
+   "keys": {
+    "EntityTemplate": "break_2f_template",
+    "PostSpawnDirection": "0 0 0",
+    "PostSpawnDirectionVariance": "0.15",
+    "angles": "0 0 0",
+    "spawnflags": "0",
+    "targetname": "break_2f__spawn"
+   },
+   "model": null,
+   "origin": [
+    7.3152,
+    3.81,
+    67.056
+   ],
+   "target": "",
+   "targetname": "break_2f__spawn",
+   "treatment": "data"
+  },
+  {
+   "classname": "env_shake",
+   "entity": 125,
+   "keys": {
+    "amplitude": "16",
+    "duration": "2",
+    "frequency": "200",
+    "parentname": "drop_container",
+    "radius": "500",
+    "targetname": "container_shaker"
+   },
+   "model": null,
+   "origin": [
+    7.5293,
+    52.8329,
+    67.0941
+   ],
+   "target": "",
+   "targetname": "container_shaker",
+   "treatment": "data"
+  },
+  {
+   "classname": "point_template",
+   "entity": 137,
+   "keys": {
+    "Template01": "break_roof_break",
+    "spawnflags": "2",
+    "targetname": "break_roof_template"
+   },
+   "model": null,
+   "origin": [
+    4.8768,
+    16.1544,
+    49.9872
+   ],
+   "target": "",
+   "targetname": "break_roof_template",
+   "treatment": "data"
+  },
+  {
+   "classname": "point_template",
+   "entity": 138,
+   "keys": {
+    "Template01": "break_rooffloor_break",
+    "spawnflags": "2",
+    "targetname": "break_rooffloor_template"
+   },
+   "model": null,
+   "origin": [
+    7.3152,
+    14.7828,
+    52.4256
+   ],
+   "target": "",
+   "targetname": "break_rooffloor_template",
+   "treatment": "data"
+  },
+  {
+   "classname": "point_template",
+   "entity": 140,
+   "keys": {
+    "Template01": "break_4f_break",
+    "spawnflags": "2",
+    "targetname": "break_4f_template"
+   },
+   "model": null,
+   "origin": [
+    7.3152,
+    10.8204,
+    52.4256
+   ],
+   "target": "",
+   "targetname": "break_4f_template",
+   "treatment": "data"
+  },
+  {
+   "classname": "point_template",
+   "entity": 141,
+   "keys": {
+    "Template01": "break_3f_break",
+    "spawnflags": "2",
+    "targetname": "break_3f_template"
+   },
+   "model": null,
+   "origin": [
+    7.3152,
+    7.1628,
+    52.4256
+   ],
+   "target": "",
+   "targetname": "break_3f_template",
+   "treatment": "data"
+  },
+  {
+   "classname": "point_template",
+   "entity": 142,
+   "keys": {
+    "Template01": "break_2f_break",
+    "spawnflags": "2",
+    "targetname": "break_2f_template"
+   },
+   "model": null,
+   "origin": [
+    7.3152,
+    3.81,
+    52.4256
+   ],
+   "target": "",
+   "targetname": "break_2f_template",
+   "treatment": "data"
+  },
+  {
+   "classname": "logic_auto",
+   "entity": 150,
+   "keys": {
+    "spawnflags": "1"
+   },
+   "model": null,
+   "origin": [
+    8.7036,
+    15.1067,
+    61.5298
+   ],
+   "target": "",
+   "targetname": "",
+   "treatment": "data"
+  },
+  {
+   "classname": "path_track",
+   "entity": 154,
+   "keys": {
+    "angles": "0 0 0",
+    "orientationtype": "0",
+    "spawnflags": "0",
+    "speed": "100",
+    "target": "Shutter_left01_start",
+    "targetname": "Shutter_left01_end"
+   },
+   "model": null,
+   "origin": [
+    -40.2336,
+    8.9916,
+    34.29
+   ],
+   "target": "Shutter_left01_start",
+   "targetname": "Shutter_left01_end",
+   "treatment": "data"
+  },
+  {
+   "classname": "path_track",
+   "entity": 155,
+   "keys": {
+    "angles": "0 0 0",
+    "orientationtype": "0",
+    "spawnflags": "0",
+    "speed": "100",
+    "targetname": "Shutter_left01_start"
+   },
+   "model": null,
+   "origin": [
+    -40.2336,
+    11.5824,
+    34.29
+   ],
+   "target": "",
+   "targetname": "Shutter_left01_start",
+   "treatment": "data"
+  },
+  {
+   "classname": "path_track",
+   "entity": 159,
+   "keys": {
+    "angles": "0 0 0",
+    "orientationtype": "0",
+    "spawnflags": "0",
+    "speed": "100",
+    "target": "Shutter_right01_start",
+    "targetname": "Shutter_right01_end"
+   },
+   "model": null,
+   "origin": [
+    -40.2336,
+    8.9916,
+    29.1084
+   ],
+   "target": "Shutter_right01_start",
+   "targetname": "Shutter_right01_end",
+   "treatment": "data"
+  },
+  {
+   "classname": "path_track",
+   "entity": 160,
+   "keys": {
+    "angles": "0 0 0",
+    "orientationtype": "0",
+    "spawnflags": "0",
+    "speed": "100",
+    "targetname": "Shutter_right01_start"
+   },
+   "model": null,
+   "origin": [
+    -40.2336,
+    11.5824,
+    29.1084
+   ],
+   "target": "",
+   "targetname": "Shutter_right01_start",
+   "treatment": "data"
+  },
+  {
+   "classname": "path_track",
+   "entity": 164,
+   "keys": {
+    "angles": "0 0 0",
+    "orientationtype": "0",
+    "spawnflags": "0",
+    "speed": "12",
+    "target": "Elevater01_end",
+    "targetname": "Elevater01_start"
+   },
+   "model": null,
+   "origin": [
+    -60.6552,
+    20.4216,
+    31.6992
+   ],
+   "target": "Elevater01_end",
+   "targetname": "Elevater01_start",
+   "treatment": "data"
+  },
+  {
+   "classname": "path_track",
+   "entity": 165,
+   "keys": {
+    "angles": "0 0 0",
+    "orientationtype": "0",
+    "spawnflags": "0",
+    "speed": "12",
+    "targetname": "Elevater01_end"
+   },
+   "model": null,
+   "origin": [
+    -60.6552,
+    5.6388,
+    31.6992
+   ],
+   "target": "",
+   "targetname": "Elevater01_end",
+   "treatment": "data"
+  }
+ ],
+ "format": "dot-bsp-mesh",
+ "links": [
+  {
+   "delay": 0.0,
+   "from": 11,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap03_bar",
+   "input": "EnableMotion",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap03",
+   "times": 1,
+   "to": [
+    8
+   ]
+  },
+  {
+   "delay": 3.0,
+   "from": 11,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap03_bar",
+   "input": "DisableMotion",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap03",
+   "times": 1,
+   "to": [
+    8
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 11,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap03_bar",
+   "input": "EnableMotion",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap04",
+   "times": 1,
+   "to": [
+    7
+   ]
+  },
+  {
+   "delay": 3.0,
+   "from": 11,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap03_bar",
+   "input": "DisableMotion",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap04",
+   "times": 1,
+   "to": [
+    7
+   ]
+  },
+  {
+   "delay": 10.0,
+   "from": 104,
+   "from_class": "func_button",
+   "from_name": "lift01_button_up",
+   "input": "Unlock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift01_button_down",
+   "times": -1,
+   "to": [
+    108,
+    109
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 104,
+   "from_class": "func_button",
+   "from_name": "lift01_button_up",
+   "input": "Open",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift01_plate",
+   "times": -1,
+   "to": [
+    105
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 104,
+   "from_class": "func_button",
+   "from_name": "lift01_button_up",
+   "input": "Lock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift01_button_up",
+   "times": -1,
+   "to": [
+    104,
+    107
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 105,
+   "from_class": "func_door",
+   "from_name": "lift01_plate",
+   "input": "StartShake",
+   "output": "OnOpen",
+   "param": "",
+   "special": false,
+   "target": "lift01_shaker",
+   "times": -1,
+   "to": [
+    106
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 105,
+   "from_class": "func_door",
+   "from_name": "lift01_plate",
+   "input": "StartSpark",
+   "output": "OnOpen",
+   "param": "",
+   "special": false,
+   "target": "lift01_spark",
+   "times": -1,
+   "to": [
+    1,
+    2
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 105,
+   "from_class": "func_door",
+   "from_name": "lift01_plate",
+   "input": "StopShake",
+   "output": "OnFullyOpen",
+   "param": "",
+   "special": false,
+   "target": "lift01_shaker",
+   "times": -1,
+   "to": [
+    106
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 105,
+   "from_class": "func_door",
+   "from_name": "lift01_plate",
+   "input": "StopSpark",
+   "output": "OnFullyOpen",
+   "param": "",
+   "special": false,
+   "target": "lift01_spark",
+   "times": -1,
+   "to": [
+    1,
+    2
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 105,
+   "from_class": "func_door",
+   "from_name": "lift01_plate",
+   "input": "StopShake",
+   "output": "OnFullyClosed",
+   "param": "",
+   "special": false,
+   "target": "lift01_shaker",
+   "times": -1,
+   "to": [
+    106
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 105,
+   "from_class": "func_door",
+   "from_name": "lift01_plate",
+   "input": "StopSpark",
+   "output": "OnFullyClosed",
+   "param": "",
+   "special": false,
+   "target": "lift01_spark",
+   "times": -1,
+   "to": [
+    1,
+    2
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 105,
+   "from_class": "func_door",
+   "from_name": "lift01_plate",
+   "input": "StartShake",
+   "output": "OnClose",
+   "param": "",
+   "special": false,
+   "target": "lift01_shaker",
+   "times": -1,
+   "to": [
+    106
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 105,
+   "from_class": "func_door",
+   "from_name": "lift01_plate",
+   "input": "StartSpark",
+   "output": "OnClose",
+   "param": "",
+   "special": false,
+   "target": "lift01_spark",
+   "times": -1,
+   "to": [
+    1,
+    2
+   ]
+  },
+  {
+   "delay": 10.0,
+   "from": 107,
+   "from_class": "func_button",
+   "from_name": "lift01_button_up",
+   "input": "Unlock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift01_button_down",
+   "times": -1,
+   "to": [
+    108,
+    109
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 107,
+   "from_class": "func_button",
+   "from_name": "lift01_button_up",
+   "input": "Lock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift01_button_up",
+   "times": -1,
+   "to": [
+    104,
+    107
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 107,
+   "from_class": "func_button",
+   "from_name": "lift01_button_up",
+   "input": "Open",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift01_plate",
+   "times": -1,
+   "to": [
+    105
+   ]
+  },
+  {
+   "delay": 10.0,
+   "from": 108,
+   "from_class": "func_button",
+   "from_name": "lift01_button_down",
+   "input": "Unlock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift01_button_up",
+   "times": -1,
+   "to": [
+    104,
+    107
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 108,
+   "from_class": "func_button",
+   "from_name": "lift01_button_down",
+   "input": "Lock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift01_button_down",
+   "times": -1,
+   "to": [
+    108,
+    109
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 108,
+   "from_class": "func_button",
+   "from_name": "lift01_button_down",
+   "input": "Close",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift01_plate",
+   "times": -1,
+   "to": [
+    105
+   ]
+  },
+  {
+   "delay": 10.0,
+   "from": 109,
+   "from_class": "func_button",
+   "from_name": "lift01_button_down",
+   "input": "Unlock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift01_button_up",
+   "times": -1,
+   "to": [
+    104,
+    107
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 109,
+   "from_class": "func_button",
+   "from_name": "lift01_button_down",
+   "input": "Close",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift01_plate",
+   "times": -1,
+   "to": [
+    105
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 109,
+   "from_class": "func_button",
+   "from_name": "lift01_button_down",
+   "input": "Lock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift01_button_down",
+   "times": -1,
+   "to": [
+    108,
+    109
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 134,
+   "from_class": "func_breakable",
+   "from_name": "break_4f_break",
+   "input": "PlaySound",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "mansion_sound",
+   "times": -1,
+   "to": [
+    143
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 135,
+   "from_class": "func_breakable",
+   "from_name": "break_3f_break",
+   "input": "PlaySound",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "mansion_sound",
+   "times": -1,
+   "to": [
+    143
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 136,
+   "from_class": "func_breakable",
+   "from_name": "break_2f_break",
+   "input": "PlaySound",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "mansion_sound",
+   "times": -1,
+   "to": [
+    143
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 139,
+   "from_class": "func_breakable",
+   "from_name": "break_rooffloor_break",
+   "input": "PlaySound",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "mansion_sound",
+   "times": -1,
+   "to": [
+    143
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 144,
+   "from_class": "func_button",
+   "from_name": "lift02_button_down",
+   "input": "Close",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift02_plate",
+   "times": -1,
+   "to": [
+    145
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 144,
+   "from_class": "func_button",
+   "from_name": "lift02_button_down",
+   "input": "Lock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift02_button_down",
+   "times": -1,
+   "to": [
+    144,
+    149
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 145,
+   "from_class": "func_door",
+   "from_name": "lift02_plate",
+   "input": "Unlock",
+   "output": "OnFullyClosed",
+   "param": "",
+   "special": false,
+   "target": "lift03_button_up",
+   "times": -1,
+   "to": [
+    230,
+    233
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 145,
+   "from_class": "func_door",
+   "from_name": "lift02_plate",
+   "input": "Unlock",
+   "output": "OnFullyOpen",
+   "param": "",
+   "special": false,
+   "target": "lift02_button_down",
+   "times": -1,
+   "to": [
+    144,
+    149
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 146,
+   "from_class": "func_button",
+   "from_name": "lift02_button_up",
+   "input": "Open",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift02_plate",
+   "times": -1,
+   "to": [
+    145
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 146,
+   "from_class": "func_button",
+   "from_name": "lift02_button_up",
+   "input": "Lock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift02_button_up",
+   "times": -1,
+   "to": [
+    146,
+    148
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 148,
+   "from_class": "func_button",
+   "from_name": "lift02_button_up",
+   "input": "Lock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift02_button_up",
+   "times": -1,
+   "to": [
+    146,
+    148
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 148,
+   "from_class": "func_button",
+   "from_name": "lift02_button_up",
+   "input": "Open",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift02_plate",
+   "times": -1,
+   "to": [
+    145
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 149,
+   "from_class": "func_button",
+   "from_name": "lift02_button_down",
+   "input": "Lock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift02_button_down",
+   "times": -1,
+   "to": [
+    144,
+    149
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 149,
+   "from_class": "func_button",
+   "from_name": "lift02_button_down",
+   "input": "Close",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift02_plate",
+   "times": -1,
+   "to": [
+    145
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 150,
+   "from_class": "logic_auto",
+   "from_name": "",
+   "input": "Enable",
+   "output": "OnMapSpawn",
+   "param": "",
+   "special": false,
+   "target": "break_2f",
+   "times": -1,
+   "to": [
+    115
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 150,
+   "from_class": "logic_auto",
+   "from_name": "",
+   "input": "Enable",
+   "output": "OnMapSpawn",
+   "param": "",
+   "special": false,
+   "target": "break_3f",
+   "times": -1,
+   "to": [
+    114
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 150,
+   "from_class": "logic_auto",
+   "from_name": "",
+   "input": "Enable",
+   "output": "OnMapSpawn",
+   "param": "",
+   "special": false,
+   "target": "break_4f",
+   "times": -1,
+   "to": [
+    113
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 150,
+   "from_class": "logic_auto",
+   "from_name": "",
+   "input": "Enable",
+   "output": "OnMapSpawn",
+   "param": "",
+   "special": false,
+   "target": "break_roof",
+   "times": -1,
+   "to": [
+    112
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 150,
+   "from_class": "logic_auto",
+   "from_name": "",
+   "input": "Enable",
+   "output": "OnMapSpawn",
+   "param": "",
+   "special": false,
+   "target": "break_rooffloor",
+   "times": -1,
+   "to": [
+    118
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 150,
+   "from_class": "logic_auto",
+   "from_name": "",
+   "input": "EnableMotion",
+   "output": "OnMapSpawn",
+   "param": "",
+   "special": false,
+   "target": "phys_prp",
+   "times": -1,
+   "to": []
+  },
+  {
+   "delay": 0.0,
+   "from": 154,
+   "from_class": "path_track",
+   "from_name": "Shutter_left01_end",
+   "input": "SetSpeed",
+   "output": "OnPass",
+   "param": "0",
+   "special": false,
+   "target": "Shutter_left01",
+   "times": -1,
+   "to": [
+    153
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 155,
+   "from_class": "path_track",
+   "from_name": "Shutter_left01_start",
+   "input": "SetSpeed",
+   "output": "OnPass",
+   "param": "0",
+   "special": false,
+   "target": "Shutter_left01",
+   "times": -1,
+   "to": [
+    153
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 156,
+   "from_class": "func_button",
+   "from_name": "Shutter_left01_switch_close",
+   "input": "StartBackward",
+   "output": "OnDamaged",
+   "param": "",
+   "special": false,
+   "target": "Shutter_left01",
+   "times": -1,
+   "to": [
+    153
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 156,
+   "from_class": "func_button",
+   "from_name": "Shutter_left01_switch_close",
+   "input": "StartBackward",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "Shutter_left01",
+   "times": -1,
+   "to": [
+    153
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 157,
+   "from_class": "func_button",
+   "from_name": "Shutter_left01_switch_open",
+   "input": "StartForward",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "Shutter_left01",
+   "times": -1,
+   "to": [
+    153
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 157,
+   "from_class": "func_button",
+   "from_name": "Shutter_left01_switch_open",
+   "input": "StartForward",
+   "output": "OnDamaged",
+   "param": "",
+   "special": false,
+   "target": "Shutter_left01",
+   "times": -1,
+   "to": [
+    153
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 159,
+   "from_class": "path_track",
+   "from_name": "Shutter_right01_end",
+   "input": "SetSpeed",
+   "output": "OnPass",
+   "param": "0",
+   "special": false,
+   "target": "Shutter_right01",
+   "times": -1,
+   "to": [
+    158
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 160,
+   "from_class": "path_track",
+   "from_name": "Shutter_right01_start",
+   "input": "SetSpeed",
+   "output": "OnPass",
+   "param": "0",
+   "special": false,
+   "target": "Shutter_right01",
+   "times": -1,
+   "to": [
+    158
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 161,
+   "from_class": "func_button",
+   "from_name": "Shutter_right01_switch_close",
+   "input": "StartBackward",
+   "output": "OnDamaged",
+   "param": "",
+   "special": false,
+   "target": "Shutter_right01",
+   "times": -1,
+   "to": [
+    158
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 161,
+   "from_class": "func_button",
+   "from_name": "Shutter_right01_switch_close",
+   "input": "StartBackward",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "Shutter_right01",
+   "times": -1,
+   "to": [
+    158
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 162,
+   "from_class": "func_button",
+   "from_name": "Shutter_right01_switch_open",
+   "input": "StartForward",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "Shutter_right01",
+   "times": -1,
+   "to": [
+    158
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 162,
+   "from_class": "func_button",
+   "from_name": "Shutter_right01_switch_open",
+   "input": "StartForward",
+   "output": "OnDamaged",
+   "param": "",
+   "special": false,
+   "target": "Shutter_right01",
+   "times": -1,
+   "to": [
+    158
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 164,
+   "from_class": "path_track",
+   "from_name": "Elevater01_start",
+   "input": "SetSpeed",
+   "output": "OnPass",
+   "param": "0",
+   "special": false,
+   "target": "Elevater01",
+   "times": -1,
+   "to": [
+    163
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 165,
+   "from_class": "path_track",
+   "from_name": "Elevater01_end",
+   "input": "SetSpeed",
+   "output": "OnPass",
+   "param": "0",
+   "special": false,
+   "target": "Elevater01",
+   "times": -1,
+   "to": [
+    163
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 166,
+   "from_class": "func_button",
+   "from_name": "Elevater01_switch_up2",
+   "input": "StartForward",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "Elevater01",
+   "times": -1,
+   "to": [
+    163
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 167,
+   "from_class": "func_button",
+   "from_name": "Elevater01_switch_down2",
+   "input": "StartBackward",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "Elevater01",
+   "times": -1,
+   "to": [
+    163
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 168,
+   "from_class": "func_door",
+   "from_name": "Elevater01_upper_door01",
+   "input": "Open",
+   "output": "OnOpen",
+   "param": "",
+   "special": false,
+   "target": "Elevater01_upper_door02",
+   "times": -1,
+   "to": [
+    169
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 169,
+   "from_class": "func_door",
+   "from_name": "Elevater01_upper_door02",
+   "input": "Open",
+   "output": "OnOpen",
+   "param": "",
+   "special": false,
+   "target": "Elevater01_upper_door01",
+   "times": -1,
+   "to": [
+    168
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 191,
+   "from_class": "func_button",
+   "from_name": "Elevater01_switch_down",
+   "input": "StartBackward",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "Elevater01",
+   "times": -1,
+   "to": [
+    163
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 192,
+   "from_class": "func_button",
+   "from_name": "Elevater01_switch_up",
+   "input": "StartForward",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "Elevater01",
+   "times": -1,
+   "to": [
+    163
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 225,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap01_bar",
+   "input": "EnableMotion",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap01",
+   "times": 1,
+   "to": [
+    223
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 225,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap01_bar",
+   "input": "EnableMotion",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap01_cli2",
+   "times": 1,
+   "to": [
+    224
+   ]
+  },
+  {
+   "delay": 16.0,
+   "from": 225,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap01_bar",
+   "input": "DisableMotion",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap01_cli2",
+   "times": 1,
+   "to": [
+    224
+   ]
+  },
+  {
+   "delay": 4.0,
+   "from": 225,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap01_bar",
+   "input": "Break",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap01_bar2",
+   "times": 1,
+   "to": [
+    226
+   ]
+  },
+  {
+   "delay": 8.0,
+   "from": 225,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap01_bar",
+   "input": "Break",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap01",
+   "times": 1,
+   "to": [
+    223
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 225,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap01_bar",
+   "input": "SetHealth",
+   "output": "OnBreak",
+   "param": "1",
+   "special": false,
+   "target": "Upper_Trap01_wall1",
+   "times": 1,
+   "to": [
+    227
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 225,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap01_bar",
+   "input": "SetHealth",
+   "output": "OnBreak",
+   "param": "1",
+   "special": false,
+   "target": "Upper_Trap01_wall2",
+   "times": 1,
+   "to": [
+    228
+   ]
+  },
+  {
+   "delay": 23.0,
+   "from": 225,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap01_bar",
+   "input": "Break",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap01_cli2",
+   "times": -1,
+   "to": [
+    224
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 225,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap01_bar",
+   "input": "Enable",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap01_hurt",
+   "times": -1,
+   "to": [
+    256
+   ]
+  },
+  {
+   "delay": 16.0,
+   "from": 225,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap01_bar",
+   "input": "Disable",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap01_hurt",
+   "times": -1,
+   "to": [
+    256
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 229,
+   "from_class": "func_door",
+   "from_name": "lift03_plate",
+   "input": "Unlock",
+   "output": "OnFullyOpen",
+   "param": "",
+   "special": false,
+   "target": "lift03_button_down",
+   "times": -1,
+   "to": [
+    231,
+    232
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 229,
+   "from_class": "func_door",
+   "from_name": "lift03_plate",
+   "input": "Unlock",
+   "output": "OnFullyClosed",
+   "param": "",
+   "special": false,
+   "target": "lift03_button_up",
+   "times": -1,
+   "to": [
+    230,
+    233
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 230,
+   "from_class": "func_button",
+   "from_name": "lift03_button_up",
+   "input": "Open",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift03_plate",
+   "times": -1,
+   "to": [
+    229
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 230,
+   "from_class": "func_button",
+   "from_name": "lift03_button_up",
+   "input": "Lock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift03_button_up",
+   "times": -1,
+   "to": [
+    230,
+    233
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 231,
+   "from_class": "func_button",
+   "from_name": "lift03_button_down",
+   "input": "Close",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift03_plate",
+   "times": -1,
+   "to": [
+    229
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 231,
+   "from_class": "func_button",
+   "from_name": "lift03_button_down",
+   "input": "Lock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift03_button_down",
+   "times": -1,
+   "to": [
+    231,
+    232
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 232,
+   "from_class": "func_button",
+   "from_name": "lift03_button_down",
+   "input": "Close",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift03_plate",
+   "times": -1,
+   "to": [
+    229
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 232,
+   "from_class": "func_button",
+   "from_name": "lift03_button_down",
+   "input": "Lock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift03_button_down",
+   "times": -1,
+   "to": [
+    231,
+    232
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 233,
+   "from_class": "func_button",
+   "from_name": "lift03_button_up",
+   "input": "Open",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift03_plate",
+   "times": -1,
+   "to": [
+    229
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 233,
+   "from_class": "func_button",
+   "from_name": "lift03_button_up",
+   "input": "Lock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "lift03_button_up",
+   "times": -1,
+   "to": [
+    230,
+    233
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 243,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap02_bar",
+   "input": "EnableMotion",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap02",
+   "times": 1,
+   "to": [
+    242
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 243,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap02_bar",
+   "input": "EnableMotion",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap02_cli2",
+   "times": 1,
+   "to": [
+    245
+   ]
+  },
+  {
+   "delay": 16.0,
+   "from": 243,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap02_bar",
+   "input": "DisableMotion",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap02_cli2",
+   "times": 1,
+   "to": [
+    245
+   ]
+  },
+  {
+   "delay": 4.0,
+   "from": 243,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap02_bar",
+   "input": "Break",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap02_bar2",
+   "times": 1,
+   "to": [
+    244
+   ]
+  },
+  {
+   "delay": 8.0,
+   "from": 243,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap02_bar",
+   "input": "Break",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap02",
+   "times": 1,
+   "to": [
+    242
+   ]
+  },
+  {
+   "delay": 23.0,
+   "from": 243,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap02_bar",
+   "input": "Break",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap02_cli2",
+   "times": -1,
+   "to": [
+    245
+   ]
+  },
+  {
+   "delay": 16.0,
+   "from": 243,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap02_bar",
+   "input": "Disable",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap02_hurt",
+   "times": -1,
+   "to": [
+    257
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 243,
+   "from_class": "func_breakable",
+   "from_name": "Upper_Trap02_bar",
+   "input": "Enable",
+   "output": "OnBreak",
+   "param": "",
+   "special": false,
+   "target": "Upper_Trap02_hurt",
+   "times": -1,
+   "to": [
+    257
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 255,
+   "from_class": "func_door",
+   "from_name": "cataparto",
+   "input": "Unlock",
+   "output": "OnFullyClosed",
+   "param": "",
+   "special": false,
+   "target": "cataparto_switch",
+   "times": -1,
+   "to": [
+    390
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "ForceSpawn",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "break_roof_spawn",
+   "times": 1,
+   "to": [
+    116
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "Disable",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "break_roof",
+   "times": 1,
+   "to": [
+    112
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "Disable",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "break_rooffloor",
+   "times": 1,
+   "to": [
+    118
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "ForceSpawn",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "break_rooffloor_spawn",
+   "times": 1,
+   "to": [
+    117
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "Disable",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "break_4f",
+   "times": 1,
+   "to": [
+    113
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "ForceSpawn",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "break_4f_spawn",
+   "times": 1,
+   "to": [
+    119
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "ForceSpawn",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "break_3f__spawn",
+   "times": 1,
+   "to": [
+    120
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "Disable",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "break_3f",
+   "times": 1,
+   "to": [
+    114
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "ForceSpawn",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "break_2f__spawn",
+   "times": 1,
+   "to": [
+    121
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "Disable",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "break_2f",
+   "times": 1,
+   "to": [
+    115
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "EnableMotion",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "drop_container",
+   "times": 1,
+   "to": [
+    122
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "StartShake",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "container_shaker",
+   "times": 1,
+   "to": [
+    125
+   ]
+  },
+  {
+   "delay": 20.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "DisableMotion",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "drop_container",
+   "times": 1,
+   "to": [
+    122
+   ]
+  },
+  {
+   "delay": 60.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "Kill",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "drop_container",
+   "times": 1,
+   "to": [
+    122
+   ]
+  },
+  {
+   "delay": 20.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "StopShake",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "container_shaker",
+   "times": 1,
+   "to": [
+    125
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "TurnOn",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "container_smork",
+   "times": 1,
+   "to": [
+    123,
+    124
+   ]
+  },
+  {
+   "delay": 10.0,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "TurnOff",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "container_smork",
+   "times": 1,
+   "to": [
+    123,
+    124
+   ]
+  },
+  {
+   "delay": 2.4,
+   "from": 389,
+   "from_class": "func_button",
+   "from_name": "break_mansion_switch",
+   "input": "Break",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "mansion_window",
+   "times": -1,
+   "to": [
+    126,
+    127,
+    128,
+    129,
+    130,
+    131
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 390,
+   "from_class": "func_button",
+   "from_name": "cataparto_switch",
+   "input": "Lock",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "cataparto_switch",
+   "times": -1,
+   "to": [
+    390
+   ]
+  },
+  {
+   "delay": 0.0,
+   "from": 390,
+   "from_class": "func_button",
+   "from_name": "cataparto_switch",
+   "input": "Open",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "cataparto",
+   "times": -1,
+   "to": [
+    255
+   ]
+  }
+ ],
+ "movers": [
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 104,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": false,
+   "maxs": [
+    14.6304,
+    99.06,
+    26.67
+   ],
+   "mins": [
+    14.4018,
+    98.7552,
+    26.5938
+   ],
+   "model": 17,
+   "opened_by": [
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 104,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift01_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 107,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift01_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 10.0,
+     "entity": 108,
+     "input": "Unlock",
+     "output": "OnPressed",
+     "targetname": "lift01_button_down"
+    },
+    {
+     "classname": "func_button",
+     "delay": 10.0,
+     "entity": 109,
+     "input": "Unlock",
+     "output": "OnPressed",
+     "targetname": "lift01_button_down"
+    }
+   ],
+   "origin": [
+    14.5161,
+    98.9076,
+    26.6319
+   ],
+   "outputs": [
+    {
+     "delay": 10.0,
+     "input": "Unlock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift01_button_down",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Open",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift01_plate",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Lock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift01_button_up",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1057,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "lift01_button_up",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_door",
+   "direction": [
+    0.0,
+    1.0,
+    -0.0
+   ],
+   "distance": 97.1931,
+   "entity": 105,
+   "kind": "slide",
+   "lip": -95.7072,
+   "locked": false,
+   "maxs": [
+    13.1064,
+    1.8288,
+    25.2984
+   ],
+   "mins": [
+    11.2776,
+    0.3048,
+    23.7744
+   ],
+   "model": 18,
+   "opened_by": [
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 104,
+     "input": "Open",
+     "output": "OnPressed",
+     "targetname": "lift01_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 107,
+     "input": "Open",
+     "output": "OnPressed",
+     "targetname": "lift01_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 108,
+     "input": "Close",
+     "output": "OnPressed",
+     "targetname": "lift01_button_down"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 109,
+     "input": "Close",
+     "output": "OnPressed",
+     "targetname": "lift01_button_down"
+    }
+   ],
+   "origin": [
+    12.192,
+    1.0668,
+    25.2984
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "StartShake",
+     "output": "OnOpen",
+     "param": "",
+     "target": "lift01_shaker",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "StartSpark",
+     "output": "OnOpen",
+     "param": "",
+     "target": "lift01_spark",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "StopShake",
+     "output": "OnFullyOpen",
+     "param": "",
+     "target": "lift01_shaker",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "StopSpark",
+     "output": "OnFullyOpen",
+     "param": "",
+     "target": "lift01_spark",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "StopShake",
+     "output": "OnFullyClosed",
+     "param": "",
+     "target": "lift01_shaker",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "StopSpark",
+     "output": "OnFullyClosed",
+     "param": "",
+     "target": "lift01_spark",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "StartShake",
+     "output": "OnClose",
+     "param": "",
+     "target": "lift01_shaker",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "StartSpark",
+     "output": "OnClose",
+     "param": "",
+     "target": "lift01_spark",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 32,
+   "speed": 19.05,
+   "start_open": false,
+   "targetname": "lift01_plate",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 5.102,
+   "use": false,
+   "wait": 4.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 107,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": false,
+   "maxs": [
+    11.5824,
+    1.8288,
+    24.2316
+   ],
+   "mins": [
+    11.43,
+    1.6764,
+    24.1554
+   ],
+   "model": 19,
+   "opened_by": [
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 104,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift01_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 107,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift01_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 10.0,
+     "entity": 108,
+     "input": "Unlock",
+     "output": "OnPressed",
+     "targetname": "lift01_button_down"
+    },
+    {
+     "classname": "func_button",
+     "delay": 10.0,
+     "entity": 109,
+     "input": "Unlock",
+     "output": "OnPressed",
+     "targetname": "lift01_button_down"
+    }
+   ],
+   "origin": [
+    11.2014,
+    1.6764,
+    24.4983
+   ],
+   "outputs": [
+    {
+     "delay": 10.0,
+     "input": "Unlock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift01_button_down",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Lock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift01_button_up",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Open",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift01_plate",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1057,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "lift01_button_up",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 108,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": true,
+   "maxs": [
+    11.5824,
+    1.524,
+    24.2316
+   ],
+   "mins": [
+    11.43,
+    1.3716,
+    24.1554
+   ],
+   "model": 20,
+   "opened_by": [
+    {
+     "classname": "func_button",
+     "delay": 10.0,
+     "entity": 104,
+     "input": "Unlock",
+     "output": "OnPressed",
+     "targetname": "lift01_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 10.0,
+     "entity": 107,
+     "input": "Unlock",
+     "output": "OnPressed",
+     "targetname": "lift01_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 108,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift01_button_down"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 109,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift01_button_down"
+    }
+   ],
+   "origin": [
+    11.6205,
+    1.6764,
+    24.4983
+   ],
+   "outputs": [
+    {
+     "delay": 10.0,
+     "input": "Unlock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift01_button_up",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Lock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift01_button_down",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Close",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift01_plate",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 3105,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "lift01_button_down",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 109,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": true,
+   "maxs": [
+    13.5636,
+    1.2192,
+    23.4919
+   ],
+   "mins": [
+    13.335,
+    0.9144,
+    23.4157
+   ],
+   "model": 21,
+   "opened_by": [
+    {
+     "classname": "func_button",
+     "delay": 10.0,
+     "entity": 104,
+     "input": "Unlock",
+     "output": "OnPressed",
+     "targetname": "lift01_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 10.0,
+     "entity": 107,
+     "input": "Unlock",
+     "output": "OnPressed",
+     "targetname": "lift01_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 108,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift01_button_down"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 109,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift01_button_down"
+    }
+   ],
+   "origin": [
+    13.4493,
+    1.0668,
+    23.4538
+   ],
+   "outputs": [
+    {
+     "delay": 10.0,
+     "input": "Unlock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift01_button_up",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Close",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift01_plate",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Lock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift01_button_down",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 3105,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "lift01_button_down",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 144,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": true,
+   "maxs": [
+    23.6982,
+    1.3716,
+    58.293
+   ],
+   "mins": [
+    23.4696,
+    1.0668,
+    58.2168
+   ],
+   "model": 39,
+   "opened_by": [
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 144,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift02_button_down"
+    },
+    {
+     "classname": "func_door",
+     "delay": 0.0,
+     "entity": 145,
+     "input": "Unlock",
+     "output": "OnFullyOpen",
+     "targetname": "lift02_plate"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 149,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift02_button_down"
+    }
+   ],
+   "origin": [
+    23.5458,
+    1.2192,
+    58.2168
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "Close",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift02_plate",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Lock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift02_button_down",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 3105,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "lift02_button_down",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_door",
+   "direction": [
+    0.0,
+    1.0,
+    -0.0
+   ],
+   "distance": 58.7883,
+   "entity": 145,
+   "kind": "slide",
+   "lip": -57.3024,
+   "locked": false,
+   "maxs": [
+    22.5552,
+    1.8288,
+    58.5216
+   ],
+   "mins": [
+    20.1168,
+    0.3048,
+    55.4736
+   ],
+   "model": 40,
+   "opened_by": [
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 144,
+     "input": "Close",
+     "output": "OnPressed",
+     "targetname": "lift02_button_down"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 146,
+     "input": "Open",
+     "output": "OnPressed",
+     "targetname": "lift02_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 148,
+     "input": "Open",
+     "output": "OnPressed",
+     "targetname": "lift02_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 149,
+     "input": "Close",
+     "output": "OnPressed",
+     "targetname": "lift02_button_down"
+    }
+   ],
+   "origin": [
+    21.336,
+    1.0668,
+    56.9976
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "Unlock",
+     "output": "OnFullyClosed",
+     "param": "",
+     "target": "lift03_button_up",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Unlock",
+     "output": "OnFullyOpen",
+     "param": "",
+     "target": "lift02_button_down",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 32,
+   "speed": 2.8575,
+   "start_open": false,
+   "targetname": "lift02_plate",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 20.5733,
+   "use": false,
+   "wait": 4.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 146,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": true,
+   "maxs": [
+    23.5458,
+    60.6552,
+    55.1688
+   ],
+   "mins": [
+    23.3172,
+    60.3504,
+    55.0926
+   ],
+   "model": 41,
+   "opened_by": [
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 146,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift02_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 148,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift02_button_up"
+    }
+   ],
+   "origin": [
+    23.4694,
+    60.5028,
+    55.1688
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "Open",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift02_plate",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Lock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift02_button_up",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 3105,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "lift02_button_up",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 148,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": false,
+   "maxs": [
+    22.2504,
+    1.8288,
+    58.2168
+   ],
+   "mins": [
+    22.098,
+    1.6764,
+    58.1406
+   ],
+   "model": 42,
+   "opened_by": [
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 146,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift02_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 148,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift02_button_up"
+    }
+   ],
+   "origin": [
+    22.0218,
+    1.6764,
+    58.1787
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "Lock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift02_button_up",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Open",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift02_plate",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1057,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "lift02_button_up",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 149,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": true,
+   "maxs": [
+    22.2504,
+    1.524,
+    58.2168
+   ],
+   "mins": [
+    22.098,
+    1.3716,
+    58.1406
+   ],
+   "model": 43,
+   "opened_by": [
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 144,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift02_button_down"
+    },
+    {
+     "classname": "func_door",
+     "delay": 0.0,
+     "entity": 145,
+     "input": "Unlock",
+     "output": "OnFullyOpen",
+     "targetname": "lift02_plate"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 149,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift02_button_down"
+    }
+   ],
+   "origin": [
+    22.4409,
+    1.6764,
+    58.1787
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "Lock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift02_button_down",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Close",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift02_plate",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 3105,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "lift02_button_down",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_tracktrain",
+   "entity": 153,
+   "height": 0.0762,
+   "kind": "path",
+   "maxs": [
+    -38.7096,
+    11.7348,
+    34.3662
+   ],
+   "mins": [
+    -41.7576,
+    9.144,
+    34.2138
+   ],
+   "model": 44,
+   "opened_by": [
+    {
+     "classname": "path_track",
+     "delay": 0.0,
+     "entity": 154,
+     "input": "SetSpeed",
+     "output": "OnPass",
+     "targetname": "Shutter_left01_end"
+    },
+    {
+     "classname": "path_track",
+     "delay": 0.0,
+     "entity": 155,
+     "input": "SetSpeed",
+     "output": "OnPass",
+     "targetname": "Shutter_left01_start"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 156,
+     "input": "StartBackward",
+     "output": "OnDamaged",
+     "targetname": "Shutter_left01_switch_close"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 156,
+     "input": "StartBackward",
+     "output": "OnPressed",
+     "targetname": "Shutter_left01_switch_close"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 157,
+     "input": "StartForward",
+     "output": "OnPressed",
+     "targetname": "Shutter_left01_switch_open"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 157,
+     "input": "StartForward",
+     "output": "OnDamaged",
+     "targetname": "Shutter_left01_switch_open"
+    }
+   ],
+   "origin": [
+    -40.2336,
+    9.144,
+    34.29
+   ],
+   "outputs": [],
+   "path": [
+    {
+     "at": [
+      -40.2336,
+      11.5824,
+      34.29
+     ],
+     "name": "Shutter_left01_start",
+     "speed": 1.905
+    }
+   ],
+   "solid": true,
+   "spawnflags": 3,
+   "speed": 1.905,
+   "start_speed": 0.381,
+   "targetname": "Shutter_left01",
+   "travel_time": 0.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 156,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": false,
+   "maxs": [
+    -39.9288,
+    12.0396,
+    34.1376
+   ],
+   "mins": [
+    -40.5384,
+    11.7348,
+    34.0614
+   ],
+   "model": 45,
+   "opened_by": [],
+   "origin": [
+    -40.2336,
+    11.8872,
+    29.2989
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "StartBackward",
+     "output": "OnDamaged",
+     "param": "",
+     "target": "Shutter_left01",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "StartBackward",
+     "output": "OnPressed",
+     "param": "",
+     "target": "Shutter_left01",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1025,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "Shutter_left01_switch_close",
+   "toggle": false,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 157,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": false,
+   "maxs": [
+    -37.8714,
+    10.4394,
+    33.8328
+   ],
+   "mins": [
+    -38.0238,
+    10.1346,
+    33.7566
+   ],
+   "model": 46,
+   "opened_by": [],
+   "origin": [
+    -37.9476,
+    10.287,
+    33.7947
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "StartForward",
+     "output": "OnPressed",
+     "param": "",
+     "target": "Shutter_left01",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "StartForward",
+     "output": "OnDamaged",
+     "param": "",
+     "target": "Shutter_left01",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1025,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "Shutter_left01_switch_open",
+   "toggle": false,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_tracktrain",
+   "entity": 158,
+   "height": 0.0762,
+   "kind": "path",
+   "maxs": [
+    -38.7096,
+    11.7348,
+    29.1846
+   ],
+   "mins": [
+    -41.7576,
+    9.144,
+    29.0322
+   ],
+   "model": 47,
+   "opened_by": [
+    {
+     "classname": "path_track",
+     "delay": 0.0,
+     "entity": 159,
+     "input": "SetSpeed",
+     "output": "OnPass",
+     "targetname": "Shutter_right01_end"
+    },
+    {
+     "classname": "path_track",
+     "delay": 0.0,
+     "entity": 160,
+     "input": "SetSpeed",
+     "output": "OnPass",
+     "targetname": "Shutter_right01_start"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 161,
+     "input": "StartBackward",
+     "output": "OnDamaged",
+     "targetname": "Shutter_right01_switch_close"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 161,
+     "input": "StartBackward",
+     "output": "OnPressed",
+     "targetname": "Shutter_right01_switch_close"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 162,
+     "input": "StartForward",
+     "output": "OnPressed",
+     "targetname": "Shutter_right01_switch_open"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 162,
+     "input": "StartForward",
+     "output": "OnDamaged",
+     "targetname": "Shutter_right01_switch_open"
+    }
+   ],
+   "origin": [
+    -40.2336,
+    9.144,
+    29.1084
+   ],
+   "outputs": [],
+   "path": [
+    {
+     "at": [
+      -40.2336,
+      11.5824,
+      29.1084
+     ],
+     "name": "Shutter_right01_start",
+     "speed": 1.905
+    }
+   ],
+   "solid": true,
+   "spawnflags": 3,
+   "speed": 1.905,
+   "start_speed": 0.381,
+   "targetname": "Shutter_right01",
+   "travel_time": 0.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 161,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": false,
+   "maxs": [
+    -39.9288,
+    12.0396,
+    29.337
+   ],
+   "mins": [
+    -40.5384,
+    11.7348,
+    29.2608
+   ],
+   "model": 48,
+   "opened_by": [],
+   "origin": [
+    -40.2336,
+    11.8872,
+    34.0995
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "StartBackward",
+     "output": "OnDamaged",
+     "param": "",
+     "target": "Shutter_right01",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "StartBackward",
+     "output": "OnPressed",
+     "param": "",
+     "target": "Shutter_right01",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1025,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "Shutter_right01_switch_close",
+   "toggle": false,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 162,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": false,
+   "maxs": [
+    -37.8714,
+    10.4394,
+    29.6418
+   ],
+   "mins": [
+    -38.0238,
+    10.1346,
+    29.5656
+   ],
+   "model": 49,
+   "opened_by": [],
+   "origin": [
+    -37.9476,
+    10.287,
+    29.6037
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "StartForward",
+     "output": "OnPressed",
+     "param": "",
+     "target": "Shutter_right01",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "StartForward",
+     "output": "OnDamaged",
+     "param": "",
+     "target": "Shutter_right01",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1025,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "Shutter_right01_switch_open",
+   "toggle": false,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_tracktrain",
+   "entity": 163,
+   "height": 0.0762,
+   "kind": "path",
+   "maxs": [
+    -59.436,
+    20.8788,
+    33.528
+   ],
+   "mins": [
+    -61.8744,
+    19.812,
+    29.8704
+   ],
+   "model": 50,
+   "opened_by": [
+    {
+     "classname": "path_track",
+     "delay": 0.0,
+     "entity": 164,
+     "input": "SetSpeed",
+     "output": "OnPass",
+     "targetname": "Elevater01_start"
+    },
+    {
+     "classname": "path_track",
+     "delay": 0.0,
+     "entity": 165,
+     "input": "SetSpeed",
+     "output": "OnPass",
+     "targetname": "Elevater01_end"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 166,
+     "input": "StartForward",
+     "output": "OnPressed",
+     "targetname": "Elevater01_switch_up2"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 167,
+     "input": "StartBackward",
+     "output": "OnPressed",
+     "targetname": "Elevater01_switch_down2"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 191,
+     "input": "StartBackward",
+     "output": "OnPressed",
+     "targetname": "Elevater01_switch_down"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 192,
+     "input": "StartForward",
+     "output": "OnPressed",
+     "targetname": "Elevater01_switch_up"
+    }
+   ],
+   "origin": [
+    -60.6552,
+    20.3454,
+    31.6992
+   ],
+   "outputs": [],
+   "path": [
+    {
+     "at": [
+      -60.6552,
+      20.4216,
+      31.6992
+     ],
+     "name": "Elevater01_start",
+     "speed": 0.2286
+    },
+    {
+     "at": [
+      -60.6552,
+      5.6388,
+      31.6992
+     ],
+     "name": "Elevater01_end",
+     "speed": 0.2286
+    }
+   ],
+   "solid": true,
+   "spawnflags": 3,
+   "speed": 0.0,
+   "start_speed": 1.905,
+   "targetname": "Elevater01",
+   "travel_time": 0.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 166,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": false,
+   "maxs": [
+    -59.436,
+    21.717,
+    32.385
+   ],
+   "mins": [
+    -59.6646,
+    21.4122,
+    32.2326
+   ],
+   "model": 51,
+   "opened_by": [],
+   "origin": [
+    -59.5503,
+    21.5646,
+    32.3088
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "StartForward",
+     "output": "OnPressed",
+     "param": "",
+     "target": "Elevater01",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1025,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "Elevater01_switch_up2",
+   "toggle": false,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 167,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": false,
+   "maxs": [
+    -59.436,
+    6.6454,
+    32.3309
+   ],
+   "mins": [
+    -59.5122,
+    6.3406,
+    32.1785
+   ],
+   "model": 52,
+   "opened_by": [],
+   "origin": [
+    -59.4741,
+    6.493,
+    32.2547
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "StartBackward",
+     "output": "OnPressed",
+     "param": "",
+     "target": "Elevater01",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1025,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "Elevater01_switch_down2",
+   "toggle": false,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_door",
+   "direction": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "distance": 1.9812,
+   "entity": 168,
+   "kind": "slide",
+   "lip": -0.1905,
+   "locked": false,
+   "maxs": [
+    -62.2554,
+    22.5552,
+    31.6992
+   ],
+   "mins": [
+    -62.4078,
+    20.1168,
+    29.8704
+   ],
+   "model": 53,
+   "opened_by": [
+    {
+     "classname": "func_door",
+     "delay": 0.0,
+     "entity": 169,
+     "input": "Open",
+     "output": "OnOpen",
+     "targetname": "Elevater01_upper_door02"
+    }
+   ],
+   "origin": [
+    -62.3316,
+    21.336,
+    30.7848
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "Open",
+     "output": "OnOpen",
+     "param": "",
+     "target": "Elevater01_upper_door02",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1024,
+   "speed": 1.905,
+   "start_open": false,
+   "targetname": "Elevater01_upper_door01",
+   "toggle": false,
+   "touch": true,
+   "travel_time": 1.04,
+   "use": false,
+   "wait": 4.0
+  },
+  {
+   "classname": "func_door",
+   "direction": [
+    -0.0,
+    -0.0,
+    1.0
+   ],
+   "distance": 1.9812,
+   "entity": 169,
+   "kind": "slide",
+   "lip": -0.1905,
+   "locked": false,
+   "maxs": [
+    -62.2554,
+    22.5552,
+    33.528
+   ],
+   "mins": [
+    -62.4078,
+    20.1168,
+    31.6992
+   ],
+   "model": 54,
+   "opened_by": [
+    {
+     "classname": "func_door",
+     "delay": 0.0,
+     "entity": 168,
+     "input": "Open",
+     "output": "OnOpen",
+     "targetname": "Elevater01_upper_door01"
+    }
+   ],
+   "origin": [
+    -62.3316,
+    21.336,
+    32.6136
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "Open",
+     "output": "OnOpen",
+     "param": "",
+     "target": "Elevater01_upper_door01",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1024,
+   "speed": 1.905,
+   "start_open": false,
+   "targetname": "Elevater01_upper_door02",
+   "toggle": false,
+   "touch": true,
+   "travel_time": 1.04,
+   "use": false,
+   "wait": 4.0
+  },
+  {
+   "classname": "func_door",
+   "direction": [
+    0.0,
+    -0.0,
+    -1.0
+   ],
+   "distance": 3.7338,
+   "entity": 170,
+   "kind": "slide",
+   "lip": -0.1905,
+   "locked": false,
+   "maxs": [
+    -62.2554,
+    7.9248,
+    33.528
+   ],
+   "mins": [
+    -62.4078,
+    5.4864,
+    29.9466
+   ],
+   "model": 55,
+   "opened_by": [],
+   "origin": [
+    -62.3316,
+    6.7056,
+    31.7373
+   ],
+   "outputs": [],
+   "solid": true,
+   "spawnflags": 1024,
+   "speed": 1.905,
+   "start_open": false,
+   "targetname": "Elevater01_middle_door01",
+   "toggle": false,
+   "touch": true,
+   "travel_time": 1.96,
+   "use": false,
+   "wait": 4.0
+  },
+  {
+   "axis": [
+    0.0,
+    1.0,
+    -0.0
+   ],
+   "classname": "func_door_rotating",
+   "degrees": 90.0,
+   "entity": 171,
+   "kind": "rotate",
+   "locked": false,
+   "maxs": [
+    -64.9224,
+    7.3152,
+    14.7828
+   ],
+   "mins": [
+    -66.1416,
+    5.4864,
+    14.6304
+   ],
+   "model": 56,
+   "opened_by": [],
+   "origin": [
+    -64.9224,
+    6.4008,
+    14.7066
+   ],
+   "outputs": [],
+   "solid": true,
+   "spawnflags": 1024,
+   "speed": 100.0,
+   "start_open": false,
+   "targetname": "",
+   "touch": false,
+   "travel_time": 0.9,
+   "use": true,
+   "wait": 4.0
+  },
+  {
+   "axis": [
+    0.0,
+    1.0,
+    -0.0
+   ],
+   "classname": "func_door_rotating",
+   "degrees": 90.0,
+   "entity": 172,
+   "kind": "rotate",
+   "locked": false,
+   "maxs": [
+    -69.7992,
+    7.3152,
+    48.6156
+   ],
+   "mins": [
+    -71.0184,
+    5.4864,
+    48.4632
+   ],
+   "model": 57,
+   "opened_by": [],
+   "origin": [
+    -69.7992,
+    6.4008,
+    48.5394
+   ],
+   "outputs": [],
+   "solid": true,
+   "spawnflags": 1024,
+   "speed": 100.0,
+   "start_open": false,
+   "targetname": "",
+   "touch": false,
+   "travel_time": 0.9,
+   "use": true,
+   "wait": 4.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 191,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": false,
+   "maxs": [
+    -62.484,
+    21.5646,
+    29.5656
+   ],
+   "mins": [
+    -62.5602,
+    21.2598,
+    29.4132
+   ],
+   "model": 58,
+   "opened_by": [],
+   "origin": [
+    -62.5221,
+    21.4884,
+    29.1711
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "StartBackward",
+     "output": "OnPressed",
+     "param": "",
+     "target": "Elevater01",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1025,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "Elevater01_switch_down",
+   "toggle": false,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 192,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": false,
+   "maxs": [
+    -62.484,
+    6.7056,
+    34.0614
+   ],
+   "mins": [
+    -62.5602,
+    6.4008,
+    33.909
+   ],
+   "model": 59,
+   "opened_by": [],
+   "origin": [
+    -62.5221,
+    6.7818,
+    34.2765
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "StartForward",
+     "output": "OnPressed",
+     "param": "",
+     "target": "Elevater01",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1025,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "Elevater01_switch_up",
+   "toggle": false,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_door",
+   "direction": [
+    0.0,
+    1.0,
+    -0.0
+   ],
+   "distance": 65.1891,
+   "entity": 229,
+   "kind": "slide",
+   "lip": -63.7032,
+   "locked": false,
+   "maxs": [
+    -0.3048,
+    33.8328,
+    19.2024
+   ],
+   "mins": [
+    -4.8768,
+    32.3088,
+    14.3256
+   ],
+   "model": 66,
+   "opened_by": [
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 230,
+     "input": "Open",
+     "output": "OnPressed",
+     "targetname": "lift03_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 231,
+     "input": "Close",
+     "output": "OnPressed",
+     "targetname": "lift03_button_down"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 232,
+     "input": "Close",
+     "output": "OnPressed",
+     "targetname": "lift03_button_down"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 233,
+     "input": "Open",
+     "output": "OnPressed",
+     "targetname": "lift03_button_up"
+    }
+   ],
+   "origin": [
+    -2.5908,
+    33.0708,
+    16.764
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "Unlock",
+     "output": "OnFullyOpen",
+     "param": "",
+     "target": "lift03_button_down",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Unlock",
+     "output": "OnFullyClosed",
+     "param": "",
+     "target": "lift03_button_up",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 32,
+   "speed": 5.715,
+   "start_open": false,
+   "targetname": "lift03_plate",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 11.4067,
+   "use": false,
+   "wait": 4.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 230,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": false,
+   "maxs": [
+    -0.9144,
+    33.8328,
+    18.8214
+   ],
+   "mins": [
+    -1.0668,
+    33.6804,
+    18.7452
+   ],
+   "model": 67,
+   "opened_by": [
+    {
+     "classname": "func_door",
+     "delay": 0.0,
+     "entity": 145,
+     "input": "Unlock",
+     "output": "OnFullyClosed",
+     "targetname": "lift02_plate"
+    },
+    {
+     "classname": "func_door",
+     "delay": 0.0,
+     "entity": 229,
+     "input": "Unlock",
+     "output": "OnFullyClosed",
+     "targetname": "lift03_plate"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 230,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift03_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 233,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift03_button_up"
+    }
+   ],
+   "origin": [
+    -0.9906,
+    33.7566,
+    18.7833
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "Open",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift03_plate",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Lock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift03_button_up",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1057,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "lift03_button_up",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 231,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": true,
+   "maxs": [
+    -0.9144,
+    33.528,
+    18.8214
+   ],
+   "mins": [
+    -1.067,
+    33.3754,
+    18.7452
+   ],
+   "model": 68,
+   "opened_by": [
+    {
+     "classname": "func_door",
+     "delay": 0.0,
+     "entity": 229,
+     "input": "Unlock",
+     "output": "OnFullyOpen",
+     "targetname": "lift03_plate"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 231,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift03_button_down"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 232,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift03_button_down"
+    }
+   ],
+   "origin": [
+    -0.9906,
+    33.4518,
+    18.7833
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "Close",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift03_plate",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Lock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift03_button_down",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 3105,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "lift03_button_down",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 232,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": true,
+   "maxs": [
+    -5.0292,
+    33.528,
+    19.1262
+   ],
+   "mins": [
+    -5.1816,
+    33.3756,
+    19.05
+   ],
+   "model": 69,
+   "opened_by": [
+    {
+     "classname": "func_door",
+     "delay": 0.0,
+     "entity": 229,
+     "input": "Unlock",
+     "output": "OnFullyOpen",
+     "targetname": "lift03_plate"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 231,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift03_button_down"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 232,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift03_button_down"
+    }
+   ],
+   "origin": [
+    -5.2578,
+    33.4518,
+    19.1643
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "Close",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift03_plate",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Lock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift03_button_down",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 3105,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "lift03_button_down",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 233,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": false,
+   "maxs": [
+    0.9144,
+    99.06,
+    19.431
+   ],
+   "mins": [
+    0.762,
+    98.9076,
+    19.3548
+   ],
+   "model": 70,
+   "opened_by": [
+    {
+     "classname": "func_door",
+     "delay": 0.0,
+     "entity": 145,
+     "input": "Unlock",
+     "output": "OnFullyClosed",
+     "targetname": "lift02_plate"
+    },
+    {
+     "classname": "func_door",
+     "delay": 0.0,
+     "entity": 229,
+     "input": "Unlock",
+     "output": "OnFullyClosed",
+     "targetname": "lift03_plate"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 230,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift03_button_up"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 233,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "lift03_button_up"
+    }
+   ],
+   "origin": [
+    0.8382,
+    100.203,
+    19.4691
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "Open",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift03_plate",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Lock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "lift03_button_up",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1057,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "lift03_button_up",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_door",
+   "direction": [
+    0.0,
+    1.0,
+    -0.0
+   ],
+   "distance": 5.2959,
+   "entity": 255,
+   "kind": "slide",
+   "lip": -4.8768,
+   "locked": false,
+   "maxs": [
+    12.4968,
+    59.2836,
+    76.8096
+   ],
+   "mins": [
+    9.7536,
+    58.8264,
+    73.152
+   ],
+   "model": 75,
+   "opened_by": [
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 390,
+     "input": "Open",
+     "output": "OnPressed",
+     "targetname": "cataparto_switch"
+    }
+   ],
+   "origin": [
+    11.1252,
+    59.055,
+    74.9808
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "Unlock",
+     "output": "OnFullyClosed",
+     "param": "",
+     "target": "cataparto_switch",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 0,
+   "speed": 28.575,
+   "start_open": false,
+   "targetname": "cataparto",
+   "toggle": false,
+   "touch": false,
+   "travel_time": 0.1853,
+   "use": false,
+   "wait": 4.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 389,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": false,
+   "maxs": [
+    6.3477,
+    54.5592,
+    67.6656
+   ],
+   "mins": [
+    6.1191,
+    54.483,
+    67.3608
+   ],
+   "model": 78,
+   "opened_by": [],
+   "origin": [
+    6.2334,
+    54.5211,
+    67.5132
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "ForceSpawn",
+     "output": "OnPressed",
+     "param": "",
+     "target": "break_roof_spawn",
+     "times": 1
+    },
+    {
+     "delay": 0.0,
+     "input": "Disable",
+     "output": "OnPressed",
+     "param": "",
+     "target": "break_roof",
+     "times": 1
+    },
+    {
+     "delay": 0.0,
+     "input": "Disable",
+     "output": "OnPressed",
+     "param": "",
+     "target": "break_rooffloor",
+     "times": 1
+    },
+    {
+     "delay": 0.0,
+     "input": "ForceSpawn",
+     "output": "OnPressed",
+     "param": "",
+     "target": "break_rooffloor_spawn",
+     "times": 1
+    },
+    {
+     "delay": 0.0,
+     "input": "Disable",
+     "output": "OnPressed",
+     "param": "",
+     "target": "break_4f",
+     "times": 1
+    },
+    {
+     "delay": 0.0,
+     "input": "ForceSpawn",
+     "output": "OnPressed",
+     "param": "",
+     "target": "break_4f_spawn",
+     "times": 1
+    },
+    {
+     "delay": 0.0,
+     "input": "ForceSpawn",
+     "output": "OnPressed",
+     "param": "",
+     "target": "break_3f__spawn",
+     "times": 1
+    },
+    {
+     "delay": 0.0,
+     "input": "Disable",
+     "output": "OnPressed",
+     "param": "",
+     "target": "break_3f",
+     "times": 1
+    },
+    {
+     "delay": 0.0,
+     "input": "ForceSpawn",
+     "output": "OnPressed",
+     "param": "",
+     "target": "break_2f__spawn",
+     "times": 1
+    },
+    {
+     "delay": 0.0,
+     "input": "Disable",
+     "output": "OnPressed",
+     "param": "",
+     "target": "break_2f",
+     "times": 1
+    },
+    {
+     "delay": 0.0,
+     "input": "EnableMotion",
+     "output": "OnPressed",
+     "param": "",
+     "target": "drop_container",
+     "times": 1
+    },
+    {
+     "delay": 0.0,
+     "input": "StartShake",
+     "output": "OnPressed",
+     "param": "",
+     "target": "container_shaker",
+     "times": 1
+    },
+    {
+     "delay": 20.0,
+     "input": "DisableMotion",
+     "output": "OnPressed",
+     "param": "",
+     "target": "drop_container",
+     "times": 1
+    },
+    {
+     "delay": 60.0,
+     "input": "Kill",
+     "output": "OnPressed",
+     "param": "",
+     "target": "drop_container",
+     "times": 1
+    },
+    {
+     "delay": 20.0,
+     "input": "StopShake",
+     "output": "OnPressed",
+     "param": "",
+     "target": "container_shaker",
+     "times": 1
+    },
+    {
+     "delay": 0.0,
+     "input": "TurnOn",
+     "output": "OnPressed",
+     "param": "",
+     "target": "container_smork",
+     "times": 1
+    },
+    {
+     "delay": 10.0,
+     "input": "TurnOff",
+     "output": "OnPressed",
+     "param": "",
+     "target": "container_smork",
+     "times": 1
+    },
+    {
+     "delay": 2.4,
+     "input": "Break",
+     "output": "OnPressed",
+     "param": "",
+     "target": "mansion_window",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1057,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "break_mansion_switch",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  },
+  {
+   "classname": "func_button",
+   "direction": [
+    1.0,
+    -0.0,
+    -0.0
+   ],
+   "distance": 0.0,
+   "entity": 390,
+   "kind": "button",
+   "lip": 0.0,
+   "locked": false,
+   "maxs": [
+    11.811,
+    60.579,
+    76.6572
+   ],
+   "mins": [
+    11.5824,
+    60.2742,
+    76.581
+   ],
+   "model": 79,
+   "opened_by": [
+    {
+     "classname": "func_door",
+     "delay": 0.0,
+     "entity": 255,
+     "input": "Unlock",
+     "output": "OnFullyClosed",
+     "targetname": "cataparto"
+    },
+    {
+     "classname": "func_button",
+     "delay": 0.0,
+     "entity": 390,
+     "input": "Lock",
+     "output": "OnPressed",
+     "targetname": "cataparto_switch"
+    }
+   ],
+   "origin": [
+    11.6967,
+    60.4266,
+    76.6191
+   ],
+   "outputs": [
+    {
+     "delay": 0.0,
+     "input": "Lock",
+     "output": "OnPressed",
+     "param": "",
+     "target": "cataparto_switch",
+     "times": -1
+    },
+    {
+     "delay": 0.0,
+     "input": "Open",
+     "output": "OnPressed",
+     "param": "",
+     "target": "cataparto",
+     "times": -1
+    }
+   ],
+   "solid": true,
+   "spawnflags": 1057,
+   "speed": 0.0953,
+   "start_open": false,
+   "targetname": "cataparto_switch",
+   "toggle": true,
+   "touch": false,
+   "travel_time": 0.0,
+   "use": true,
+   "wait": 3.0
+  }
+ ],
+ "name": "zm_4way_tunnel",
+ "partial": "entities only",
+ "version": 1,
+ "volumes": [
+  {
+   "brushes": [
+    [
+     [
+      0.0,
+      0.0,
+      1.0,
+      22.5552
+     ],
+     [
+      0.0,
+      0.0,
+      -1.0,
+      -19.812
+     ],
+     [
+      0.98178,
+      0.190022,
+      -0.0,
+      -22.47486
+     ],
+     [
+      0.83697,
+      0.547249,
+      -0.0,
+      -7.07052
+     ],
+     [
+      0.547249,
+      0.83697,
+      0.0,
+      10.59083
+     ],
+     [
+      0.190022,
+      0.98178,
+      0.0,
+      25.7907
+     ],
+     [
+      -0.190022,
+      0.98178,
+      -0.0,
+      37.20069
+     ],
+     [
+      -0.547249,
+      0.83697,
+      -0.0,
+      43.45075
+     ],
+     [
+      -0.83697,
+      0.547249,
+      -0.0,
+      43.18582
+     ],
+     [
+      -0.98178,
+      0.190022,
+      -0.0,
+      36.4767
+     ],
+     [
+      -0.98178,
+      -0.190022,
+      -0.0,
+      24.71921
+     ],
+     [
+      -0.83697,
+      -0.547249,
+      -0.0,
+      9.3251
+     ],
+     [
+      -0.547249,
+      -0.83697,
+      0.0,
+      -8.33625
+     ],
+     [
+      -0.190022,
+      -0.98178,
+      0.0,
+      -23.54636
+     ],
+     [
+      0.190022,
+      -0.98178,
+      -0.0,
+      -34.95634
+     ],
+     [
+      0.547249,
+      -0.83697,
+      -0.0,
+      -41.19616
+     ],
+     [
+      0.83697,
+      -0.547249,
+      -0.0,
+      -40.93125
+     ],
+     [
+      0.98178,
+      -0.190022,
+      -0.0,
+      -34.23235
+     ]
+    ]
+   ],
+   "classname": "trigger_hurt",
+   "damage": 22.0,
+   "disabled": true,
+   "entity": 256,
+   "kind": "hurt",
+   "model": 76,
+   "outputs": [],
+   "spawnflags": 1,
+   "targetname": "Upper_Trap01_hurt"
+  },
+  {
+   "brushes": [
+    [
+     [
+      0.0,
+      0.0,
+      1.0,
+      17.3736
+     ],
+     [
+      0.0,
+      0.0,
+      -1.0,
+      -14.3256
+     ],
+     [
+      0.98178,
+      0.190022,
+      -0.0,
+      -37.83296
+     ],
+     [
+      0.83697,
+      0.547249,
+      -0.0,
+      -21.57245
+     ],
+     [
+      0.547249,
+      0.83697,
+      0.0,
+      -0.64375
+     ],
+     [
+      0.190022,
+      0.98178,
+      0.0,
+      19.36173
+     ],
+     [
+      -0.190022,
+      0.98178,
+      -0.0,
+      36.44774
+     ],
+     [
+      -0.547249,
+      0.83697,
+      -0.0,
+      48.56273
+     ],
+     [
+      -0.83697,
+      0.547249,
+      -0.0,
+      53.68451
+     ],
+     [
+      -0.98178,
+      0.190022,
+      -0.0,
+      50.44476
+     ],
+     [
+      -0.98178,
+      -0.190022,
+      -0.0,
+      40.07731
+     ],
+     [
+      -0.83697,
+      -0.547249,
+      -0.0,
+      23.82703
+     ],
+     [
+      -0.547249,
+      -0.83697,
+      0.0,
+      2.89833
+     ],
+     [
+      -0.190022,
+      -0.98178,
+      0.0,
+      -17.11738
+     ],
+     [
+      0.190022,
+      -0.98178,
+      -0.0,
+      -34.20339
+     ],
+     [
+      0.547249,
+      -0.83697,
+      -0.0,
+      -46.30814
+     ],
+     [
+      0.83697,
+      -0.547249,
+      -0.0,
+      -51.42994
+     ],
+     [
+      0.98178,
+      -0.190022,
+      -0.0,
+      -48.20041
+     ]
+    ]
+   ],
+   "classname": "trigger_hurt",
+   "damage": 22.0,
+   "disabled": true,
+   "entity": 257,
+   "kind": "hurt",
+   "model": 77,
+   "outputs": [],
+   "spawnflags": 1,
+   "targetname": "Upper_Trap02_hurt"
+  }
+ ]
+}

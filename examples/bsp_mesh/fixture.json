@@ -16,6 +16,7 @@
  "credit": {
   "author": "dot-map tests"
  },
+ "entities": [],
  "format": "dot-bsp-mesh",
  "hulls": [
   {
@@ -49,6 +50,23 @@
    "point_offset": 3120
   }
  ],
+ "links": [
+  {
+   "delay": 0.0,
+   "from": 5,
+   "from_class": "func_button",
+   "from_name": "b",
+   "input": "Open",
+   "output": "OnPressed",
+   "param": "",
+   "special": false,
+   "target": "gate",
+   "times": -1,
+   "to": [
+    4
+   ]
+  }
+ ],
  "movers": [
   {
    "classname": "func_door",
@@ -60,6 +78,7 @@
    "distance": 1.9431,
    "entity": 4,
    "kind": "slide",
+   "lip": 0.1524,
    "locked": false,
    "maxs": [
     4.953,
@@ -95,6 +114,7 @@
    "targetname": "gate",
    "toggle": false,
    "touch": false,
+   "travel_time": 1.02,
    "use": false,
    "wait": 4.0
   },
@@ -108,6 +128,7 @@
    "distance": 0.0,
    "entity": 5,
    "kind": "button",
+   "lip": 0.0,
    "locked": false,
    "model": null,
    "opened_by": [],
@@ -133,6 +154,7 @@
    "targetname": "b",
    "toggle": false,
    "touch": false,
+   "travel_time": 0.0,
    "use": true,
    "wait": 1.0
   }

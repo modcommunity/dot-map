@@ -45,6 +45,7 @@ var source_path: String = ""
 
 var _blob: PackedByteArray = PackedByteArray()
 var _movers: Dictionary = {}
+var _entities: DotMapEntities = null
 
 
 ## Reads [code]<prefix>.json[/code] and [code]<prefix>.bin[/code].
@@ -127,6 +128,13 @@ func models() -> PackedInt32Array:
 	var out := PackedInt32Array(seen.keys())
 	out.sort()
 	return out
+
+
+## The entities of this map (movers, volumes, links, data), built on first use.
+func entities() -> DotMapEntities:
+	if _entities == null:
+		_entities = DotMapEntities.from_manifest(manifest)
+	return _entities
 
 
 ## The mover record for a brush entity (direction, distance, speed, what opens it), or {}.

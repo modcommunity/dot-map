@@ -10,3 +10,4 @@ The reasoning behind maps as content, one subject per file. [CLAUDE.md](../CLAUD
 | [history.md](history.md) | The bugs, and how each looked |
 | [surfaces.md](surfaces.md) | `DotMapSurfaces`: a material per surface kind, world-space triplanar, loaded by path for packs, sizes and credits |
 | [brushes.md](brushes.md) | `DotMapBrush`: map-building solids as data, convex collision, UVs in metres |
+| [brush-entities.md](brush-entities.md) | The converter's doors, buttons, lifts, triggers and output links as manifest data, and `DotMapEntities` reading them |
