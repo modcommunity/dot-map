@@ -21,3 +21,10 @@ Each folder holds `albedo.jpg` (the Color map), `normal.jpg` (NormalGL, the Open
 | corrugated | CorrugatedSteel009 | https://ambientcg.com/view?id=CorrugatedSteel009 |
 | grass | Grass004 | https://ambientcg.com/view?id=Grass004 |
 | ground | Ground037 | https://ambientcg.com/view?id=Ground037 |
+| carpet_grey | Carpet001 | https://ambientcg.com/view?id=Carpet001 |
+| carpet_pattern | Carpet004 | https://ambientcg.com/view?id=Carpet004 |
+| carpet_red | Carpet013 | https://ambientcg.com/view?id=Carpet013 |
+| carpet_blue | Carpet012 | https://ambientcg.com/view?id=Carpet012 |
+| snow | Snow004 | https://ambientcg.com/view?id=Snow004 |
+
+The carpet and snow kinds were added 2026-10-22 from the same source, author and licence (CC0 1.0, read on each asset page); all are 1024x1024 1K-JPG, re-encoded at quality 85.

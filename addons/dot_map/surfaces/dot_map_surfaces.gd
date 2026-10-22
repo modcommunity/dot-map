@@ -58,6 +58,11 @@ const KINDS := {
 	&"corrugated": {"meters": 3.0, "rough": 1.0, "metal": 0.5},
 	&"grass": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
 	&"ground": {"meters": 3.0, "rough": 1.0, "metal": 0.0},
+	&"carpet_grey": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
+	&"carpet_pattern": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
+	&"carpet_red": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
+	&"carpet_blue": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
+	&"snow": {"meters": 3.0, "rough": 1.0, "metal": 0.0},
 }
 
 ## Names a generator already uses for a surface, to the kind that draws it. A map document that
@@ -67,7 +72,7 @@ const ALIASES := {
 	&"pavement": &"concrete_clean", &"sidewalk": &"concrete_clean", &"dirt": &"ground",
 	&"earth": &"ground", &"lawn": &"grass", &"wood": &"wood_floor", &"planks": &"wood_planks",
 	&"tile": &"tile_white", &"tiles": &"tile_white", &"steel": &"metal", &"container": &"rust",
-	&"roof": &"corrugated", &"ceiling": &"concrete_clean", &"stone": &"concrete",
+	&"roof": &"corrugated", &"ceiling": &"concrete_clean", &"stone": &"concrete", &"carpet": &"carpet_grey",
 }
 
 ## Where the textures are. A folder per kind with albedo.jpg, normal.jpg and roughness.jpg.

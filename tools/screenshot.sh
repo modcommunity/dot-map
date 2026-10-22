@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Render one frame of a converted map (free textures, environment, stand-in props) under Xvfb.
 #
-#   heavy -- tools/screenshot.sh <world prefix, without .json> <out.png> [--cam=x,y,z --look=x,y,z]
+#   heavy -- tools/screenshot.sh <world prefix, without .json> <out.png> [--view=spawn|overview] [--cam=x,y,z --look=x,y,z]
 #
 # Not --headless: that driver draws nothing and saves a black PNG. Mesa's llvmpipe stands in for a GPU.
 set -uo pipefail

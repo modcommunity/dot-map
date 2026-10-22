@@ -3,7 +3,7 @@ extends Node3D
 ## Renders one frame of a converted map the way a game would dress it: free photo and generated
 ## textures, the environment, the stand-in props. Run it under a display (tools/screenshot.sh).
 ##
-##   godot --path . res://examples/bsp_world_shot.tscn -- --world=<prefix> --out=<png> [--cam=x,y,z --look=x,y,z]
+##   godot --path . res://examples/bsp_world_shot.tscn -- --world=<prefix> --out=<png> [--view=spawn|overview] [--cam=x,y,z --look=x,y,z]
 
 var _out := "user://shot.png"
 
@@ -47,19 +47,17 @@ func _ready() -> void:
 			m = surfaces.material(StringName(key.get_slice(":", 0)))
 		cache[key] = m
 		return m
-	add_child(world.build_node(mat_for))
 	var env := world.build_environment()
 	if env != null:
 		add_child(env)
 	add_child(world.build_props())
 	add_child(world.build_sounds())
-	var movers: Array = world.manifest.get("movers", [])
-	var o := func(i: int) -> Vector3:
-		var p: Array = movers[mini(i, movers.size() - 1)].get("origin", [0, 0, 0])
-		return Vector3(p[0], p[1], p[2])
+	var node := world.build_node(mat_for)
+	add_child(node)
 	var cam := Camera3D.new()
-	var from: Vector3 = o.call(0) + Vector3(0, 1.6, 0)
-	var look: Vector3 = o.call(movers.size() / 2) + Vector3(0, 1.4, 0)
+	var view := _default_view(world, node, str(args.get("view", "")))
+	var from: Vector3 = view[0]
+	var look: Vector3 = view[1]
 	if args.has("cam"):
 		var c := str(args["cam"]).split_floats(",")
 		from = Vector3(c[0], c[1], c[2])
@@ -77,3 +75,26 @@ func _ready() -> void:
 	var err := img.save_png(_out)
 	print("saved %s (%s) from %s to %s" % [_out, error_string(err), from, look])
 	get_tree().quit(0 if err == OK else 1)
+
+
+## The camera when none is given: at the first player spawn looking at the map centre (the small sky model is not part of the map), or when the
+## map has none (or --view=overview) from above one corner of the bounding box, looking down at the centre.
+func _default_view(world: DotMapBspMesh, node: Node3D, view: String) -> Array:
+	var box := AABB()
+	var first := true
+	for mi in node.find_children("*", "MeshInstance3D", true, false):
+		if mi.name.begins_with("sky3d"):
+			continue
+		var b: AABB = (mi as MeshInstance3D).global_transform * (mi as MeshInstance3D).get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	var centre := box.get_center()
+	if view != "overview":
+		for e: Dictionary in world.manifest.get("entities", []):
+			if str(e.get("classname", "")).begins_with("info_player") and e.has("origin"):
+				var p: Array = e["origin"]
+				var eye := Vector3(p[0], p[1] + 1.6, p[2])
+				return [eye, Vector3(centre.x, eye.y, centre.z)]
+	var r := maxf(box.size.x, box.size.z)
+	var from := centre + Vector3(r * 0.45, maxf(box.size.y, r * 0.7), r * 0.45)
+	return [from, centre]
