@@ -13,13 +13,13 @@ extends Node
 ## running, rather than on nothing. It is the reason the load happens before the
 ## teardown, and it is the step that is easiest to "simplify" back out.
 
-const CHECKS := 298
+const CHECKS := 309
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 31
+const SECTIONS := 32
 
 var _passed := 0
 var _failed := 0
@@ -68,6 +68,7 @@ func _run() -> void:
 	_test_workshop_maps()
 	_test_rotation_file()
 	await _test_rotation_paths()
+	_test_rotation_file_layout()
 
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
@@ -2661,6 +2662,47 @@ func _test_rotation_paths() -> void:
 	DirAccess.remove_absolute(dir.path_join("maps.yml"))
 	DirAccess.remove_absolute(dir)
 	session.free()
+	_done()
+
+
+func _put(path: String, text: String) -> void:
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string(text)
+	f.close()
+
+
+func _test_rotation_file_layout() -> void:
+	_section("maps.yml: cfg/addons/dot_map, the operator tier, the legacy shim")
+	var base := OS.get_temp_dir().path_join("dot_map_layout_%d" % Time.get_ticks_usec())
+	var addon_f := base.path_join("addons/dot_map/maps.yml")
+	var server_f := base.path_join("server/dot_map/maps.yml")
+	var flat_f := base.path_join("maps.yml")
+	DotCfgLegacy.reset()
+	_check(DotMapRotationFile.find("cfg/maps.yml", base) == "" or not DotMapRotationFile.find("cfg/maps.yml", base).begins_with(base), "nothing in an empty config directory")
+	_check(DotMapRotationFile.find_layers(base).is_empty(), "find_layers is empty with no file")
+	_put(flat_f, "defaults:\n  maps: [a]\n")
+	_check(DotMapRotationFile.find("cfg/maps.yml", base) == flat_f, "the flat file is still found")
+	_check(DotCfgLegacy.warned_count() == 1, "and warned once through the shim")
+	DotMapRotationFile.find("cfg/maps.yml", base)
+	_check(DotCfgLegacy.warned_count() == 1, "not twice")
+	_put(addon_f, "defaults:\n  maps: [b]\n")
+	_check(DotMapRotationFile.find("cfg/maps.yml", base) == addon_f, "cfg/addons/dot_map/maps.yml beats the flat file")
+	_put(server_f, "defaults:\n  maps: [c]\n")
+	_check(DotMapRotationFile.find("cfg/maps.yml", base) == server_f, "the operator's cfg/server/dot_map/maps.yml beats the addon's")
+	var layers := DotMapRotationFile.find_layers(base)
+	_check(layers.size() == 2 and layers[0] == addon_f and layers[1] == server_f, "find_layers lists addon then server, weakest first")
+	var loaded := DotMapRotationFile.load_files(layers, "g")
+	_check(loaded.ok, "the layers load")
+	_check(DotMapRotationFile.find("cfg/other.yml", base) == "", "another stem is not routed through the new layout")
+	_put(addon_f, "defaults:\n\tmaps: [b\n  - broken: [\n")
+	var bad := DotMapRotationFile.load_files(DotMapRotationFile.find_layers(base), "g")
+	_check(not bad.ok, "a bad maps.yml fails to load rather than rotating nothing")
+	DotCfgLegacy.reset()
+	for p in [addon_f, server_f, flat_f]:
+		DirAccess.remove_absolute(p)
+	for d in ["addons/dot_map", "addons", "server/dot_map", "server", ""]:
+		DirAccess.remove_absolute(base.path_join(d) if d != "" else base)
 	_done()
 
 

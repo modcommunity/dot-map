@@ -65,6 +65,10 @@ var _bound: WeakRef = null
 var _bound_catalogue: DotMapCatalogue = null
 
 
+## The stem games pass for the default file; it resolves to `cfg/addons/dot_map/maps.yml`, with the old flat path read through [DotCfgLegacy].
+const DEFAULT_STEM := "cfg/maps.yml"
+
+
 ## Where a path given as [param stem] (with or without extension) is: in [param config_dir]
 ## first when one is given (the directory the host was started with, a plain filesystem path),
 ## then beside the project, in `user://`, beside the executable. "" when there is none.
@@ -74,6 +78,22 @@ var _bound_catalogue: DotMapCatalogue = null
 static func find(stem: String, config_dir: String = "") -> String:
 	if stem.strip_edges().is_empty():
 		return ""
+	if stem.trim_suffix(".yml").trim_suffix(".yaml") == DEFAULT_STEM.trim_suffix(".yml"):
+		return DotCfgLegacy.find(_find_flat(stem, config_dir), _strongest(find_layers(config_dir)))
+	return _find_flat(stem, config_dir)
+
+
+## Every `maps.yml` of the new layout, weakest first: `cfg/addons/dot_map/` then the operator's
+## `cfg/server/dot_map/`, over the shipped, executable, `user://` and `--config` roots.
+static func find_layers(config_dir: String = "") -> PackedStringArray:
+	return DotAddonConfig.file_layers("dot-map", "maps.yml", config_dir)
+
+
+static func _strongest(paths: PackedStringArray) -> String:
+	return "" if paths.is_empty() else paths[paths.size() - 1]
+
+
+static func _find_flat(stem: String, config_dir: String) -> String:
 	var names := PackedStringArray([stem]) if stem.get_extension() != "" \
 		else PackedStringArray(EXTENSIONS.map(func(e: String) -> String: return "%s.%s" % [stem, e]))
 	if config_dir != "":

@@ -15,5 +15,8 @@ extends RefCounted
 #    that take aliases). Needs dot-core API level 12 (DotYaml, DotRotationSpec, DotCommandNames).
 # 6: DotMapCatalogue.content_refreshed; DotMapRotationFile re-applies its marks on it, so a
 #    content refresh no longer puts unlisted pack maps back in rotation.
-const LEVEL := 6
+# 7: DotMapRotationFile.find_layers; find("cfg/maps.yml") reads cfg/addons/dot_map/maps.yml (and
+#    the operator's cfg/server/dot_map/), the flat cfg/maps.yml through DotCfgLegacy until
+#    2026-12-31. Needs dot-core API level 15.
+const LEVEL := 7
 const OLDEST := 1

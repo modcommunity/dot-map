@@ -36,7 +36,7 @@ The clock can wait while the server hibernates: `DotMapSession.follow_hibernatio
 
 ## The rotation file
 
-`cfg/maps.yml` says which installed maps rotate, in the shape of the server's content.yml: `defaults:` for every game and `games: <game>:` for one, read by `DotMapRotationFile`. Layers, weakest first: the game's shipped file, the server's defaults, the game's own entry. A list replaces a list; scalars merge.
+`cfg/addons/dot_map/maps.yml` says which installed maps rotate (the operator's `cfg/server/dot_map/maps.yml` over it; the flat `cfg/maps.yml` is still found through `DotCfgLegacy` with one WARN until 2026-12-31, and `DotMapRotationFile.find("cfg/maps.yml")` does all of that; `find_layers` lists the new-layout files weakest first), in the shape of the server's content.yml: `defaults:` for every game and `games: <game>:` for one, read by `DotMapRotationFile`. Layers, weakest first: the game's shipped file, the server's defaults, the game's own entry. A list replaces a list; scalars merge.
 
 ```yaml
 defaults:

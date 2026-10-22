@@ -4,7 +4,7 @@ Maps as content rather than as builds: one game, many maps, switched under live 
 
 Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is specific to maps. The reasoning is in [docs/](docs/README.md).
 
-**Only dot-core is a dependency, at API level 12 or later (`DotYaml`, `DotRotationSpec`, `DotCommandNames`).** dot-cloud, dot-timer, dot-server and dot-net are all optional and none is named anywhere in the source: dot-cloud is found in `DotRegistry`, zones come back as text, commands are installed duck-typed, and messages go out through a `send_fn`. [content](docs/content.md#reaching-dot-cloud-without-naming-it)
+**Only dot-core is a dependency, at API level 15 or later (`DotYaml`, `DotRotationSpec`, `DotCommandNames`, `DotAddonConfig.file_layers`, `DotCfgLegacy`).** dot-cloud, dot-timer, dot-server and dot-net are all optional and none is named anywhere in the source: dot-cloud is found in `DotRegistry`, zones come back as text, commands are installed duck-typed, and messages go out through a `send_fn`. [content](docs/content.md#reaching-dot-cloud-without-naming-it)
 
 ## Read before
 
@@ -21,7 +21,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | Path | What |
 | --- | --- |
 | `addons/dot_map/core/` | `DotMapDef` (id, version, scene, pack, tier, player range), `DotMapCatalogue` (the JSON an operator edits) |
-| `addons/dot_map/runtime/` | `DotMapLoader` (def to `PackedScene`, fetching first), `DotMapRotation`, `DotMapRotationFile` (`cfg/maps.yml`), `DotMapSession` (the node a game adds) |
+| `addons/dot_map/runtime/` | `DotMapLoader` (def to `PackedScene`, fetching first), `DotMapRotation`, `DotMapRotationFile` (`cfg/addons/dot_map/maps.yml`, legacy `cfg/maps.yml` via `DotCfgLegacy`), `DotMapSession` (the node a game adds) |
 | `addons/dot_map/net/` | `DotMapMessage` (the five messages), `DotMapSyncHost` (announce, wait, swap; read its class doc), `DotMapSyncClient` (fetch, ready, load; owns the trust rules) |
 | `addons/dot_map/surfaces/` | `DotMapSurfaces`: a surface kind (`&"brick"`) to a world-space triplanar material; 15 CC0 photo kinds, credits beside them. [surfaces](docs/surfaces.md) |
 | `addons/dot_map/brushes/` | `DotMapBrush`: box, wedge, stairs, cylinder, cone, spike, arch, quarter_pipe, slab_holes from a dictionary; convex collision, UVs in metres, a material slot. [brushes](docs/brushes.md) |
