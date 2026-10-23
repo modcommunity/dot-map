@@ -36,7 +36,7 @@ A manifest without the newer sections (`links`, `entities`, volume `outputs`) re
 
 ## Volumes
 
-`kind` is `multiple` (fires on each entry, then waits `wait`), `once` (`wait` -1), `teleport` (`target`), `push` (`direction`, `speed`), `hurt` (`damage`), `gravity`, `water` or `ladder`. Each has `brushes` as plane lists (`n.p <= d` inside), `outputs`, `disabled` (starts disabled) and `filter`. `DotMapVolume.contains(point)` tests exactly, `bounds()` boxes it.
+`kind` is `multiple` (fires on each entry, then waits `wait`), `once` (`wait` -1), `teleport` (`target`), `push` (`direction` a unit vector in Godot axes from `pushdir`, `speed` in metres a second, `spawnflags`; `DotMapVolume.push_velocity()` is their product, and a game applies it to bodies inside `contains`), `hurt` (`damage`), `gravity`, `water` or `ladder`. Each has `brushes` as plane lists (`n.p <= d` inside), `outputs`, `disabled` (starts disabled) and `filter`. `DotMapVolume.contains(point)` tests exactly, `bounds()` boxes it.
 
 ## Links
 

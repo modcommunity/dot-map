@@ -18,6 +18,11 @@ var wait: float = 0.0
 var target: String = ""
 var filter: String = ""
 var outputs: Array = []
+## A [code]push[/code] volume's unit direction (Godot axes) and speed in metres a second.
+var direction: Vector3 = Vector3.ZERO
+var speed: float = 0.0
+## Raw source flags; for a push volume bit 1 is "players" (the others are physics objects and NPCs).
+var spawnflags: int = 0
 
 var _brushes: Array = []
 
@@ -36,6 +41,11 @@ static func from_record(rec: Dictionary) -> DotMapVolume:
 	v.target = str(rec.get("target", ""))
 	v.filter = str(rec.get("filter", ""))
 	v.outputs = rec.get("outputs", [])
+	v.spawnflags = int(rec.get("spawnflags", 0))
+	var dir: Array = rec.get("direction", [])
+	if dir.size() == 3:
+		v.direction = Vector3(dir[0], dir[1], dir[2])
+	v.speed = float(rec.get("speed", 0.0))
 	for planes: Array in rec.get("brushes", []):
 		var set: Array[Plane] = []
 		for p: Array in planes:
@@ -55,6 +65,11 @@ func contains(point: Vector3) -> bool:
 		if inside:
 			return true
 	return false
+
+
+## The velocity a push volume applies to a body inside (m/s, Godot axes); zero for other kinds.
+func push_velocity() -> Vector3:
+	return direction * speed if kind == "push" else Vector3.ZERO
 
 
 ## The box around every brush (corners found from plane triples).

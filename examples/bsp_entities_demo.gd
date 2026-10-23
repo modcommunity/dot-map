@@ -11,8 +11,8 @@ extends Node3D
 ## (toggle doors moved by buttons that lock and unlock one another), hinged doors, shutters, and
 ## classes the converter keeps as data.
 
-const CHECKS := 32
-const SECTIONS := 4
+const CHECKS := 37
+const SECTIONS := 5
 const REAL := "res://examples/bsp_mesh/zm_4way_tunnel.entities.json"
 
 var _passed := 0
@@ -37,6 +37,7 @@ func _run() -> void:
 		_test_travel(ents)
 		_test_links(ents)
 		_test_generic(ents)
+		_test_push()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -156,4 +157,19 @@ func _test_generic(ents: DotMapEntities) -> void:
 	_check(e.links.unresolved().size() == 1 and e.links.fired_by(7, "OnThing")[0]["delay"] == 0.5, "its outputs are in the graph")
 	var empty := DotMapEntities.from_manifest({})
 	_check(empty.movers.is_empty() and empty.links.size() == 0 and empty.mover_named("x") == null, "an old manifest with none of it reads as empty")
+	_done()
+
+
+func _test_push() -> void:
+	_section("a push volume carries its direction and speed")
+	var planes := [[1, 0, 0, 1], [-1, 0, 0, 1], [0, 1, 0, 1], [0, -1, 0, 1], [0, 0, 1, 1], [0, 0, -1, 1]]
+	var rec := {"entity": 3, "model": 2, "classname": "trigger_push", "kind": "push", "spawnflags": 65, "disabled": true,
+			"direction": [0.0, 1.0, 0.0], "speed": 95.25, "brushes": [planes]}
+	var ents := DotMapEntities.from_manifest({"volumes": [rec]})
+	var v := ents.volumes_of("push")[0]
+	_check(v.direction == Vector3.UP and is_equal_approx(v.speed, 95.25), "direction and speed read: %s %f" % [v.direction, v.speed])
+	_check(v.push_velocity().is_equal_approx(Vector3.UP * 95.25), "push_velocity is direction times speed")
+	_check(v.spawnflags == 65 and v.disabled, "spawnflags and the start-disabled state read")
+	_check(v.contains(Vector3.ZERO) and v.bounds().size.is_equal_approx(Vector3(2, 2, 2)), "it contains its middle and boxes 2 m")
+	_check(DotMapVolume.from_record({"kind": "hurt", "direction": [0, 1, 0], "speed": 3.0}).push_velocity() == Vector3.ZERO, "another kind pushes nothing")
 	_done()
