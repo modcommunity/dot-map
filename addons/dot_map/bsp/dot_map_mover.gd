@@ -48,6 +48,8 @@ var yaw: float = 0.0
 ## A prop_door_rotating hung off an authored hinge: the yaw (degrees) its panel lies along and its width in metres, NAN and 0 when the model's own origin is the hinge.
 var panel_yaw: float = NAN
 var panel_width: float = 0.0
+## Metres from the hinge to the model's origin along the panel (0 when the origin is the hinge): a real model is placed this far along it.
+var panel_offset: float = 0.0
 ## 1 or -1: the side a door that starts open stands on (spawnpos), 0 for none.
 var spawn_side: float = 0.0
 var use: bool = false
@@ -84,6 +86,7 @@ static func from_record(rec: Dictionary) -> DotMapMover:
 	if typeof(rec.get("panel_yaw")) in [TYPE_FLOAT, TYPE_INT]:
 		m.panel_yaw = float(rec["panel_yaw"])
 		m.panel_width = float(rec.get("panel_width", 0.0))
+		m.panel_offset = float(rec.get("panel_offset", 0.0))
 	m.use = bool(rec.get("use", false))
 	m.touch = bool(rec.get("touch", false))
 	m.solid = bool(rec.get("solid", true))

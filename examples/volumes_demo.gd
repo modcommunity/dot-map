@@ -8,7 +8,7 @@ extends Node
 ## godot --headless --path . res://examples/volumes_demo.tscn
 ## [/codeblock]
 
-const CHECKS := 125
+const CHECKS := 128
 const SECTIONS := 13
 const OFFICE := "res://examples/io/office_io.doc.json"
 
@@ -349,6 +349,19 @@ func _test_boxes() -> void:
 	DotMapVolume.min_thickness = 0.25
 	_check(not raw.touches_column(Vector3(4.9, 0, 2), 1.8) and not raw.touches_column(Vector3(5.1, 0, 2), 1.8),
 		"with min_thickness 0 the sheet is the brush as written (and is stepped over)")
+	# An angled sheet (a 2 cm brush turned 45 degrees): its AABB is as wide as it is long, so only its own thinnest
+	# normal finds it thin; it grows along that normal and not along its edges or height.
+	var h := sqrt(0.5)
+	var n1 := Vector3(h, 0, h)
+	var n2 := Vector3(-h, 0, h)
+	var angled := DotMapVolume.from_record({"kind": "teleport", "brushes": [[
+			[n1.x, 0, n1.z, 0.01], [-n1.x, 0, -n1.z, 0.01], [n2.x, 0, n2.z, 2.0], [-n2.x, 0, -n2.z, 2.0],
+			[0, 1, 0, 1.0], [0, -1, 0, 1.0]]]})
+	_check(angled.contains(n1 * 0.1) and not angled.contains(n1 * 0.2), "an angled sheet is thickened to 25 cm along its own normal")
+	_check(not angled.contains(n2 * 2.05) and not angled.contains(Vector3(0, 1.05, 0)), "armed: its edges and height do not bleed")
+	var flush := DotMapVolume.from_record(_vol(-1, "teleport", "trigger_teleport", Vector3(5, 0, 0), Vector3(5.019, 2, 4)))
+	_check(flush.contains(Vector3(5.1, 1.0, 2.0)) and not flush.contains(Vector3(5.01, 2.1, 2.0)) and not flush.contains(Vector3(5.01, 1.0, 4.1)),
+		"a flush sheet grows across its thin side only, not up or along")
 	io.send("lad", "Disable")
 	_check(vols.ladder_boxes().size() == 1, "a disabled ladder entity is off the list")
 	_check(_climb(vols.ladder_boxes()[0]), "a body walked up the ladder box stays inside it from foot to top")

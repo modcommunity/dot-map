@@ -10,7 +10,7 @@ extends Node
 ## ([code]examples/bsp_mesh/zm_4way_tunnel.entities.json[/code]); nodes are built here the way
 ## [method DotMapBspMesh.build_node] shapes them (a Node3D per model with a [code]model[/code] meta).
 
-const CHECKS := 179
+const CHECKS := 183
 const SECTIONS := 15
 const TUNNEL := "res://examples/bsp_mesh/zm_4way_tunnel.entities.json"
 
@@ -598,13 +598,27 @@ func _test_door_standin() -> void:
 	# A door hung off an authored hinge (panel_yaw): the node sits on the hinge, the panel runs from it along that yaw
 	# whatever the entity's angles, and it swings away from the opener about that hinge.
 	var hrec := {"model": null, "classname": "prop_door_rotating", "targetname": "hd", "origin": [10, 0, 20], "axis": [0, 1, 0],
-			"degrees": 90.0, "travel_time": 1.0, "open_dir": 0, "yaw": 0.0, "panel_yaw": 0.0, "panel_width": 1.2, "use": true}
+			"degrees": 90.0, "travel_time": 1.0, "open_dir": 0, "yaw": 0.0, "panel_yaw": 0.0, "panel_width": 1.2, "panel_offset": 0.6, "use": true}
 	var hm := _door_rec(0, "rotate", hrec)
 	var hdoor := DotMapDoorStandIn.build(hm, 270.0)
 	add_child(hdoor)
 	var hpanel := hdoor.get_node("Panel") as MeshInstance3D
 	_check(hdoor.position == Vector3(10, 0, 20) and is_equal_approx(hdoor.rotation.y, 0.0), "a door with a panel_yaw ignores the entity's angles (270) and sits on the hinge")
 	_check(is_equal_approx((hpanel.mesh as BoxMesh).size.z, 1.2) and is_equal_approx(hpanel.position.z, -0.6), "its panel is as wide as the hinge-to-origin line says and starts at the hinge")
+	# A game's own model (origin mid-panel, built at the hinge with the entity's yaw) is hung under a pivot on the
+	# hinge, half a width along the panel, so it swings about the hinge and not about its own middle.
+	var wld := DotMapWorld.new()
+	var model := Node3D.new()
+	model.position = hm.origin
+	var pivot := wld._hung_model(model, hm, 270.0)
+	add_child(pivot)
+	_check(pivot.position == Vector3(10, 0, 20) and model.get_parent() == pivot, "a custom door model hangs under a pivot at the hinge")
+	_check(model.position.is_equal_approx(Vector3(0, 0, -0.6)) and is_equal_approx(model.rotation.y, deg_to_rad(270.0)), "armed: the model sits half a width along the panel with the entity's yaw, not on the hinge")
+	_check(pivot.to_global(model.position).is_equal_approx(Vector3(10, 0, 19.4)), "its origin is mid-panel in the map")
+	var own := Node3D.new()
+	_check(wld._hung_model(own, _door_rec(0, "rotate", {"model": null, "classname": "prop_door_rotating", "targetname": "x", "origin": [0, 0, 0], "axis": [0, 1, 0], "degrees": 90.0}), 0.0) == own, "a door whose origin is the hinge keeps the game's node as built")
+	own.free()
+	wld.free()
 	var bare_rec := hrec.duplicate()
 	bare_rec.erase("panel_yaw")
 	var plain := DotMapDoorStandIn.build(_door_rec(0, "rotate", bare_rec), 270.0)

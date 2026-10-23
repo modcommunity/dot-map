@@ -65,28 +65,39 @@ static func from_record(rec: Dictionary) -> DotMapVolume:
 	return v
 
 
-## Pushes every plane of a brush thinner than [param thickness] outwards until its thinnest side is that wide.
+## Thickens every brush thinner than [param thickness] along its own thinnest plane normal (not the world axes,
+## so an angled sheet is thickened too, and nothing grows along the sheet's edges): the two planes facing
+## opposite ways on that normal move out by half the shortfall each.
 func _thicken(thickness: float) -> void:
 	for planes: Array in _brushes:
-		var lo := Vector3(INF, INF, INF)
-		var hi := -lo
+		var verts: Array[Vector3] = []
 		for i in planes.size():
 			for j in range(i + 1, planes.size()):
 				for k in range(j + 1, planes.size()):
 					var hit: Variant = (planes[i] as Plane).intersect_3(planes[j], planes[k])
-					if hit == null or not _inside(planes, hit):
-						continue
-					lo = lo.min(hit)
-					hi = hi.max(hit)
-		if not lo.is_finite():
+					if hit != null and _inside(planes, hit):
+						verts.append(hit)
+		if verts.is_empty():
 			continue
-		var thin := minf(hi.x - lo.x, minf(hi.y - lo.y, hi.z - lo.z))
+		var thin := INF
+		var axis := Vector3.ZERO
+		for p: Plane in planes:
+			var lo := INF
+			var hi := -INF
+			for v in verts:
+				var t := p.normal.dot(v)
+				lo = minf(lo, t)
+				hi = maxf(hi, t)
+			if hi - lo < thin:
+				thin = hi - lo
+				axis = p.normal
 		if thin >= thickness:
 			continue
 		var pad := (thickness - thin) * 0.5
 		for i in planes.size():
 			var p: Plane = planes[i]
-			planes[i] = Plane(p.normal, p.d + pad)
+			if absf(p.normal.dot(axis)) > 0.999:
+				planes[i] = Plane(p.normal, p.d + pad)
 
 
 ## Whether [param point] (world metres) is inside any of the volume's brushes.

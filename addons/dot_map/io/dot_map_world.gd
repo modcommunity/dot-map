@@ -235,11 +235,12 @@ func _build_doors(ents: DotMapEntities, hooks: Dictionary, layers: Dictionary) -
 			continue
 		var ang := e.key("angles").split_floats(" ", false)
 		var yaw := float(ang[1]) if ang.size() > 1 else 0.0
+		var entity_yaw := yaw
 		if not is_nan(m.panel_yaw):
 			yaw = m.panel_yaw
 		var door: Node3D = null
 		if hooks.get("door_fn") is Callable:
-			door = (hooks["door_fn"] as Callable).call(m, yaw)
+			door = _hung_model((hooks["door_fn"] as Callable).call(m, entity_yaw), m, entity_yaw)
 		if door == null:
 			door = DotMapDoorStandIn.build(m, yaw, DotMapDoorStandIn.SIZE, int(layers.get("solid", 1)))
 		visual.add_child(door)
@@ -250,6 +251,22 @@ func _build_doors(ents: DotMapEntities, hooks: Dictionary, layers: Dictionary) -
 		e.bind_node(door)
 		e.tick_view(io)
 		doors.append(door)
+
+
+## A game's model is built with its origin where the model's is (mid-panel on a door hung off an authored
+## hinge) and the entity's yaw, but [DotMapMoverNode] swings the node about its own origin, which must be the
+## hinge. So it goes under a pivot on the hinge, [member DotMapMover.panel_offset] along the panel.
+func _hung_model(model: Node3D, m: DotMapMover, entity_yaw: float) -> Node3D:
+	if model == null or is_nan(m.panel_yaw) or m.panel_offset <= 0.0:
+		return model
+	var pivot := Node3D.new()
+	pivot.name = model.name if model.name != &"" else &"Door"
+	pivot.position = m.origin
+	pivot.rotation.y = deg_to_rad(m.panel_yaw)
+	model.position = Vector3(0.0, 0.0, -m.panel_offset)
+	model.rotation = Vector3(0.0, deg_to_rad(entity_yaw - m.panel_yaw), 0.0)
+	pivot.add_child(model)
+	return pivot
 
 
 func _apply_config(opts: Dictionary) -> void:
