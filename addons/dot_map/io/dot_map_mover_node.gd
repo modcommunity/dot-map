@@ -210,6 +210,16 @@ func touched(io: DotMapIO, activator: Variant, use: bool) -> bool:
 	return true
 
 
+## A shot at a button or door: fires OnDamaged, and a button flagged "damage activates" (512) is pressed.
+func shot(io: DotMapIO, amount: float, by: Variant) -> bool:
+	if mover == null or not alive or amount <= 0.0:
+		return false
+	fire(io, "OnDamaged", by)
+	if mover.kind in [DotMapMover.KIND_BUTTON, DotMapMover.KIND_HINGE_BUTTON] and has_spawnflag(512) and not locked:
+		_press(io, by)
+	return true
+
+
 func _press(io: DotMapIO, activator: Variant) -> void:
 	if locked:
 		fire(io, "OnUseLocked", activator)

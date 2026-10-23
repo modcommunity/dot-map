@@ -331,10 +331,14 @@ func use(index: int, activator: Variant = null) -> DotResult:
 	return DotResult.success()
 
 
-## Damage from the game to the breakable with the map's [param index] (the authority only).
-## Returns true when it broke.
+## Damage from the game to the breakable or button with the map's [param index] (the authority only).
+## Returns true when it broke or a button took the shot.
 func hurt(index: int, amount: float, at: Vector3 = Vector3.ZERO, by: Variant = null) -> bool:
 	var e: Variant = _by_index.get(index)
+	if authoritative and e is DotMapMoverNode:
+		var shot: bool = (e as DotMapMoverNode).shot(self, amount, by)
+		_settle()
+		return shot
 	if not authoritative or not e is DotMapBreakable:
 		return false
 	var broke: bool = (e as DotMapBreakable).hurt(self, amount, at, by)
