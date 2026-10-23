@@ -65,6 +65,8 @@ var entities: Array = []
 var history: Array = []
 ## Every map command seen: [code]{tick, entity, kind, text, name, allowed}[/code].
 var commands: Array = []
+## Every script operation sent to the game or refused: [code]{tick, entity, op, allowed}[/code]; no script text is ever run.
+var scripts: Array = []
 ## "classname|input" to the times an input arrived that no class or handler implements.
 var unhandled: Dictionary = {}
 ## A game callable that was missing when needed, with how often.
@@ -94,7 +96,7 @@ func _init() -> void:
 		"logic_relay": DotMapRelay, "logic_timer": DotMapTimer, "math_counter": DotMapCounter,
 		"logic_case": DotMapCase, "logic_compare": DotMapCompare, "logic_branch": DotMapBranch,
 		"logic_auto": DotMapAuto, "trigger_multiple": DotMapTrigger, "trigger_once": DotMapTrigger,
-		"point_servercommand": DotMapServerCommand, "point_clientcommand": DotMapClientCommand,
+		"lua_run": DotMapScript, "point_servercommand": DotMapServerCommand, "point_clientcommand": DotMapClientCommand,
 		"func_brush": DotMapToggleBrush, "func_wall_toggle": DotMapToggleBrush, "func_illusionary": DotMapToggleBrush,
 		"func_breakable": DotMapBreakable, "func_breakable_surf": DotMapBreakable,
 		"prop_physics": DotMapBreakable, "prop_physics_multiplayer": DotMapBreakable,
@@ -536,6 +538,26 @@ func record_command(e: DotMapEntity, text: String) -> Dictionary:
 	return rec
 
 
+## Replays a lua_run's converter-translated operations to the game's event callable as
+## [code]"script.<op>"[/code]; an untranslated snippet, or an operation outside the whitelist, is recorded as refused.
+func run_script(e: DotMapEntity) -> void:
+	var info: Variant = e.record.get("script")
+	var ops: Array = []
+	if info is Dictionary and str((info as Dictionary).get("status", "")) == "translated" and (info as Dictionary).get("ops") is Array:
+		ops = (info as Dictionary)["ops"]
+	if ops.is_empty():
+		scripts.append({"tick": now, "entity": e.index, "op": "", "allowed": false})
+		DotLog.info(CHANNEL, "map script not run", {"entity": e.targetname})
+		return
+	for op: Variant in ops:
+		var ok := DotMapScript.valid_op(op)
+		scripts.append({"tick": now, "entity": e.index, "op": str((op as Dictionary).get("op", "")) if op is Dictionary else "", "allowed": ok})
+		if ok:
+			event("script." + str((op as Dictionary)["op"]), (op as Dictionary).duplicate())
+		else:
+			DotLog.info(CHANNEL, "map script operation refused", {"entity": e.targetname})
+
+
 ## Records a point_clientcommand line. Its own kind, never allowed and never sent to [member event_fn]: it would run on a player's machine, not the server's.
 func record_client_command(e: DotMapEntity, text: String) -> Dictionary:
 	var rec := {}
@@ -587,7 +609,8 @@ func coverage() -> Dictionary:
 		if not _catalogue.is_empty():
 			unknown[k] = "known" if def.has(inp) else "not in the catalogue"
 	return {"unhandled": unhandled.duplicate(), "catalogue": unknown, "missing_callables": missing_callables.duplicate(),
-			"unresolved": unresolved.duplicate(), "loop_trips": loop_trips, "commands_denied": _denied()}
+			"unresolved": unresolved.duplicate(), "loop_trips": loop_trips, "commands_denied": _denied(),
+			"scripts_refused": scripts.filter(func(r: Dictionary) -> bool: return not r["allowed"]).size()}
 
 
 ## A snapshot of every entity's state, for a joining client.

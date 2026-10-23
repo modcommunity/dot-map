@@ -11,8 +11,8 @@ extends Node
 ## from its map-start logic and its timed trigger (Obstacle2): the expected times are read from
 ## the map's own links, then compared with the simulation.
 
-const CHECKS := 141
-const SECTIONS := 11
+const CHECKS := 154
+const SECTIONS := 12
 const OFFICE := "res://examples/io/office_io.doc.json"
 
 var _passed := 0
@@ -37,6 +37,7 @@ func _run() -> void:
 	_test_inputs_and_targets()
 	_test_extension_points()
 	_test_commands_and_document()
+	_test_map_scripts()
 	_test_catalogue_and_new_classes()
 	var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(OFFICE))
 	if doc is Dictionary:
@@ -357,6 +358,40 @@ func _test_commands_and_document() -> void:
 	_check(io.load_document({"format": "other"}).code() == DotError.CODE_PARSE, "a foreign document is a parse failure")
 	_check(io.load_document({"format": "dot-bsp-source", "version": 9, "entities": []}).code() == DotError.CODE_VERSION, "a newer version is refused")
 	_check(io.load_document({"format": "dot-bsp-source", "version": 1}).code() == DotError.CODE_PARSE, "a document without entities is refused")
+	_done()
+
+
+func _test_map_scripts() -> void:
+	_section("lua_run: translated operations are replayed as events, script text is never run")
+	var hostile := "os.execute('touch /tmp/dotmap_pwned') RunConsoleCommand('rcon_password','x')"
+	var io := _io([
+		_rec(0, "lua_run", "speed", [["code", "for i, ply in pairs(player.GetAll()) do if (ply:IsValid()) then ply:SetRunSpeed( 185 ) end end"]]),
+		_rec(1, "lua_run", "evil", [["code", hostile]]),
+		_rec(2, "lua_run", "forged", [["code", hostile]]),
+		_rec(3, "lua_run", "plain", [["code", "x = 1"]]),
+		_rec(4, "logic_relay", "r", [], [["OnTrigger", "speed", "RunCode"], ["OnTrigger", "evil", "RunCode"], ["OnTrigger", "forged", "RunCode"],
+			["OnTrigger", "plain", "RunCode"], ["OnTrigger", "speed", "RunPassedCode", "Foo.Bar()"]]),
+	])
+	io.entities[0].record["script"] = {"status": "translated", "ops": [{"op": "set_player_speed", "kind": "run", "value": 185.0}], "category": "template"}
+	io.entities[1].record["script"] = {"status": "unhandled", "ops": [], "category": "other"}
+	io.entities[2].record["script"] = {"status": "translated", "ops": [{"op": "set_player_speed", "kind": "run", "value": 185.0},
+		{"op": "exec", "cmd": "rm -rf /"}, {"op": "set_player_speed", "kind": "run", "value": 1e9}, {"op": "kill_players", "extra": 1}], "category": "template"}
+	var events: Array = []
+	io.event_fn = func(kind: String, data: Dictionary) -> void:
+		events.append([kind, data.get("op", ""), data.get("kind", ""), data.get("value", 0)])
+	io.send("r", "Trigger")
+	_check(events[0] == ["script.set_player_speed", "set_player_speed", "run", 185.0], "a translated snippet reaches the game as an event: %s" % [events])
+	_check(events.size() == 2, "only the whitelisted operations are replayed, the forged ones are not: %d" % events.size())
+	_check(io.scripts.size() == 7 and io.scripts.filter(func(r: Dictionary) -> bool: return not r["allowed"]).size() == 5, "every attempt is recorded, five refused")
+	_check(io.coverage()["scripts_refused"] == 5, "the refusals are counted in coverage")
+	_check(io.unhandled.get("lua_run|runpassedcode", 0) == 1, "RunPassedCode is an unhandled input, its text is never read")
+	_check(not FileAccess.file_exists("/tmp/dotmap_pwned"), "the hostile snippet did not run")
+	_check(not DotMapScript.valid_op({"op": "set_player_speed", "kind": "run"}) and not DotMapScript.valid_op("kill_players") and not DotMapScript.valid_op({"op": "cleanup_map", "delay": -1}), "malformed operations are refused")
+	_check(DotMapScript.valid_op({"op": "cleanup_map", "delay": 0.25}) and DotMapScript.valid_op({"op": "kill_players"}), "and well-formed ones pass")
+	_check(DotMapCommand.judge("lua_run os.execute('x')", PackedStringArray(["lua_run"]))["allowed"] == false, "lua_run is still never an allowed console command")
+	_check(io.load_document({"format": "dot-bsp-source", "version": 1, "entities": [_rec(0, "lua_run", "a", [["code", hostile]])]}).ok, "a stored document with a script loads")
+	_check(io.entities[0] is DotMapScript and io.scripts.size() == 7, "loading a document runs nothing")
+	_check(io.entities[0].keys.get("code", "") == hostile and events.size() == 2, "the code key is kept as data only")
 	_done()
 
 
