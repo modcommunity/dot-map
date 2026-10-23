@@ -69,6 +69,8 @@ const KINDS := {
 	&"roof_clay": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
 	&"ceiling_tile": {"meters": 2.4, "rough": 1.0, "metal": 0.0},
 	&"plaster_worn": {"meters": 2.5, "rough": 1.0, "metal": 0.0},
+	&"wallpaper": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
+	&"wallpaper_decrepit": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
 }
 
 ## Names a generator already uses for a surface, to the kind that draws it. A map document that
