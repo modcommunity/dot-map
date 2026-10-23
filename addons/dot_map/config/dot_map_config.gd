@@ -3,7 +3,7 @@ extends RefCounted
 
 ## Per-map settings: the merged `{cvar: value}` a map asks for, resolved from `map/<name>.yml` files, whitelisted, applied on load and put back on the next map.
 ##
-## Files are `map/<name>.yml` inside each [DotAddonConfig] tier of `dot-map` (`cfg/addons/dot_map/`, `cfg/game/<game>/dot_map/`, then the operator's `cfg/server/addons/dot_map/` and `cfg/server/game/<game>/dot_map/`), in every root. [code]<name>[/code] is the map id or a glob (`surf_*`, `?`/`*`, case-insensitive), the content a flat mapping of key to scalar.
+## Files are `map/<name>.yml` inside each [DotAddonConfig] tier of `dot-map` (`cfg/addons/dot_map/`, `cfg/game/<game>/dot_map/`, then the operator's `cfg/server/addons/dot_map/` and `cfg/server/game/<game>/dot_map/`), in every root. [code]<name>[/code] is the map id or a glob (`surf_%` or `surf_*`; `%` is `*`, `@` is `?`, case-insensitive), the content a flat mapping of key to scalar.
 ##
 ## [b]Order, strongest first[/b]: command line `--dot-map.map.<key>=v` / environment `DOT_MAP_MAP_<KEY>` (a key some file or [member defaults] already holds, as [DotAddonConfig] does everywhere), then the operator's tiers (exact file over wildcards), then the shipped tiers (exact over wildcards), then [member defaults] (the converter's values). Among wildcards the more specific wins: most literal characters, then the longer pattern, then the later name alphabetically; at equal specificity the stronger tier (game over addon, per-game over shared) and the later root win. Nothing is executed: a value is only ever handed to [member set_fn] for a key in [member schema].
 ##
@@ -227,7 +227,7 @@ func _matching_files(name: String) -> Array:
 				for f in DirAccess.get_files_at(dir):
 					if not EXTENSIONS.has(f.get_extension().to_lower()):
 						continue
-					var pattern := f.get_basename().to_lower()
+					var pattern := f.get_basename().to_lower().replace("%", "*").replace("@", "?")
 					var wild := pattern.contains("*") or pattern.contains("?")
 					if (wild and name.matchn(pattern)) or (not wild and name == pattern):
 						found.append({"path": dir.path_join(f), "pattern": pattern, "group": group,

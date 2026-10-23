@@ -4,11 +4,11 @@ A map can ask for settings (the commands its entities send, such as `sv_airaccel
 
 ## Where the files are
 
-A file is `map/<name>.yml` inside each `dot-map` tier of dot-core's `DotAddonConfig`: `cfg/addons/dot_map/`, `cfg/game/<game>/dot_map/`, then the operator's `cfg/server/addons/dot_map/` and `cfg/server/game/<game>/dot_map/`, in every root. `<name>` is a map id or a glob (`surf_*.yml` covers every surf map, `?` is one character, case does not matter) and the content is a flat mapping of key to one scalar. Nothing is nested and no value is ever a command line.
+A file is `map/<name>.yml` inside each `dot-map` tier of dot-core's `DotAddonConfig`: `cfg/addons/dot_map/`, `cfg/game/<game>/dot_map/`, then the operator's `cfg/server/addons/dot_map/` and `cfg/server/game/<game>/dot_map/`, in every root. `<name>` is a map id or a glob (`surf_%.yml` covers every surf map: `%` is any run of characters, `@` is exactly one, case does not matter; the literal `*` and `?` still work but cannot be in a file name on Windows or in a published pack, so spell them `%` and `@`; map ids never contain either) and the content is a flat mapping of key to one scalar. Nothing is nested and no value is ever a command line.
 
 ## Which value wins
 
-Strongest first: the command line (`--dot-map.map.<key>=v`) and environment (`DOT_MAP_MAP_<KEY>`), for a key a file or default already holds, as every `DotAddonConfig` override works; then the operator's tiers, an exact file over a wildcard; then the shipped tiers, an exact file over a wildcard; then the converter's default. Among wildcards the more specific wins: the most literal characters, then the longer pattern, then the later name alphabetically (so `surf_?` beats `surf_*`). At equal specificity the stronger tier (game over addon, per-game over shared) and the later root win. Keys merge one by one, so a stronger file only replaces the keys it names.
+Strongest first: the command line (`--dot-map.map.<key>=v`) and environment (`DOT_MAP_MAP_<KEY>`), for a key a file or default already holds, as every `DotAddonConfig` override works; then the operator's tiers, an exact file over a wildcard; then the shipped tiers, an exact file over a wildcard; then the converter's default. Among wildcards the more specific wins: the most literal characters, then the longer pattern, then the later name alphabetically (so `surf_@` beats `surf_%`). At equal specificity the stronger tier (game over addon, per-game over shared) and the later root win. Keys merge one by one, so a stronger file only replaces the keys it names.
 
 ## The whitelist
 

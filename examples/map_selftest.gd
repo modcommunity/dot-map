@@ -13,7 +13,7 @@ extends Node
 ## running, rather than on nothing. It is the reason the load happens before the
 ## teardown, and it is the step that is easiest to "simplify" back out.
 
-const CHECKS := 348
+const CHECKS := 354
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -2868,6 +2868,23 @@ func _test_map_config() -> void:
 	_check(cfg2._check("arena_int", 1.0e30).value == 9000000000000000, "an int clamps instead of overflowing")
 	var bare := DotMapConfig.new()
 	_check(not bare.apply("x").ok, "apply without hooks fails")
+	_cfg_clear()
+	_cfg_file("addons", "pf_%", "arena_air: 11\narena_gravity: 22\n")
+	_cfg_file("addons", "pf_ab%", "arena_air: 33\n")
+	_cfg_file("addons", "PF_@", "arena_gravity: 44\n")
+	_cfg_file("addons", "pf_abc", "arena_air: 55\n")
+	_cfg_file("server/addons", "pf_%", "arena_air: 66\n")
+	var pc := DotMapConfig.new()
+	pc.config_dir = CFG_ROOT
+	pc.allow("arena_air", {"type": "float"}).allow("arena_gravity", {"type": "float"})
+	var ps: Dictionary = pc.resolve("pf_zzz").value["settings"]
+	_check(ps["arena_air"] == 66.0 and ps["arena_gravity"] == 22.0, "`%` spells `*`: a server pf_% beats the shipped one (%s)" % [ps])
+	DirAccess.remove_absolute(CFG_ROOT.path_join("server/addons/dot_map/map/pf_%.yml"))
+	_check(pc.resolve("pf_zzz").value["settings"]["arena_air"] == 11.0, "the shipped `%` file applies")
+	_check(pc.resolve("pf_abx").value["settings"]["arena_air"] == 33.0, "a longer literal prefix beats a shorter one")
+	_check(pc.resolve("pf_abc").value["settings"]["arena_air"] == 55.0, "an exact file beats a `%` glob")
+	_check(pc.resolve("PF_1").value["settings"]["arena_gravity"] == 44.0, "`@` spells `?`, case does not matter")
+	_check(not pc.resolve("pf_").value["settings"].has("arena_gravity") or pc.resolve("pf_").value["settings"]["arena_gravity"] == 22.0, "`@` needs exactly one character")
 	_cfg_clear()
 	_done()
 

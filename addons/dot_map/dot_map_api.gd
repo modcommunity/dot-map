@@ -40,5 +40,6 @@ extends RefCounted
 #     DotMapMoverNode replicates a door's chosen side; spawnflag 2 no longer reverses a model door.
 # 19: a door's replicated side is clamped to +-1 (0 keeps it), the state sync refuses a side that is not finite or beyond 1,
 #     and an opener with no known position keeps the door's current side.
-const LEVEL := 19
+# 20: DotMapConfig file names spell `*` as `%` and `?` as `@` (the literal characters still work).
+const LEVEL := 20
 const OLDEST := 1
