@@ -10,7 +10,7 @@ extends Node
 ## ([code]examples/bsp_mesh/zm_4way_tunnel.entities.json[/code]); nodes are built here the way
 ## [method DotMapBspMesh.build_node] shapes them (a Node3D per model with a [code]model[/code] meta).
 
-const CHECKS := 149
+const CHECKS := 151
 const SECTIONS := 15
 const TUNNEL := "res://examples/bsp_mesh/zm_4way_tunnel.entities.json"
 
@@ -365,6 +365,8 @@ func _test_train() -> void:
 	io2.advance(20 * 5)
 	var t2 := io2.entity_of(0) as DotMapMoverNode
 	_check(t2.path_at(io2.now, 20) < 13.7 and t2.path_at(io2.now, 20) >= 0.0 and io2.pending() > 0, "a looped path wraps and keeps scheduling its next corner: %s, %d pending" % [t2.path_at(io2.now, 20), io2.pending()])
+	var tank := _io([_rec(0, "func_tanktrain", "tank")])
+	_check(tank.entity_of(0) is DotMapMoverNode, "a tank train is a path mover like a track train")
 	n.free()
 	_done()
 

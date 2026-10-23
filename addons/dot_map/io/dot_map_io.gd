@@ -106,7 +106,7 @@ func _init() -> void:
 		"env_soundscape_triggerable": DotMapSoundscape, "trigger_soundscape": DotMapTriggerSoundscape, "trigger_hurt": DotMapHurt, "trigger_push": DotMapPush, "ambient_generic": DotMapSound,
 	}
 	for cls in ["func_door", "func_door_rotating", "func_movelinear", "func_rotating", "func_tracktrain",
-			"func_train", "func_plat", "func_button", "func_rot_button", "prop_door_rotating"]:
+			"func_train", "func_tanktrain", "func_plat", "func_button", "func_rot_button", "prop_door_rotating"]:
 		_classes[cls] = DotMapMoverNode
 	for c in ["env_sprite", "env_spritetrail", "env_lightglow", "point_spotlight", "env_laser", "env_beam",
 			"env_spark", "env_steam", "env_fire", "env_smokestack", "env_explosion", "env_shake", "env_fade",

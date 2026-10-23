@@ -72,7 +72,7 @@ Work package 6. `bind_world(world_root, manifest)` joins each entity to the draw
 | `func_breakable`, `func_breakable_surf`, `prop_physics*` (`DotMapBreakable`) | health, `min_damage`, the break-on-trigger flag, Break/Shatter/SetHealth/AddHealth/RemoveHealth, OnTakeDamage/OnHealthChanged/OnBreak; a `break` effect and `broken` state; a `DotMapGlass` child is told to shatter (`apply_broken`) instead of duplicating glass code; `io.propdata_fn` supplies health for props |
 | `func_door`, `func_door_rotating`, `func_movelinear`, `func_button`, `func_rot_button`, `func_plat` (`DotMapMoverNode`) | Open/Close/Toggle/Lock/Unlock/SetPosition/SetSpeed, autoclose by `wait`, OnOpen/OnClose/OnFullyOpen/OnFullyClosed |
 | `func_rotating` | Start/Stop/Toggle/Reverse/SetSpeed |
-| `func_tracktrain`, `func_train` and `path_track` | StartForward/StartBackward/Stop/Toggle/SetSpeed/TeleportToPathTrack along the record's `path`; corner speeds and OnPass; a looping ring |
+| `func_tracktrain`, `func_tanktrain`, `func_train` and `path_track` | StartForward/StartBackward/Stop/Toggle/SetSpeed/TeleportToPathTrack along the record's `path`; corner speeds and OnPass; a looping ring |
 
 Replication: the server is authoritative (`io.authoritative`), a client runs no logic and refuses `send`, `raise` and `touch`. `DotMapStateSync` batches every `state_changed` on the `settled` signal into one `io_state` message (`tick`, `[index, key, value]` changes), sends it through each peer's `send_fn`, and `add_peer` sends an `io_snapshot` of every entity first (join in progress). `apply()` on the client sets its clock, applies the changes and counts unknown entities in `refused` and unknown keys in `ignored`.
 
