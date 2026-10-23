@@ -24,5 +24,8 @@ extends RefCounted
 # 9: DotMapDef.play and play_candidates, DotMapRotationFile.settings_for: a rotation entry may carry
 #    settings ({pattern: {waves: easy}}, dot-core 9fc12e1). Needs that dot-core.
 # 10: DotMapConfig (map/<name>.yml per-map settings with wildcards, a key whitelist, apply and restore on map change).
-const LEVEL := 10
+# 11: DotMapIO, the input/output runtime (io/: DotMapEntity and the logic classes, register_handler / register_class,
+#     the damage/move/effect/event/actor callables, load_catalogue, spawn_record, globals).
+# 12: world entities on the I/O runtime: DotMapToggleBrush, DotMapBreakable, DotMapMoverNode, DotMapStateSync (io_state/io_snapshot), bind_world.
+const LEVEL := 12
 const OLDEST := 1

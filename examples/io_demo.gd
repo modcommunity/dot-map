@@ -11,8 +11,8 @@ extends Node
 ## from its map-start logic and its timed trigger (Obstacle2): the expected times are read from
 ## the map's own links, then compared with the simulation.
 
-const CHECKS := 124
-const SECTIONS := 10
+const CHECKS := 141
+const SECTIONS := 11
 const OFFICE := "res://examples/io/office_io.doc.json"
 
 var _passed := 0
@@ -37,6 +37,7 @@ func _run() -> void:
 	_test_inputs_and_targets()
 	_test_extension_points()
 	_test_commands_and_document()
+	_test_catalogue_and_new_classes()
 	var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(OFFICE))
 	if doc is Dictionary:
 		_test_office_start(doc)
@@ -356,6 +357,64 @@ func _test_commands_and_document() -> void:
 	_check(io.load_document({"format": "other"}).code() == DotError.CODE_PARSE, "a foreign document is a parse failure")
 	_check(io.load_document({"format": "dot-bsp-source", "version": 9, "entities": []}).code() == DotError.CODE_VERSION, "a newer version is refused")
 	_check(io.load_document({"format": "dot-bsp-source", "version": 1}).code() == DotError.CODE_PARSE, "a document without entities is refused")
+	_done()
+
+
+func _test_catalogue_and_new_classes() -> void:
+	_section("The catalogue, colour blend, measure movement, globals and templates")
+	var io := _io([_rec(0, "math_colorblend", "blend", [["colormin", "0 0 0"], ["colormax", "255 100 50"], ["inmin", "0"], ["inmax", "10"]],
+			[["OutColor", "lamp", "Color"]]),
+		_rec(1, "env_light", "lamp"),
+		_rec(2, "env_global", "g", [["globalstate", "lava_on"], ["initialstate", "1"], ["counter", "4"]],
+			[["OutCounter", "lamp", "FireUser1"]]),
+		_rec(3, "logic_measure_movement", "mm", [["measuretarget", "a"], ["target", "b"], ["targetscale", "2"]]),
+		_rec(4, "point_template", "tpl", [["template01", "crate"], ["template02", "crate2"], ["spawnflags", "2"]],
+			[["OnEntitySpawned", "lamp", "FireUser2"]]),
+		_rec(5, "prop_physics", "crate", [["model", "box"]]),
+		_rec(6, "prop_physics", "crate2")])
+	var events: Array = []
+	io.event_fn = func(kind: String, data: Dictionary) -> void: events.append([kind, data])
+	var lamp := io.find("lamp")[0] as DotMapEntity
+	io.start()
+	_check((io.globals.get("lava_on", {}) as Dictionary).get("on", false) == true and io.globals["lava_on"]["counter"] == 4, "env_global starts on with its counter")
+	io.send("blend", "InValue", "5")
+	io.advance(1)
+	_check(lamp.color == "128 50 25", "colorblend: half way between the two colours (%s)" % lamp.color)
+	io.send("blend", "InValue", "99")
+	io.advance(1)
+	_check(lamp.color == "255 100 50", "colorblend: clamped at the maximum")
+	io.send("g", "AddToCounter", "3")
+	io.send("g", "TurnOff")
+	io.advance(1)
+	_check(io.globals["lava_on"]["counter"] == 7 and io.globals["lava_on"]["on"] == false, "env_global: counter and flag follow their inputs")
+	_check(events.any(func(e: Array) -> bool: return e[0] == "measure_movement" and e[1]["pairing"]["scale"] == 2.0), "measure movement: pairing announced at map start")
+	io.send("mm", "SetMeasureTarget", "c")
+	io.send("mm", "Disable")
+	io.advance(1)
+	var last: Array = events.filter(func(e: Array) -> bool: return e[0] == "measure_movement").back()
+	_check(last[1]["on"] == false and last[1]["pairing"]["measure"] == "c", "measure movement: a new target and the disable reach the game")
+	var before := io.entities.size()
+	io.send("tpl", "ForceSpawn")
+	io.advance(1)
+	_check(io.entities.size() == before + 2, "point_template: ForceSpawn adds a copy of each template (%d)" % (io.entities.size() - before))
+	_check(events.filter(func(e: Array) -> bool: return e[0] == "template_spawn").size() == 2, "and tells the game for each")
+	var copy := io.entities.back() as DotMapEntity
+	_check(copy.targetname == "crate2" and copy.index == 8 and copy.classname == "prop_physics", "the copy keeps its name and gets the next free index")
+	_check(io.unhandled.is_empty(), "no input went unhandled: %s" % [io.unhandled])
+	var r := io.load_catalogue()
+	_check(r.ok, "the shipped catalogue loads: %s" % r)
+	var def := io.class_def("math_colorblend")
+	_check((def.get("inputs", {}) as Dictionary).has("invalue") and (def.get("inputs", {}) as Dictionary).has("kill"), "a class has its own and the common inputs")
+	_check(((def.get("keys", {}) as Dictionary).get("colormax", []) as Array) == ["color255", "255 255 255"], "keys carry a type and a default")
+	var io2 := _io([_rec(0, "logic_relay", "r", [], [["OnTrigger", "r", "NoSuchInput"], ["OnSpawn", "r", "Toggle"]])])
+	io2.load_catalogue()
+	io2.start()
+	io2.send("r", "NoSuchInput")
+	io2.send("r", "TriggerWithParameter", "x")
+	io2.advance(1)
+	var cov := io2.coverage()
+	_check(cov["catalogue"].get("logic_relay|nosuchinput") == "not in the catalogue", "coverage tells a typo from an engine input: %s" % [cov["catalogue"]])
+	_check(cov["catalogue"].get("logic_relay|triggerwithparameter") == "known", "and a real input no class implements")
 	_done()
 
 

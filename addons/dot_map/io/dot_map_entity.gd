@@ -15,10 +15,13 @@ var links: Array = []
 var enabled := true
 var alive := true
 var color := ""
+## The record this was built from, so a template can make a copy.
+var record: Dictionary = {}
 
 
 ## Fills from one entity record of the source document ([code]pairs[/code] and [code]outputs[/code]).
 func load_record(rec: Dictionary) -> void:
+	record = rec
 	index = int(rec.get("index", -1))
 	classname = str(rec.get("classname", ""))
 	targetname = str(rec.get("targetname", ""))

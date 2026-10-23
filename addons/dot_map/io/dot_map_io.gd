@@ -52,6 +52,8 @@ var commands: Array = []
 var unhandled: Dictionary = {}
 ## A game callable that was missing when needed, with how often.
 var missing_callables: Dictionary = {}
+## env_global state: [code]globalstate -> {on: bool, counter: int}[/code], shared by every entity naming it.
+var globals: Dictionary = {}
 var delivered := 0
 var loop_trips := 0
 var unresolved: Dictionary = {}
@@ -75,6 +77,8 @@ func _init() -> void:
 		"logic_case": DotMapCase, "logic_compare": DotMapCompare, "logic_branch": DotMapBranch,
 		"logic_auto": DotMapAuto, "trigger_multiple": DotMapTrigger, "trigger_once": DotMapTrigger,
 		"point_servercommand": DotMapServerCommand, "point_clientcommand": DotMapServerCommand,
+		"math_colorblend": DotMapColorBlend, "logic_measure_movement": DotMapMeasureMovement,
+		"env_global": DotMapGlobal, "point_template": DotMapTemplate,
 	}
 
 
@@ -98,21 +102,44 @@ func load_records(records: Array) -> DotResult:
 	_by_name = {}
 	_by_index = {}
 	_queue = []
+	globals = {}
 	for r: Variant in records:
 		if not r is Dictionary:
 			return DotResult.fail(DotError.CODE_PARSE, "entity record is not a dictionary")
 		var rec: Dictionary = r
 		if not rec.has("classname"):
 			return DotResult.fail(DotError.CODE_PARSE, "entity record without a classname")
-		var cls := str(rec["classname"]).to_lower()
-		var script: Variant = _classes.get(cls)
-		var e: DotMapEntity = script.new() if script != null else DotMapEntity.new()
-		e.load_record(rec)
-		entities.append(e)
-		_by_index[e.index] = e
-		_index_name(e)
+		_make(rec)
 	DotLog.debug(CHANNEL, "loaded", {"entities": entities.size()})
 	return DotResult.success(entities.size())
+
+
+## Adds one more entity from a record at run time (a template's copy); its index is the next free one.
+func spawn_record(rec: Dictionary) -> DotMapEntity:
+	var copy := rec.duplicate(true)
+	copy["index"] = _next_index()
+	var e := _make(copy)
+	e.on_map_spawn(self)
+	return e
+
+
+func _next_index() -> int:
+	var top := -1
+	for k: Variant in _by_index:
+		top = maxi(top, int(k))
+	return top + 1
+
+
+func _make(rec: Dictionary) -> DotMapEntity:
+	var script: Variant = _classes.get(str(rec["classname"]).to_lower())
+	var e: DotMapEntity = script.new() if script != null else DotMapEntity.new()
+	e.load_record(rec)
+	entities.append(e)
+	_by_index[e.index] = e
+	_index_name(e)
+	if e.animated:
+		_animated.append(e)
+	return e
 
 
 ## Gives [param classname] an entity class of its own (a script extending [DotMapEntity]).
@@ -140,6 +167,35 @@ func register_handler(classname: String, handler: Callable) -> DotResult:
 ## [method coverage] tell an input the engine has from a typo.
 func set_catalogue(classes: Dictionary) -> void:
 	_catalogue = classes
+
+
+## Reads [code]catalogue.json[/code] (beside this script unless [param path] is given), the names,
+## types and defaults of every class the converter has seen, and installs it with [method set_catalogue].
+func load_catalogue(path: String = "") -> DotResult:
+	var file := path if not path.is_empty() else (DotMapIO as Script).resource_path.get_base_dir().path_join("catalogue.json")
+	var f := FileAccess.open(file, FileAccess.READ)
+	if f == null:
+		return DotResult.fail(DotError.CODE_IO, "cannot read %s" % file)
+	var doc: Variant = JSON.parse_string(f.get_as_text())
+	if not doc is Dictionary or str((doc as Dictionary).get("format", "")) != "dot-map-io-catalogue":
+		return DotResult.fail(DotError.CODE_PARSE, "%s is not a dot-map-io-catalogue" % file)
+	var common: Dictionary = (doc as Dictionary).get("common", {})
+	var merged := {}
+	for cls: String in (doc as Dictionary).get("classes", {}):
+		var rec: Dictionary = ((doc as Dictionary)["classes"] as Dictionary)[cls]
+		var full := {}
+		for part: String in ["inputs", "outputs", "keys"]:
+			var d: Dictionary = (common.get(part, {}) as Dictionary).duplicate()
+			d.merge(rec.get(part, {}), true)
+			full[part] = d
+		merged[cls] = full
+	set_catalogue(merged)
+	return DotResult.success((_catalogue as Dictionary).size())
+
+
+## The catalogue entry of a class (inputs, outputs, keys with type and default), or an empty one.
+func class_def(classname: String) -> Dictionary:
+	return _catalogue.get(classname.to_lower(), {})
 
 
 ## Fires the map-start outputs (logic_auto, relay OnSpawn) and arms timers. Call once, at tick 0.
