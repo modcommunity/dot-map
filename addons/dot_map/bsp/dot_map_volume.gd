@@ -24,6 +24,9 @@ var speed: float = 0.0
 ## Raw source flags; for a push volume bit 1 is "players" (the others are physics objects and NPCs).
 var spawnflags: int = 0
 
+## How far under the feet a column reaches, so a body resting on a floor is on a slab laid in it.
+const COLUMN_SLACK := 0.03
+
 var _brushes: Array = []
 
 
@@ -63,6 +66,31 @@ func contains(point: Vector3) -> bool:
 				inside = false
 				break
 		if inside:
+			return true
+	return false
+
+
+## Whether the vertical column from [param feet] up [param height] metres touches the volume: the exact
+## test of a segment against each convex brush, so a slab thinner than the points [method contains]
+## samples (a belt laid flat on a floor) still catches a body standing on it.
+func touches_column(feet: Vector3, height: float) -> bool:
+	var from := feet - Vector3(0.0, COLUMN_SLACK, 0.0)
+	var span := Vector3(0.0, height + COLUMN_SLACK, 0.0)
+	for planes: Array in _brushes:
+		var t0 := 0.0
+		var t1 := 1.0
+		for p: Plane in planes:
+			var start := p.normal.dot(from) - p.d - 0.0001
+			var rate := p.normal.dot(span)
+			if absf(rate) < 0.000001:
+				if start > 0.0:
+					t1 = -1.0
+					break
+			elif rate > 0.0:
+				t1 = minf(t1, -start / rate)
+			else:
+				t0 = maxf(t0, -start / rate)
+		if t0 <= t1:
 			return true
 	return false
 

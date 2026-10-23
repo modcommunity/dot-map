@@ -37,7 +37,7 @@
 
 ## Volumes: hurt, push, teleport, gravity, trigger, ladder, water
 
-Work package 7. `DotMapVolumes.build(entities, io)` joins each manifest volume to its `DotMapEntity` by index (the geometry is the volume's, the behaviour and outputs the entity's) and `step(bodies)` runs once a tick after `io.advance(1)`. A body is `{id, body, position (feet), height, kind: player|npc|pushable|physics, name, class}`; the volume tests the feet, the middle and the head. A disabled or killed entity makes its volume empty, so enabling it again with somebody still inside is a new entry, as the original does, and that is what makes a timed hazard catch a player who waits.
+Work package 7. `DotMapVolumes.build(entities, io)` joins each manifest volume to its `DotMapEntity` by index (the geometry is the volume's, the behaviour and outputs the entity's) and `step(bodies)` runs once a tick after `io.advance(1)`. A body is `{id, body, position (feet), height, kind: player|npc|pushable|physics, name, class}`; the volume tests the body's whole column, feet to head (`DotMapVolume.touches_column`, a segment against each convex brush, 3 cm of slack under the feet), so a belt laid flat on a floor catches a body standing on it. A disabled or killed entity makes its volume empty, so enabling it again with somebody still inside is a new entry, as the original does, and that is what makes a timed hazard catch a player who waits.
 
 | Class | Does |
 | --- | --- |

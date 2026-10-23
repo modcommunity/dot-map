@@ -56,10 +56,7 @@ func step(io: DotMapIO, bodies: Array) -> void:
 
 
 func _touches(info: Dictionary) -> bool:
-	var p: Vector3 = info["position"]
-	var h: float = float(info.get("height", 1.8))
-	return volume.contains(p + Vector3(0.0, 0.05, 0.0)) or volume.contains(p + Vector3(0.0, h * 0.5, 0.0)) \
-			or volume.contains(p + Vector3(0.0, h - 0.05, 0.0))
+	return volume.touches_column(info["position"], float(info.get("height", 1.8)))
 
 
 func _admits(io: DotMapIO, info: Dictionary) -> bool:

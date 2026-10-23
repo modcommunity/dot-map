@@ -8,7 +8,7 @@ extends Node
 ## godot --headless --path . res://examples/volumes_demo.tscn
 ## [/codeblock]
 
-const CHECKS := 114
+const CHECKS := 116
 const SECTIONS := 13
 const OFFICE := "res://examples/io/office_io.doc.json"
 
@@ -319,6 +319,11 @@ func _test_boxes() -> void:
 	var two := DotMapVolume.from_record({"kind": "water", "brushes": [
 		_vol(-1, "water", "x", Vector3.ZERO, Vector3.ONE)["brushes"][0], _vol(-1, "water", "x", Vector3(5, 0, 0), Vector3(6, 1, 1))["brushes"][0]]})
 	_check(two.brush_boxes().size() == 2 and two.bounds().size.x == 6.0, "two brushes are two boxes, not their union")
+	var slab := DotMapVolume.from_record(_vol(-1, "push", "trigger_push", Vector3(0, 0.0, 0), Vector3(4, 0.02, 4)))
+	_check(slab.touches_column(Vector3(2, 0.02, 2), 1.8) and not slab.touches_column(Vector3(2, 0.2, 2), 1.8),
+		"a 2 cm slab is touched by a body standing on it, not by one a step above")
+	_check(slab.touches_column(Vector3(2, -1.0, 2), 1.8) and not slab.touches_column(Vector3(5, 0.0, 2), 1.8),
+		"a body whose column crosses it is in it, one beside it is not")
 	io.send("lad", "Disable")
 	_check(vols.ladder_boxes().size() == 1, "a disabled ladder entity is off the list")
 	_check(_climb(vols.ladder_boxes()[0]), "a body walked up the ladder box stays inside it from foot to top")
