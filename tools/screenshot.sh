@@ -4,6 +4,7 @@
 #   heavy -- tools/screenshot.sh <world prefix, without .json> <out.png> [--view=spawn|overview] [--cam=x,y,z --look=x,y,z]
 #
 # Not --headless: that driver draws nothing and saves a black PNG. Mesa's llvmpipe stands in for a GPU.
+# A world outside this repo cannot be routed to the GPU boxes: prefix GPU_OFFLOAD=0 to render here.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 command -v Xvfb >/dev/null || { echo "Xvfb not installed" >&2; exit 3; }
