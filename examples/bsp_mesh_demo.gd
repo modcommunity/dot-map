@@ -11,10 +11,11 @@ extends Node3D
 ## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
 ## thick at (256, 256, 16), at 0.01905 m per unit.
 
-const CHECKS := 60
-const SECTIONS := 5
+const CHECKS := 68
+const SECTIONS := 6
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
+const TERRAIN := "res://examples/bsp_mesh/terrain_fixture.json"
 const U := 0.01905
 
 var _passed := 0
@@ -37,6 +38,7 @@ func _run() -> void:
 		_test_environment(world)
 		await _test_collide(world)
 		await _test_glass()
+	_test_terrain()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -277,4 +279,37 @@ func _test_glass() -> void:
 	add_child(twin)
 	twin.apply_broken(Vector3.ONE, &"host")
 	_check(twin.is_broken(), "the host's word breaks it on a client")
+	_done()
+
+
+func _test_terrain() -> void:
+	_section("terrain reads as the converter wrote it (tools/bsp/tests/test_terrain.py)")
+	var fx: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TERRAIN))
+	var res := DotMapTerrain.from_dict(fx["terrain"])
+	_check(res.ok, "the terrain fixture reads: %s" % ("" if res.ok else str(res)))
+	if not res.ok:
+		_done()
+		return
+	var t: DotMapTerrain = res.value
+	var bad := PackedStringArray()
+	for p: Array in fx["probes"]:
+		var h := t.height_at(p[0], p[1])
+		if (p[2] == null) != is_nan(h) or (p[2] != null and absf(h - float(p[2])) > 1e-4):
+			bad.append("(%s, %s) %s != %s" % [p[0], p[1], h, p[2]])
+	_check(bad.is_empty(), "heights match the converter's: %s" % ", ".join(bad))
+	var pts := t.walk_points(1.0)
+	_check(pts.size() == int(fx["walk_points"]), "walk points %d, converter %d" % [pts.size(), fx["walk_points"]])
+	var first: Array = fx["walk_first"]
+	var last: Array = fx["walk_last"]
+	_check(not pts.is_empty() and pts[0].distance_to(Vector3(first[0], first[1], first[2])) < 1e-3
+			and pts[-1].distance_to(Vector3(last[0], last[1], last[2])) < 1e-3, "first and last walk points match")
+	var faces := t.faces()
+	_check(faces.size() == int(fx["faces"]), "faces %d, converter %d (the hole is kept)" % [faces.size(), fx["faces"]])
+	_check((faces[1] - faces[0]).cross(faces[2] - faces[0]).y < 0.0, "faces wind clockwise seen from above, so they face up")
+	var newer: Dictionary = fx["terrain"].duplicate()
+	newer["format"] = DotMapTerrain.FORMAT + 1
+	_check(DotMapTerrain.from_dict(newer).code() == DotError.CODE_VERSION, "a newer format is refused as a version error")
+	var broken: Dictionary = fx["terrain"].duplicate()
+	broken["bytes"] = 1
+	_check(DotMapTerrain.from_dict(broken).code() == DotError.CODE_PARSE, "a wrong size is refused as a parse error")
 	_done()

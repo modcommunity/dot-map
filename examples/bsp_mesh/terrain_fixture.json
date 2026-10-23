@@ -1,0 +1,64 @@
+{
+ "terrain": {
+  "format": 1,
+  "origin": [
+   0.0,
+   0.0
+  ],
+  "cell": 2.0,
+  "size": [
+   21,
+   21
+  ],
+  "base": 0.0076,
+  "step": 0.05,
+  "bytes": 936,
+  "data": "eNqVU0ESxCAIA9v9/3P3orJKCGqnl9WhM61pCAHNsL7211LxpRnxYax5PJ8I4uYvRGng5rM7TuNN87QcnP3gBH6e3yMWEtK6B1BkvOUTyOJa5nl7YIEsY18eUC1SBwIblUnmvBwJLPia1eTsthjnvh+czQOc9FAj98Sz7uohoVpSpzgflJixpt0req+Hs8vFhXnv3Ht3Rc5c8G7XwyqhpEYNUL/85TxQSwtPavbuGp7RPRVOC/ytBr/FcWAFZ4ns8AR756S/rM6SE3zdKyo5L6siPbBrGjgPGr2QR/SjF2W7A3CUvOtWaKJ5M35foVZH",
+  "walk": "eNpjYICDBwwM9Qwf5Bn+sz/4z/DP/sB/9h9Amv/Af0ag4B9GBj4GJAAAv8wPNQ==",
+  "mat": "grass"
+ },
+ "probes": [
+  [
+   20.0,
+   20.0,
+   5.9576
+  ],
+  [
+   7.3,
+   11.9,
+   0.9251
+  ],
+  [
+   11.9,
+   7.3,
+   0.9251
+  ],
+  [
+   0.1,
+   39.5,
+   0.0076
+  ],
+  [
+   9.0,
+   7.0,
+   null
+  ],
+  [
+   50.0,
+   5.0,
+   null
+  ]
+ ],
+ "walk_points": 484,
+ "walk_first": [
+  17.5,
+  1.5826,
+  7.5
+ ],
+ "walk_last": [
+  22.5,
+  1.5826,
+  32.5
+ ],
+ "faces": 2382
+}
