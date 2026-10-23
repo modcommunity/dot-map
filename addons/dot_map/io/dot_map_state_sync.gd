@@ -16,6 +16,13 @@ const TYPE_SNAPSHOT := "io_snapshot"
 ## [code]send(peer, message: Dictionary)[/code], called once per peer, never with a broadcast id.
 var send_fn := Callable()
 var peers: Array = []
+## Most changes in one state message, entities in one snapshot, and keys of one entity; more is refused whole.
+const MAX_CHANGES := 4096
+const MAX_ENTITIES := 8192
+const MAX_KEYS := 64
+## The furthest a message may move a client's clock, in seconds.
+const MAX_TICK_JUMP_SECONDS := 86400
+
 ## Keys not sent (a logic value only the server reads).
 var skip_keys: PackedStringArray = ["triggered"]
 ## Changes applied, and ones refused (unknown entity or key, bad shape), on a client.
@@ -78,8 +85,20 @@ func apply(io: DotMapIO, msg: Dictionary) -> DotResult:
 		return DotResult.fail(DotError.CODE_PARSE, "not a map state message")
 	if not msg.get("tick") is int and not msg.get("tick") is float:
 		return DotResult.fail(DotError.CODE_PARSE, "state message without a tick")
-	var tick := int(msg["tick"])
-	io.now = maxi(io.now, tick) if kind == TYPE_STATE else tick
+	if io.authoritative:
+		return DotResult.fail(DotError.CODE_STATE, "an authoritative runtime takes no state from outside")
+	var raw: Variant = msg["tick"]
+	if raw is float and (is_nan(raw) or is_inf(raw) or absf(raw) > 1.0e12):
+		return DotResult.fail(DotError.CODE_INVALID, "state message tick is not a usable number")
+	var tick := int(raw)
+	if tick < io.now:
+		return DotResult.fail(DotError.CODE_INVALID, "state message older than the clock")
+	if tick - io.now > io.rate * MAX_TICK_JUMP_SECONDS:
+		return DotResult.fail(DotError.CODE_INVALID, "state message jumps the clock too far")
+	var size_err := _too_big(kind, msg)
+	if size_err != "":
+		return DotResult.fail(DotError.CODE_INVALID, size_err)
+	io.now = tick
 	var n := 0
 	if kind == TYPE_SNAPSHOT:
 		var ents: Variant = msg.get("entities")
@@ -100,6 +119,22 @@ func apply(io: DotMapIO, msg: Dictionary) -> DotResult:
 			else:
 				refused += 1
 	return DotResult.success(n)
+
+
+func _too_big(kind: String, msg: Dictionary) -> String:
+	if kind == TYPE_SNAPSHOT:
+		var ents: Variant = msg.get("entities")
+		if ents is Dictionary:
+			if (ents as Dictionary).size() > MAX_ENTITIES:
+				return "snapshot has too many entities"
+			for k: Variant in ents:
+				if ents[k] is Dictionary and (ents[k] as Dictionary).size() > MAX_KEYS:
+					return "snapshot entity has too many keys"
+	else:
+		var changes: Variant = msg.get("changes")
+		if changes is Array and (changes as Array).size() > MAX_CHANGES:
+			return "state message has too many changes"
+	return ""
 
 
 func _apply_one(io: DotMapIO, index: int, key: String, value: Variant, tick: int) -> int:

@@ -9,7 +9,9 @@ extends RefCounted
 ## A first word that is never allowed.
 const NEVER := ["quit", "exit", "exec", "alias", "bind", "unbind", "connect", "disconnect", "map", "changelevel",
 		"kick", "kickid", "ban", "banid", "addip", "rcon", "rcon_password", "sv_password", "script", "lua_run",
-		"sm", "plugin_load", "writeid", "cfg", "echo", "wait", "toggle", "incrementvar", "cvarlist", "find"]
+		"sm", "plugin_load", "writeid", "cfg", "echo", "wait", "toggle", "incrementvar", "cvarlist", "find",
+		"changemap", "gamechange", "game", "sv_map", "restart", "shutdown", "sv_cheats", "writeconfig", "host_writeconfig",
+		"load", "save", "sv_rcon", "setpause", "unpause", "_restart", "disconnect_all", "status", "mp_restartgame"]
 const MAX_LENGTH := 256
 const MAX_SAY := 200
 
@@ -45,6 +47,8 @@ static func judge(command: String, allow: PackedStringArray) -> Dictionary:
 	elif name == "say" or name == "say_team":
 		if args.length() > MAX_SAY or args.contains("\n"):
 			rec["reason"] = "chat line too long"
+		elif args.begins_with("!") or args.begins_with("/") or args.begins_with("\"!") or args.begins_with("\"/"):
+			rec["reason"] = "chat line would be read as a command"
 		else:
 			rec["kind"] = "say"
 			rec["allowed"] = true

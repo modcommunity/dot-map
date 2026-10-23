@@ -33,5 +33,8 @@ extends RefCounted
 # 15: DotMapDoorStandIn, DotMapPhysbox, DotMapSoundscape, DotMapMoverNode.push_bodies / pose_delta, DotMapWorld.doors and
 #     the door_fn hook, hurt once/force, manifest settings as the config's weakest layer.
 # 16: DotMapStateTransport (batching send_fn), DotMapTriggerSoundscape, physbox pose replication, func_rotating fanfriction ramps.
-const LEVEL := 16
+# 17: DotMapClientCommand + record_client_command (point_clientcommand is its own kind, never run), longer DotMapCommand.NEVER, chat starting with ! or / refused,
+#     DotMapConfig restore compares to what the cvar holds after apply and logs a refusal, inf/nan refused, ints clamped,
+#     DotMapStateSync.apply refuses an authoritative runtime, an older tick and oversize messages.
+const LEVEL := 17
 const OLDEST := 1

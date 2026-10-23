@@ -126,7 +126,8 @@ func apply(map_name: String) -> DotResult:
 		if set_fn.call(key, settings[key]) == false:
 			DotLog.warn(CHANNEL, "the game refused a map setting", {"map": map_name, "key": key})
 			continue
-		_applied[key] = {"before": before, "set": settings[key]}
+		# What the cvar holds now is its own coercion of the value (clamped, reformatted); restore compares to that.
+		_applied[key] = {"before": before, "set": settings[key], "after": get_fn.call(key)}
 		done.append(key)
 	DotLog.info(CHANNEL, "map settings applied", {"map": map_name, "keys": ", ".join(done)})
 	return DotResult.success(done)
@@ -137,10 +138,15 @@ func restore() -> int:
 	var n := 0
 	for key: String in _applied:
 		var rec: Dictionary = _applied[key]
-		if get_fn.is_valid() and str(get_fn.call(key)) != str(rec["set"]):
-			continue
+		if get_fn.is_valid():
+			var live := str(get_fn.call(key))
+			if live != str(rec["after"]) and live != str(rec["set"]):
+				DotLog.info(CHANNEL, "a map setting was changed since it was applied; left as is", {"map": current_map, "key": key, "live": live})
+				continue
 		if set_fn.is_valid() and set_fn.call(key, rec["before"]) != false:
 			n += 1
+		else:
+			DotLog.warn(CHANNEL, "a map setting could not be restored", {"map": current_map, "key": key})
 	_applied.clear()
 	current_map = ""
 	return n
@@ -189,12 +195,14 @@ func _check(key: String, value: Variant) -> DotResult:
 			if value is bool or not (value is int or value is float or text.is_valid_float()):
 				return DotResult.fail(DotError.CODE_INVALID, "expected a number")
 			out = float(value) if value is float or value is int else text.to_float()
+			if is_inf(float(out)) or is_nan(float(out)):
+				return DotResult.fail(DotError.CODE_INVALID, "expected a finite number")
 			if spec.has("min"):
 				out = maxf(float(out), float(spec["min"]))
 			if spec.has("max"):
 				out = minf(float(out), float(spec["max"]))
 			if type == "int":
-				out = int(out)
+				out = int(clampf(float(out), -9.0e15, 9.0e15))
 		"bool":
 			var t := str(value).to_lower()
 			if not ["true", "false", "1", "0"].has(t):

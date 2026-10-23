@@ -94,7 +94,7 @@ func _init() -> void:
 		"logic_relay": DotMapRelay, "logic_timer": DotMapTimer, "math_counter": DotMapCounter,
 		"logic_case": DotMapCase, "logic_compare": DotMapCompare, "logic_branch": DotMapBranch,
 		"logic_auto": DotMapAuto, "trigger_multiple": DotMapTrigger, "trigger_once": DotMapTrigger,
-		"point_servercommand": DotMapServerCommand, "point_clientcommand": DotMapServerCommand,
+		"point_servercommand": DotMapServerCommand, "point_clientcommand": DotMapClientCommand,
 		"func_brush": DotMapToggleBrush, "func_wall_toggle": DotMapToggleBrush, "func_illusionary": DotMapToggleBrush,
 		"func_breakable": DotMapBreakable, "func_breakable_surf": DotMapBreakable,
 		"prop_physics": DotMapBreakable, "prop_physics_multiplayer": DotMapBreakable,
@@ -533,6 +533,18 @@ func record_command(e: DotMapEntity, text: String) -> Dictionary:
 			event(str(rec["kind"]), rec)
 		else:
 			DotLog.info(CHANNEL, "map command denied", {"command": part, "reason": v["reason"]})
+	return rec
+
+
+## Records a point_clientcommand line. Its own kind, never allowed and never sent to [member event_fn]: it would run on a player's machine, not the server's.
+func record_client_command(e: DotMapEntity, text: String) -> Dictionary:
+	var rec := {}
+	for part in DotMapCommand.split(text):
+		var name := part.split(" ", false, 1)[0].to_lower()
+		rec = {"tick": now, "entity": e.index, "text": part, "name": name, "kind": "clientcommand",
+				"allowed": false, "reason": "client commands are never run"}
+		commands.append(rec)
+		DotLog.info(CHANNEL, "map client command recorded, not run", {"command": part})
 	return rec
 
 

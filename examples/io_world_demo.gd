@@ -10,7 +10,7 @@ extends Node
 ## ([code]examples/bsp_mesh/zm_4way_tunnel.entities.json[/code]); nodes are built here the way
 ## [method DotMapBspMesh.build_node] shapes them (a Node3D per model with a [code]model[/code] meta).
 
-const CHECKS := 151
+const CHECKS := 155
 const SECTIONS := 15
 const TUNNEL := "res://examples/bsp_mesh/zm_4way_tunnel.entities.json"
 
@@ -482,8 +482,15 @@ func _test_replication() -> void:
 	late.advance(5)
 	_check((late.entity_of(1) as DotMapMoverNode).fraction_at(late.now, 20) == (host.entity_of(1) as DotMapMoverNode).fraction_at(late.now, 20), "and the door in the right place for its clock")
 	_check(not late_sync.apply(late, {"type": "chat"}).ok and not late_sync.apply(late, {"type": "io_state", "tick": 1, "changes": 5}).ok, "foreign and malformed messages are refused")
-	late_sync.apply(late, {"type": "io_state", "tick": 1, "changes": [[99, "enabled", true], [0, "nonsense", 1], "x"]})
+	late_sync.apply(late, {"type": "io_state", "tick": late.now, "changes": [[99, "enabled", true], [0, "nonsense", 1], "x"]})
 	_check(late_sync.refused == 2 and late_sync.ignored == ignored_before + 1, "unknown entities and shapes are refused, an unknown key is ignored: %d, %d" % [late_sync.refused, late_sync.ignored])
+	_check(not late_sync.apply(late, {"type": "io_state", "tick": late.now - 1, "changes": []}).ok, "a tick lower than the client's clock is refused")
+	var many: Array = []
+	for i in DotMapStateSync.MAX_CHANGES + 1:
+		many.append([0, "enabled", true])
+	_check(not late_sync.apply(late, {"type": "io_state", "tick": late.now, "changes": many}).ok, "an oversize message is refused whole")
+	_check(not late_sync.apply(late, {"type": "io_state", "tick": INF, "changes": []}).ok, "an infinite tick is refused")
+	_check(not DotMapStateSync.new().apply(host, {"type": "io_state", "tick": host.now + 1, "changes": []}).ok, "an authoritative runtime takes no state from a message")
 	pane.free()
 	for n: Node in cnodes.values():
 		n.free()

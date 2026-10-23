@@ -8,7 +8,7 @@ extends Node
 ## godot --headless --path . res://examples/volumes_demo.tscn
 ## [/codeblock]
 
-const CHECKS := 116
+const CHECKS := 120
 const SECTIONS := 13
 const OFFICE := "res://examples/io/office_io.doc.json"
 
@@ -427,6 +427,18 @@ func _test_commands() -> void:
 	_check(not DotMapCommand.judge("net_graph 1", io.command_allow)["allowed"], "anything unlisted is denied")
 	_check(not DotMapCommand.judge("say " + "a".repeat(210), io.command_allow)["allowed"], "a chat line has a length limit")
 	_check(io.coverage()["commands_denied"] == 1, "denied commands are counted")
+	var never_ok := true
+	for n in ["changemap", "gamechange", "game", "sv_map", "restart", "shutdown", "sv_cheats", "writeconfig", "quit", "exec", "rcon", "rcon_password"]:
+		never_ok = never_ok and not DotMapCommand.judge(n + " 1", PackedStringArray([n])).get("allowed", true)
+	_check(never_ok, "the never list holds even when the allow-list names the command")
+	_check(not DotMapCommand.judge("say !kick all", io.command_allow)["allowed"] and not DotMapCommand.judge("say /rcon x", io.command_allow)["allowed"], "chat starting with ! or / is refused")
+	_check(DotMapCommand.judge("say hello", io.command_allow)["allowed"], "ordinary chat is still allowed")
+	io.load_records([_rec(0, "point_clientcommand", "ccmd")])
+	ev.clear()
+	io.commands.clear()
+	var ccmd := io.find("ccmd")[0] as DotMapEntity
+	ccmd.receive(io, "command", "say hi; sv_gravity 400", null, null) if ccmd.has_method("receive") else io.record_client_command(ccmd, "say hi; sv_gravity 400")
+	_check(ev.is_empty() and io.commands.size() == 2 and io.commands[0]["kind"] == "clientcommand" and not io.commands[0]["allowed"], "point_clientcommand is its own kind, never allowed, never sent to the event callable")
 	_done()
 
 

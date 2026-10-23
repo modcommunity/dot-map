@@ -1,7 +1,7 @@
 class_name DotMapServerCommand
 extends DotMapEntity
 
-## point_servercommand and point_clientcommand: Command is recorded on the runtime (a chat line
+## point_servercommand: Command is recorded on the runtime (a chat line
 ## goes to the game's event callable; a cvar only if allow-listed) and never executed.
 
 

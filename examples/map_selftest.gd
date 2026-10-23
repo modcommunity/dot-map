@@ -13,7 +13,7 @@ extends Node
 ## running, rather than on nothing. It is the reason the load happens before the
 ## teardown, and it is the step that is easiest to "simplify" back out.
 
-const CHECKS := 343
+const CHECKS := 348
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
@@ -2850,6 +2850,22 @@ func _test_map_config() -> void:
 	live["arena_air"] = 77.0
 	cfg.apply("dm_plain")
 	_check(live["arena_air"] == 77.0, "a value changed since is not stomped on restore")
+	var clamped := {"arena_air": 150.0, "arena_gravity": 800.0, "arena_extra": 0}
+	var cfg2 := DotMapConfig.new()
+	cfg2.config_dir = CFG_ROOT
+	cfg2.allow("arena_air", {"type": "float"}).allow("arena_gravity", {"type": "float", "min": 0.0}).allow("arena_extra")
+	cfg2.get_fn = func(k: String) -> Variant: return clamped.get(k)
+	cfg2.set_fn = func(k: String, v: Variant) -> bool:
+		clamped[k] = 90.0 if k == "arena_air" and float(v) < 140.0 else v
+		return true
+	cfg2.apply("surf_zzz")
+	_check(clamped["arena_air"] == 90.0, "the cvar clamped what the map asked for")
+	cfg2.apply("dm_plain")
+	_check(clamped["arena_air"] == 150.0, "restore still puts back a value the cvar clamped or reformatted")
+	_check(not cfg2._check("arena_air", INF).ok and not cfg2._check("arena_air", NAN).ok and not cfg2._check("arena_air", "inf").ok, "inf and nan are refused")
+	_check(cfg2._check("arena_extra", 1.0e30).ok, "a huge value is accepted")
+	cfg2.allow("arena_int", {"type": "int"})
+	_check(cfg2._check("arena_int", 1.0e30).value == 9000000000000000, "an int clamps instead of overflowing")
 	var bare := DotMapConfig.new()
 	_check(not bare.apply("x").ok, "apply without hooks fails")
 	_cfg_clear()
