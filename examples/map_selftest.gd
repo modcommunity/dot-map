@@ -2878,7 +2878,7 @@ func _test_map_config() -> void:
 	pc.config_dir = CFG_ROOT
 	pc.allow("arena_air", {"type": "float"}).allow("arena_gravity", {"type": "float"})
 	var ps: Dictionary = pc.resolve("pf_zzz").value["settings"]
-	_check(ps["arena_air"] == 66.0 and ps["arena_gravity"] == 22.0, "`%%` spells `*`: a server pf_% beats the shipped one (%s)" % [ps])
+	_check(ps["arena_air"] == 66.0 and ps["arena_gravity"] == 22.0, "`%%` spells `*`: a server pf_%% beats the shipped one (%s)" % [ps])
 	DirAccess.remove_absolute(CFG_ROOT.path_join("server/addons/dot_map/map/pf_%.yml"))
 	_check(pc.resolve("pf_zzz").value["settings"]["arena_air"] == 11.0, "the shipped `%` file applies")
 	_check(pc.resolve("pf_abx").value["settings"]["arena_air"] == 33.0, "a longer literal prefix beats a shorter one")
