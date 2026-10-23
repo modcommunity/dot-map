@@ -88,6 +88,25 @@ func bounds() -> AABB:
 	return box
 
 
+## One box per brush (a ladder or a water brush is one convex box; a union would span the gaps).
+func brush_boxes() -> Array[AABB]:
+	var out: Array[AABB] = []
+	for planes: Array in _brushes:
+		var box := AABB()
+		var first := true
+		for i in planes.size():
+			for j in range(i + 1, planes.size()):
+				for k in range(j + 1, planes.size()):
+					var hit: Variant = (planes[i] as Plane).intersect_3(planes[j], planes[k])
+					if hit == null or not _inside(planes, hit):
+						continue
+					box = AABB(hit, Vector3.ZERO) if first else box.expand(hit)
+					first = false
+		if not first:
+			out.append(box)
+	return out
+
+
 func _inside(planes: Array, point: Vector3) -> bool:
 	for p: Plane in planes:
 		if p.normal.dot(point) > p.d + 0.001:
