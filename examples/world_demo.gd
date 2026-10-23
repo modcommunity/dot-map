@@ -8,8 +8,8 @@ extends Node
 ## [/codeblock]
 ## Without the converted worlds (or the store holding their source documents) it prints SKIP and exits 0.
 
-const CHECKS := 29
-const SECTIONS := 4
+const CHECKS := 34
+const SECTIONS := 5
 
 var _passed := 0
 var _failed := 0
@@ -38,6 +38,7 @@ func _run() -> void:
 	await _test_office_hurt_room()
 	await _test_replication()
 	await _test_dans()
+	await _test_manifest_settings()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -211,4 +212,34 @@ func _test_dans() -> void:
 	_check(not bad.ok and bad.code() == DotError.CODE_IO, "a missing mesh is a CODE_IO failure, not a crash")
 	w.queue_free()
 	await get_tree().process_frame
+	_completed += 1
+
+
+func _test_manifest_settings() -> void:
+	_section("the manifest's settings are the weakest config layer, behind the game's whitelist")
+	var loaded := DotMapBspMesh.load_prefix(_dir.path_join("wo_office_course"))
+	_check(loaded.ok, "the mesh loads")
+	if not loaded.ok:
+		_completed += 1
+		return
+	var m: DotMapBspMesh = loaded.value
+	m.manifest["settings"] = {"sv_airaccelerate": 150, "sv_evil": 1}
+	var applied := {}
+	var setter := func(k: String, v: Variant) -> bool:
+		applied[k] = v
+		return true
+	var getter := func(_k: String) -> Variant:
+		return 0
+	var cfg := {"allow": {"sv_airaccelerate": {}, "sv_gravity": {}}, "defaults": {"sv_gravity": 700},
+			"get_fn": getter, "set_fn": setter}
+	var res := DotMapWorld.build(m, {}, {"config": cfg, "environment": false, "props": false, "sounds": false})
+	_check(res.ok, "the world builds with a config")
+	if res.ok:
+		var w: DotMapWorld = res.value
+		add_child(w)
+		_check(applied.get("sv_airaccelerate") == 150.0, "the map's own cvar is applied once the game allows it: %s" % [applied])
+		_check(applied.get("sv_gravity") == 700.0, "the options' defaults sit beside it")
+		_check(not applied.has("sv_evil"), "and a key the game did not allow is refused")
+		w.queue_free()
+		await get_tree().process_frame
 	_completed += 1

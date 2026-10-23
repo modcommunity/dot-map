@@ -20,7 +20,7 @@ The game gives `get_fn(key)` and `set_fn(key, value) -> bool` and calls `apply(m
 
 ## The converter's starter file
 
-Every map gets one without being asked. `bsp.py store` writes `mapcfg.yml` into the map's store entry, and `bsp.py regen` writes `<outdir>/dot_map/map/<map_name>.yml` beside the regenerated map (copy that folder to `cfg/game/<game>/dot_map/map/` in the game's maps repo). Both come from the `Command` inputs aimed at `point_servercommand` entities; a map that sends none gets no file. Every value is commented out, commands that are not `name value` settings are listed as skipped, and an existing file is never overwritten. Nothing is applied until someone uncomments a line and the game whitelists the key. `python3 -m dotbsp.mapcfg OUT_DIR map.bsp ...` (from `tools/bsp`) does the same for loose files.
+Every map gets one without being asked. `bsp.py store` writes `mapcfg.yml` into the map's store entry, and `bsp.py regen` writes `<outdir>/dot_map/map/<map_name>.yml` beside the regenerated map (copy that folder to `cfg/game/<game>/dot_map/map/` in the game's maps repo). Both come from the `Command` inputs aimed at `point_servercommand` entities; a map that sends none gets no file. Every value is commented out, commands that are not `name value` settings are listed as skipped, and an existing file is never overwritten. The same commands are also written into the converted manifest as `settings` (typed), which `DotMapWorld` uses as the weakest layer, so a map's own cvars apply once the game whitelists them. Nothing from the yml is applied until someone uncomments a line and the game whitelists the key. `python3 -m dotbsp.mapcfg OUT_DIR map.bsp ...` (from `tools/bsp`) does the same for loose files.
 
 ## Wiring a game
 

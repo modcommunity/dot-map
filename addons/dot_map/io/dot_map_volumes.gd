@@ -24,6 +24,12 @@ var nodes: Array[DotMapVolumeNode] = []
 var fire_period := 0.5
 var fire_radius_units := 64.0
 
+var _mover_nodes: Array[DotMapMoverNode] = []
+var _movers_checked := false
+var _scapes: Array[DotMapSoundscape] = []
+var _scapes_checked := false
+var _heard: Dictionary = {}
+
 
 ## One node per volume of [param entities], each joined to its entity in [param io] by index.
 static func build(entities: DotMapEntities, io: DotMapIO, destinations: Dictionary = {}) -> DotMapVolumes:
@@ -43,6 +49,8 @@ func step(bodies: Array) -> void:
 		n.step(io, bodies)
 	_fires(bodies)
 	_blasts(bodies)
+	_soundscapes(bodies)
+	_movers(bodies)
 	io.settle()
 
 
@@ -62,6 +70,52 @@ func _boxes(kind: String) -> Array[AABB]:
 		if n.volume.kind == kind and n.active():
 			out.append_array(n.volume.brush_boxes())
 	return out
+
+
+## Bodies in the way of a moving door, lift or spinner are pushed, then hurt and turned back.
+func _movers(bodies: Array) -> void:
+	if not _movers_checked:
+		_movers_checked = true
+		for e: DotMapEntity in io.entities:
+			if e is DotMapMoverNode:
+				_mover_nodes.append(e)
+	for m: DotMapMoverNode in _mover_nodes:
+		m.push_bodies(io, bodies)
+
+
+## The nearest enabled soundscape that covers each player; an event when it changes.
+func _soundscapes(bodies: Array) -> void:
+	if _scapes_checked and _scapes.is_empty():
+		return
+	if not _scapes_checked:
+		_scapes_checked = true
+		for e: DotMapEntity in io.entities:
+			if e is DotMapSoundscape:
+				_scapes.append(e)
+		if _scapes.is_empty():
+			return
+	for info: Dictionary in bodies:
+		if str(info.get("kind", "player")) != "player":
+			continue
+		var best: DotMapSoundscape = null
+		var best_d := INF
+		var at: Vector3 = info["position"]
+		for s: DotMapSoundscape in _scapes:
+			if not s.alive or not s.enabled or not s.covers(io, at):
+				continue
+			var d := at.distance_to(s.origin(io))
+			if d < best_d:
+				best_d = d
+				best = s
+		var id: Variant = info["id"]
+		var prev: Variant = _heard.get(id)
+		if best == prev:
+			continue
+		_heard[id] = best
+		if best != null:
+			best.fire(io, "OnPlay", info.get("body"))
+		io.event("soundscape", {"body": info.get("body"), "name": best.resolved_name(io) if best != null else "",
+				"entity": best, "positions": best.positions(io) if best != null else []})
 
 
 func _blasts(bodies: Array) -> void:

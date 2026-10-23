@@ -5,13 +5,18 @@ extends DotMapEntity
 ## it takes [code]damage[/code] a second times that, through [member DotMapIO.damage_fn]. The first
 ## hit lands on entry. Disabling clears everyone; enabling with somebody still inside hurts them
 ## again (they "enter" anew), which is how a timed hazard in a map catches a player who waits.
-## [code]damagemodel[/code] 1 doubles each hit up to [code]damagecap[/code]. Not done: damage once,
-## the force keys.
+## [code]damagemodel[/code] 1 doubles each hit up to [code]damagecap[/code]. Damage once hurts each
+## body a single time per entry. [code]damageforce[/code] (unless [code]nodmgforce[/code]) goes to
+## the game as a [code]damage_force[/code] event with each hit.
 
 ## Damage type bit (source engine values) to the kind passed to the game.
 const KINDS := {1: "crush", 2: "bullet", 4: "slash", 8: "burn", 16: "vehicle", 32: "fall", 64: "blast",
 		128: "club", 256: "shock", 512: "sonic", 1024: "energybeam", 16384: "drown", 32768: "paralyze",
 		65536: "nervegas", 131072: "poison", 262144: "radiation", 1048576: "acid", 2097152: "slowburn"}
+
+## The spawnflag bit that means "hurt a given body only once"; 0 until a map confirms which bit
+## it is, so the key [code]damageonce[/code] 1 (set by a map's author or a test) is what turns it on.
+static var once_flag := 0
 
 ## Damage per second.
 var damage := 10.0
@@ -19,6 +24,9 @@ var period := 0.5
 var cap := 20.0
 var model := 0
 var kind := "generic"
+var once := false
+## Push of each hit in metres a second (Godot axes); zero for none.
+var force := Vector3.ZERO
 
 var _touching: Dictionary = {}
 var _hits: Dictionary = {}
@@ -31,6 +39,11 @@ func _configure() -> void:
 	period = maxf(key_float("hurtrate", 0.5), 0.05)
 	cap = key_float("damagecap", 20.0)
 	model = int(key_float("damagemodel", 0.0))
+	once = key_float("damageonce") != 0.0 or (once_flag != 0 and has_spawnflag(once_flag))
+	force = Vector3.ZERO
+	var f := key("damageforce").split_floats(" ", false)
+	if f.size() >= 3 and not flag("nodmgforce"):
+		force = to_godot_dir(Vector3(f[0], f[1], f[2])) * 0.0254
 	var bits := int(key_float("damagetype", 0.0))
 	kind = "generic"
 	for bit: int in KINDS:
@@ -83,6 +96,8 @@ func _think(io: DotMapIO) -> void:
 	for id: Variant in _touching.keys():
 		var info: Dictionary = _touching[id]
 		var n: int = _hits.get(id, 0)
+		if once and n > 0:
+			continue
 		var amount := damage * period
 		if model == 1:
 			amount = amount * pow(2.0, n)
@@ -90,6 +105,8 @@ func _think(io: DotMapIO) -> void:
 				amount = minf(amount, cap)
 		_hits[id] = n + 1
 		io.damage(info.get("body"), amount, kind, self)
+		if force != Vector3.ZERO:
+			io.event("damage_force", {"body": info.get("body"), "force": force, "source": self})
 		fire(io, "OnHurt", info.get("body"))
 		if str(info.get("kind", "player")) == "player":
 			fire(io, "OnHurtPlayer", info.get("body"))

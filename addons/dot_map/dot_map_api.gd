@@ -30,5 +30,7 @@ extends RefCounted
 # 13: volumes on the I/O runtime: DotMapVolumes (trigger_hurt, push, teleport, gravity, trigger, ladder_boxes, water_boxes),
 #     DotMapHurt, DotMapPush, DotMapEffect, DotMapSound, DotMapCommand, DotMapIO.settle / destinations / area_damage.
 # 14: DotMapWorld (one call builds a converted map's world), filter_multi, prop_door_rotating and func_physbox classes.
-const LEVEL := 14
+# 15: DotMapDoorStandIn, DotMapPhysbox, DotMapSoundscape, DotMapMoverNode.push_bodies / pose_delta, DotMapWorld.doors and
+#     the door_fn hook, hurt once/force, manifest settings as the config's weakest layer.
+const LEVEL := 15
 const OLDEST := 1

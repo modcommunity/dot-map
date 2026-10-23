@@ -8,8 +8,8 @@ extends Node
 ## godot --headless --path . res://examples/volumes_demo.tscn
 ## [/codeblock]
 
-const CHECKS := 85
-const SECTIONS := 9
+const CHECKS := 109
+const SECTIONS := 12
 const OFFICE := "res://examples/io/office_io.doc.json"
 
 var _passed := 0
@@ -33,6 +33,9 @@ func _run() -> void:
 	_test_boxes()
 	_test_effects_sounds()
 	_test_commands()
+	_test_hurt_once_and_force()
+	_test_soundscapes()
+	_test_movers_push_and_block()
 	var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(OFFICE))
 	if doc is Dictionary:
 		_test_office_timing(doc)
@@ -418,6 +421,127 @@ func _test_commands() -> void:
 	_check(not DotMapCommand.judge("net_graph 1", io.command_allow)["allowed"], "anything unlisted is denied")
 	_check(not DotMapCommand.judge("say " + "a".repeat(210), io.command_allow)["allowed"], "a chat line has a length limit")
 	_check(io.coverage()["commands_denied"] == 1, "denied commands are counted")
+	_done()
+
+
+func _test_hurt_once_and_force() -> void:
+	_section("trigger_hurt: damage once per entry, and the damage force goes to the game")
+	var w := _world([_rec(0, "trigger_hurt", "once", [["damage", "200"], ["damageonce", "1"], ["damageforce", "100 0 0"]]),
+			_rec(1, "trigger_hurt", "rep", [["damage", "200"], ["damageforce", "100 0 0"], ["nodmgforce", "1"]])],
+			[_vol(0, "hurt", "trigger_hurt", Vector3(0, 0, 0), Vector3(4, 3, 4)), _vol(1, "hurt", "trigger_hurt", Vector3(10, 0, 0), Vector3(14, 3, 4))])
+	var io: DotMapIO = w[0]
+	var vols: DotMapVolumes = w[1]
+	var hits: Array = []
+	var forces: Array = []
+	io.damage_fn = func(_b: Variant, amount: float, _k: String, a: Variant) -> void: hits.append([(a as DotMapEntity).targetname, amount])
+	io.event_fn = func(kind: String, data: Dictionary) -> void:
+		if kind == "damage_force":
+			forces.append(data["force"])
+	io.start()
+	var pos := [Vector3(2, 0, 2)]
+	var provider := func(_t: int) -> Array: return [_body(1, pos[0])]
+	_run_ticks(io, vols, 180, provider)
+	_check(hits.size() == 1 and hits[0][1] == 100.0, "damage once: one hit in three seconds of standing there: %s" % [hits])
+	_check(forces.size() == 1 and (forces[0] as Vector3).is_equal_approx(Vector3(2.54, 0, 0)), "and its force, 100 units a second along x: %s" % [forces])
+	pos[0] = Vector3(20, 0, 20)
+	_run_ticks(io, vols, 2, provider)
+	pos[0] = Vector3(2, 0, 2)
+	_run_ticks(io, vols, 40, provider)
+	_check(hits.size() == 2, "leaving and coming back is a new entry: hurt again")
+	hits.clear()
+	forces.clear()
+	pos[0] = Vector3(12, 0, 2)
+	_run_ticks(io, vols, 90, provider)
+	_check(hits.size() == 3, "without damage once it keeps hitting every hurtrate: %d" % hits.size())
+	_check(forces.is_empty(), "nodmgforce sends no force")
+	io.damage_fn = Callable()
+	io.event_fn = Callable()
+	_done()
+
+
+func _test_soundscapes() -> void:
+	_section("env_soundscape: the nearest enabled one that covers a player, proxies, and a change is an event")
+	var w := _world([
+			_rec(0, "env_soundscape", "sc_a", [["origin", "0 0 0"], ["radius", "400"], ["soundscape", "Alley"], ["position0", "spot"]]),
+			_rec(1, "env_soundscape", "sc_b", [["origin", "800 0 0"], ["radius", "400"], ["soundscape", "Street"]]),
+			_rec(2, "env_soundscape_proxy", "sc_p", [["origin", "1600 0 0"], ["radius", "400"], ["mainsoundscapename", "sc_a"]]),
+			_rec(3, "info_target", "spot", [["origin", "0 100 0"]])], [])
+	var io: DotMapIO = w[0]
+	var vols: DotMapVolumes = w[1]
+	var ev: Array = []
+	io.event_fn = func(kind: String, data: Dictionary) -> void:
+		if kind == "soundscape":
+			ev.append(data)
+	io.start()
+	var pos := [Vector3(1, 0, 0)]
+	var provider := func(_t: int) -> Array: return [_body(1, pos[0])]
+	_run_ticks(io, vols, 2, provider)
+	_check(ev.size() == 1 and ev[0]["name"] == "Alley", "inside the first radius: its soundscape, once (not every tick)")
+	_check((ev[0]["positions"] as Array).size() == 1 and (ev[0]["positions"][0] as Vector3).is_equal_approx(Vector3(0, 0, -2.54)), "with the named position it plays at")
+	pos[0] = Vector3(20.3, 0, 0)
+	_run_ticks(io, vols, 1, provider)
+	_check(ev.size() == 2 and ev[1]["name"] == "Street", "walking to the second: it changes")
+	pos[0] = Vector3(40.6, 0, 0)
+	_run_ticks(io, vols, 1, provider)
+	_check(ev.size() == 3 and ev[2]["name"] == "Alley", "a proxy plays the soundscape it points at")
+	pos[0] = Vector3(100, 0, 0)
+	_run_ticks(io, vols, 1, provider)
+	_check(ev.size() == 4 and ev[3]["name"] == "", "out of every radius: none")
+	pos[0] = Vector3(1, 0, 0)
+	io.send("sc_a", "Disable")
+	_run_ticks(io, vols, 1, provider)
+	_check(ev.size() == 4, "a disabled soundscape is not chosen (still none)")
+	io.send("sc_a", "Enable")
+	_run_ticks(io, vols, 1, provider)
+	_check(ev.size() == 5 and ev[4]["name"] == "Alley", "enabled again: heard again")
+	io.event_fn = Callable()
+	_done()
+
+
+func _test_movers_push_and_block() -> void:
+	_section("a moving door pushes the body in its way, hurts and turns back one it cannot move")
+	var rec := {"entity": 0, "model": 1, "kind": "slide", "classname": "func_door", "targetname": "slab",
+			"direction": [1, 0, 0], "distance": 2.0, "travel_time": 2.0, "wait": 3.0, "origin": [0, 0, 0],
+			"mins": [-2.2, 0.0, -1.0], "maxs": [-1.2, 3.0, 1.0], "solid": true}
+	var w := _world([_rec(0, "func_door", "slab", [["dmg", "10"]])], [], 20)
+	var io: DotMapIO = w[0]
+	var vols: DotMapVolumes = w[1]
+	io.bind_movers([DotMapMover.from_record(rec)])
+	var slab := io.entity_of(0) as DotMapMoverNode
+	var moves: Array = []
+	var hits: Array = []
+	io.move_fn = func(_b: Variant, v: Variant) -> void: moves.append(v)
+	io.damage_fn = func(_b: Variant, amount: float, kind: String, _a: Variant) -> void: hits.append([amount, kind])
+	io.start()
+	var provider := func(_t: int) -> Array: return [_body(1, Vector3(0, 0, 0))]
+	_run_ticks(io, vols, 30, provider)
+	_check(moves.is_empty() and hits.is_empty(), "a closed door pushes nobody")
+	io.send("slab", "Open")
+	_run_ticks(io, vols, 10, provider)
+	_check(moves.is_empty(), "and one still far away pushes nobody")
+	_run_ticks(io, vols, 10, provider)
+	_check(not moves.is_empty() and (moves[0] as Vector3).is_equal_approx(Vector3(1, 0, 0)), "reaching the body it pushes it along at the door's 1 m/s: %s" % [moves.slice(0, 1)])
+	_run_ticks(io, vols, 8, provider)
+	_check(hits.size() >= 1 and hits[0][0] == 10.0 and hits[0][1] == "crush", "a body that does not move is crushed for the dmg key: %s" % [hits])
+	_check(slab._to == 0.0, "and a door with a wait turns back")
+	var motions := io.history.filter(func(h: Dictionary) -> bool: return h["key"] == "motion")
+	_check(motions.size() >= 2, "the reversal is a new motion record for clients")
+	var w2 := _world([_rec(0, "func_door", "slab", [["dmg", "10"]])], [], 20)
+	var io2: DotMapIO = w2[0]
+	io2.bind_movers([DotMapMover.from_record(rec)])
+	var pos := [Vector3(0, 0, 0)]
+	var hits2: Array = []
+	io2.move_fn = func(_b: Variant, v: Variant) -> void: pos[0] = (pos[0] as Vector3) + (v as Vector3) / 20.0
+	io2.damage_fn = func(_b: Variant, amount: float, _k: String, _a: Variant) -> void: hits2.append(amount)
+	io2.start()
+	io2.send("slab", "Open")
+	var provider2 := func(_t: int) -> Array: return [_body(1, pos[0])]
+	_run_ticks(io2, w2[1], 40, provider2)
+	_check(hits2.is_empty() and (io2.entity_of(0) as DotMapMoverNode)._to == 1.0, "a body the game moves along is never blocked: no damage, no reversal")
+	_check((pos[0] as Vector3).x > 0.4, "and it is carried ahead of the door: %s" % [pos[0]])
+	for i in [io, io2]:
+		i.move_fn = Callable()
+		i.damage_fn = Callable()
 	_done()
 
 

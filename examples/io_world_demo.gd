@@ -10,8 +10,8 @@ extends Node
 ## ([code]examples/bsp_mesh/zm_4way_tunnel.entities.json[/code]); nodes are built here the way
 ## [method DotMapBspMesh.build_node] shapes them (a Node3D per model with a [code]model[/code] meta).
 
-const CHECKS := 106
-const SECTIONS := 10
+const CHECKS := 124
+const SECTIONS := 12
 const TUNNEL := "res://examples/bsp_mesh/zm_4way_tunnel.entities.json"
 
 var _passed := 0
@@ -38,6 +38,8 @@ func _run() -> void:
 	_test_real_lifts()
 	_test_replication()
 	_test_determinism()
+	_test_door_standin()
+	_test_physbox()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -504,4 +506,71 @@ func _test_determinism() -> void:
 		runs.append(JSON.stringify(io.history))
 	_check(runs[0] == runs[1] and runs[1] == runs[2], "history is identical for 1, 7 and 13 ticks a call")
 	_check(runs[0].count("motion") >= 4, "and it is a real run: the door moved %d times" % runs[0].count("motion"))
+	_done()
+
+
+func _test_door_standin() -> void:
+	_section("prop_door_rotating has no brush: a drawn panel and body swing about the hinge")
+	var io := _io([_rec(0, "prop_door_rotating", "pd", [["angles", "0 90 0"]], [["OnFullyOpen", "log", "Add", "1"]]),
+			_rec(1, "math_counter", "log", [["max", "10"]])])
+	var m := _door_rec(0, "rotate", {"model": null, "classname": "prop_door_rotating", "targetname": "pd",
+			"origin": [3, 0, 4], "axis": [0, 1, 0], "degrees": 90.0, "travel_time": 1.0, "use": true})
+	io.bind_movers([m])
+	var door := DotMapDoorStandIn.build(m, 90.0)
+	add_child(door)
+	var e := io.entity_of(0) as DotMapMoverNode
+	e.set_hit_box(Transform3D(), Vector3.ONE)
+	e.bind_node(door)
+	_check(door.position == Vector3(3, 0, 4) and is_equal_approx(door.rotation.y, deg_to_rad(90.0)), "the node sits at the hinge, yawed by the entity's angles")
+	_check(door.get_node_or_null("Panel") is MeshInstance3D and door.get_node_or_null("col_solid") is AnimatableBody3D, "with a drawn panel and a body of its own")
+	_check((door.get_node("Panel") as Node3D).position.z < 0.0, "the panel lies along local +Y of the source entity")
+	io.start()
+	io.send("pd", "Open")
+	io.advance(20)
+	_check(door.transform.basis.is_equal_approx(Basis(Vector3.UP, deg_to_rad(180.0))) and door.position.is_equal_approx(Vector3(3, 0, 4)), "opening swings it a further 90 degrees about the hinge")
+	_check((io.entity_of(1) as DotMapCounter).value == 1.0, "and OnFullyOpen fires at the end")
+	io.send("pd", "Close")
+	io.advance(20)
+	_check(door.transform.basis.is_equal_approx(Basis(Vector3.UP, deg_to_rad(90.0))), "closing swings it back")
+	var nodoor := DotMapDoorStandIn.build(_door_rec(0, "rotate", {"solid": false}), 0.0)
+	_check(nodoor.get_node_or_null("col_solid") == null, "a passable door gets no body")
+	nodoor.free()
+	door.free()
+	_done()
+
+
+func _test_physbox() -> void:
+	_section("func_physbox: a rigid body that EnableMotion frees, a damage wakes, and a client never simulates")
+	var io := _io([_rec(0, "func_physbox", "crate", [["damagetoenablemotion", "50"], ["model", "*3"]], [["OnMotionEnabled", "log", "Add", "1"], ["OnBreak", "log", "Add", "10"]]),
+			_rec(1, "math_counter", "log", [["max", "100"]]),
+			_rec(2, "func_physbox", "free", [["model", "*4"]])])
+	var crate := io.entity_of(0) as DotMapPhysbox
+	var log := io.entity_of(1) as DotMapCounter
+	var rb := RigidBody3D.new()
+	add_child(rb)
+	crate.bind_body(rb, true)
+	_check(not crate.motion and rb.freeze, "damagetoenablemotion starts it frozen")
+	crate.hurt(io, 10.0)
+	_check(rb.freeze, "a hit under the threshold leaves it")
+	crate.hurt(io, 60.0)
+	io.advance(1)
+	_check(crate.motion and not rb.freeze and log.value == 1.0, "a harder one frees it and fires OnMotionEnabled")
+	io.send("crate", "DisableMotion")
+	_check(rb.freeze, "DisableMotion freezes it")
+	io.send("crate", "EnableMotion")
+	_check(not rb.freeze, "EnableMotion frees it")
+	var rb2 := RigidBody3D.new()
+	add_child(rb2)
+	(io.entity_of(2) as DotMapPhysbox).bind_body(rb2, true)
+	_check(not rb2.freeze, "one with no threshold simulates from the start")
+	var rb3 := RigidBody3D.new()
+	add_child(rb3)
+	(io.entity_of(2) as DotMapPhysbox).bind_body(rb3, false)
+	_check(rb3.freeze, "a client keeps it frozen: the authority simulates")
+	io.send("crate", "Break")
+	io.advance(1)
+	_check(log.value == 12.0 and rb.freeze, "breaking it fires OnBreak (and the earlier EnableMotion fired OnMotionEnabled again) and stops the body")
+	_check(io.snapshot()["entities"][0].has("motion"), "its motion state is in a joiner's snapshot")
+	for n in [rb, rb2, rb3]:
+		n.free()
 	_done()

@@ -10,10 +10,24 @@ extends DotMapEntity
 ## (OnFullyOpen, an automatic close, a corner passed) is a self-scheduled event at the exact tick.
 ## Without a record ([method set_mover]) the entity is inert and counted as unbound.
 ##
-## Not done: blocked-damage and pushing bodies (the game's [member DotMapIO.move_fn]), spin-up
-## ramps, a train's rotation to follow its path, tank trains.
+## A moving mover pushes the bodies [DotMapVolumes] gives it through [member DotMapIO.move_fn]
+## (the velocity that carries a body along); a body still inside after [constant BLOCK_TICKS]
+## ticks is blocked: the [code]dmg[/code] key hurts it, OnBlockedOpening / OnBlockedClosing fire,
+## and a door or lift with [code]wait[/code] of 0 or more reverses, as the original does.
+##
+## Not done: spin-up ramps, a train's rotation to follow its path, tank trains.
+
+## Ticks a body may stay inside a moving mover before it counts as blocked.
+const BLOCK_TICKS := 3
+## Seconds between a blocked body's hits.
+const BLOCK_DAMAGE_PERIOD := 0.25
 
 var mover: DotMapMover = null
+## The solid the mover pushes with at rest: its frame in the world and half extents (metres).
+var hit_frame := Transform3D.IDENTITY
+var hit_half := Vector3.ZERO
+var _inside: Dictionary = {}
+var _hurt_at: Dictionary = {}
 var locked := false
 ## Slide, hinge and button: fraction at the move's start, its target, the start tick, and seconds a full travel takes.
 var _from := 0.0
@@ -43,10 +57,21 @@ func set_mover(m: DotMapMover) -> void:
 	_from = m.rest_fraction()
 	_to = _from
 	_in = false
+	if m.record.has("mins") and m.record.has("maxs"):
+		var lo := DotMapMover._vec(m.record["mins"])
+		var hi := DotMapMover._vec(m.record["maxs"])
+		set_hit_box(Transform3D(Basis.IDENTITY, (lo + hi) * 0.5), (hi - lo) * 0.5)
 	if m.kind == DotMapMover.KIND_PATH:
 		_build_path()
 	elif m.is_spinner():
 		_v = m.spin_rate() if m.start_open else 0.0
+
+
+## The solid a body can be pushed or blocked by, at rest: [param frame] places a box of
+## [param half] extents in the world (a mover without a brush model, such as a drawn door, says so).
+func set_hit_box(frame: Transform3D, half: Vector3) -> void:
+	hit_frame = frame
+	hit_half = half
 
 
 func is_bound() -> bool:
@@ -416,6 +441,89 @@ func _bound() -> void:
 		_base = node.transform
 		if mover != null and mover.kind == DotMapMover.KIND_PATH and _corners.size() > 0:
 			_base = Transform3D(_base.basis, _base.origin - _corners[0])
+
+
+## The mover's pose at [param tick] relative to its rest pose, in world space.
+func pose_delta(tick: int, rate: int) -> Transform3D:
+	if mover == null:
+		return Transform3D.IDENTITY
+	match mover.kind:
+		DotMapMover.KIND_SPIN:
+			return _about(mover.origin, Basis(mover.axis.normalized(), angle_at(tick, rate)))
+		DotMapMover.KIND_PATH:
+			return Transform3D(Basis.IDENTITY, path_point(path_at(tick, rate)) - (_corners[0] if _corners.size() > 0 else Vector3.ZERO))
+		_:
+			if not mover.is_animatable():
+				return Transform3D.IDENTITY
+			var t := mover.transform_at(fraction_at(tick, rate))
+			if mover.kind in [DotMapMover.KIND_HINGE, DotMapMover.KIND_HINGE_BUTTON]:
+				return _about(mover.origin, t.basis)
+			return Transform3D(Basis.IDENTITY, t.origin)
+
+
+static func _about(pivot: Vector3, b: Basis) -> Transform3D:
+	return Transform3D(b, pivot - b * pivot)
+
+
+## Pushes the bodies in the mover's way and deals with the ones it cannot move. [param bodies]
+## are [DotMapVolumes] body dictionaries (feet [code]position[/code], [code]height[/code], optional [code]radius[/code]).
+func push_bodies(io: DotMapIO, bodies: Array) -> void:
+	if mover == null or not alive or not mover.solid or hit_half == Vector3.ZERO:
+		return
+	var now := pose_delta(io.now, io.rate)
+	var before := pose_delta(io.now - 1, io.rate)
+	if now.is_equal_approx(before):
+		_inside.clear()
+		return
+	var step := now * before.affine_inverse()
+	var inv_now := now.affine_inverse()
+	var inv_box := hit_frame.affine_inverse()
+	var seen := {}
+	for info: Dictionary in bodies:
+		var feet: Vector3 = info["position"]
+		var h := float(info.get("height", 1.8))
+		var r := float(info.get("radius", 0.4))
+		var hit := false
+		for y: float in [0.05, h * 0.5, h - 0.05]:
+			var p: Vector3 = feet + Vector3(0.0, y, 0.0)
+			var q: Vector3 = inv_box * (inv_now * p)
+			if absf(q.x) < hit_half.x + r - 0.02 and absf(q.y) < hit_half.y - 0.02 and absf(q.z) < hit_half.z + r - 0.02:
+				hit = true
+				break
+		if not hit:
+			continue
+		var id: Variant = info["id"]
+		seen[id] = true
+		var mid := feet + Vector3(0.0, h * 0.5, 0.0)
+		var push := step * mid - mid
+		io.move_body(info.get("body"), push * float(io.rate))
+		# Blocked is a push that moved nothing: a carried body is overlapped every tick but travels.
+		var last: Dictionary = _inside.get(id, {})
+		var n: int = 0
+		if not last.is_empty() and feet.distance_to(last["feet"]) < 0.5 * float(last["push"]):
+			n = int(last["n"]) + 1
+		_inside[id] = {"feet": feet, "push": push.length(), "n": n}
+		if n >= BLOCK_TICKS:
+			_blocked(io, info, n)
+	for id: Variant in _inside.keys():
+		if not seen.has(id):
+			_inside.erase(id)
+			_hurt_at.erase(id)
+
+
+func _blocked(io: DotMapIO, info: Dictionary, n: int) -> void:
+	var id: Variant = info["id"]
+	var dmg := key_float("dmg")
+	if dmg > 0.0 and io.now - int(_hurt_at.get(id, -1000000)) >= io.ticks_for(BLOCK_DAMAGE_PERIOD):
+		_hurt_at[id] = io.now
+		io.damage(info.get("body"), dmg, "crush", self)
+	if n != BLOCK_TICKS:
+		return
+	var opening := _to >= 1.0
+	fire(io, "OnBlockedOpening" if opening else "OnBlockedClosing", info.get("body"))
+	if mover.kind in [DotMapMover.KIND_SLIDE, DotMapMover.KIND_HINGE, DotMapMover.KIND_PLAT] and mover.wait >= 0.0 \
+			and mover.kind != DotMapMover.KIND_SPIN:
+		_move_to(io, 0.0 if opening else 1.0)
 
 
 func tick_view(io: DotMapIO) -> void:

@@ -38,6 +38,8 @@ var config_result: DotResult = null
 ## The drawn tree from [method DotMapBspMesh.build_node]; collision bodies sit under each model's node.
 var visual: Node3D
 var glass: Array[DotMapGlass] = []
+## The drawn stand-in of each prop_door_rotating.
+var doors: Array[Node3D] = []
 var sounds: Node3D
 var map_id := ""
 var ladder_fn := Callable()
@@ -54,7 +56,9 @@ var _boxes_dirty := false
 ## (the source document), [code]doc_path[/code], [code]store[/code] (store root), [code]authoritative[/code]
 ## (true), [code]rate[/code] (60), [code]seed[/code], [code]command_allow[/code], [code]map_id[/code],
 ## [code]environment, props, sounds, collision[/code] (true), [code]layers[/code] ({solid, clip, glass} to
-## a collision layer, default 1), [code]config[/code] ({game, config_dir, allow, defaults, get_fn, set_fn}).
+## a collision layer, default 1), [code]config[/code] ({game, config_dir, allow, defaults, get_fn, set_fn};
+## the weakest layer is the manifest's [code]settings[/code], the cvars the map's own entities set, then
+## [code]defaults[/code]; a key the game did not [code]allow[/code] is still refused).
 ## The source document is found beside the mesh as [code]<prefix>.doc.json[/code], else in the store by the
 ## sha256 the manifest records.
 static func build(source: Variant, hooks: Dictionary = {}, options: Dictionary = {}) -> DotResult:
@@ -206,6 +210,7 @@ func _assemble(doc: Dictionary, hooks: Dictionary, options: Dictionary) -> DotRe
 	io.attach_sounds(mesh.sounds_data().get("ambient", []))
 	volumes = DotMapVolumes.build(ents, io, mesh.manifest.get("destinations", {}))
 	io.bind_world(visual)
+	_build_doors(ents, hooks, layers)
 	io.state_changed.connect(_on_state)
 	if io.authoritative:
 		if hooks.get("send_fn") is Callable:
@@ -219,13 +224,39 @@ func _assemble(doc: Dictionary, hooks: Dictionary, options: Dictionary) -> DotRe
 	return DotResult.success(self)
 
 
+## A drawn panel and body for each prop_door_rotating (no brush model); [code]door_fn(mover, yaw) -> Node3D[/code]
+## in the hooks replaces the stand-in with the game's own model.
+func _build_doors(ents: DotMapEntities, hooks: Dictionary, layers: Dictionary) -> void:
+	for m: DotMapMover in ents.movers:
+		if m.model >= 0 or m.classname.to_lower() != "prop_door_rotating":
+			continue
+		var e: DotMapEntity = io.entity_of(m.entity)
+		if not e is DotMapMoverNode:
+			continue
+		var ang := e.key("angles").split_floats(" ", false)
+		var yaw := float(ang[1]) if ang.size() > 1 else 0.0
+		var door: Node3D = null
+		if hooks.get("door_fn") is Callable:
+			door = (hooks["door_fn"] as Callable).call(m, yaw)
+		if door == null:
+			door = DotMapDoorStandIn.build(m, yaw, DotMapDoorStandIn.SIZE, int(layers.get("solid", 1)))
+		visual.add_child(door)
+		var half := Vector3(DotMapDoorStandIn.SIZE.z, DotMapDoorStandIn.SIZE.y, DotMapDoorStandIn.SIZE.x) * 0.5
+		var yaw_basis := Basis(Vector3.UP, deg_to_rad(yaw))
+		(e as DotMapMoverNode).set_hit_box(Transform3D(yaw_basis, m.origin + yaw_basis * Vector3(0.0, half.y, -half.z)), half)
+		e.bind_node(door)
+		e.tick_view(io)
+		doors.append(door)
+
+
 func _apply_config(opts: Dictionary) -> void:
 	if opts.is_empty():
 		return
 	config = DotMapConfig.new()
 	config.game = str(opts.get("game", ""))
 	config.config_dir = str(opts.get("config_dir", ""))
-	config.defaults = opts.get("defaults", {})
+	config.defaults = (mesh.manifest.get("settings", {}) as Dictionary).duplicate()
+	config.defaults.merge(opts.get("defaults", {}), true)
 	var allow: Variant = opts.get("allow", {})
 	if allow is Dictionary:
 		for k: String in allow:
@@ -247,6 +278,10 @@ func _build_collision(ents: DotMapEntities, layers: Dictionary) -> void:
 	for c in visual.get_children():
 		if c.has_meta(&"model"):
 			by_model[int(c.get_meta(&"model"))] = c
+	var physboxes := {}
+	for e: DotMapEntity in io.entities:
+		if e is DotMapPhysbox and e.key("model").begins_with("*"):
+			physboxes[int(e.key("model").substr(1))] = e
 	for model in mesh.models():
 		if broken.has(model) or not by_model.has(model):
 			continue
@@ -262,10 +297,20 @@ func _build_collision(ents: DotMapEntities, layers: Dictionary) -> void:
 				concave = mesh.concave_shapes(model)
 			if shapes.is_empty() and concave.is_empty():
 				continue
-			var body: PhysicsBody3D = AnimatableBody3D.new() if moving else StaticBody3D.new()
+			var phys: DotMapPhysbox = physboxes.get(model) if kind == "solid" else null
+			var body: PhysicsBody3D
+			if phys != null:
+				body = RigidBody3D.new()
+				concave = []
+				if shapes.is_empty():
+					continue
+			elif moving:
+				body = AnimatableBody3D.new()
+			else:
+				body = StaticBody3D.new()
 			body.name = "col_" + kind
 			body.collision_layer = int(layers.get(kind, 1))
-			body.collision_mask = 0
+			body.collision_mask = body.collision_layer if phys != null else 0
 			body.set_meta(&"hull_kind", kind)
 			for h: Dictionary in shapes:
 				var cs := CollisionShape3D.new()
@@ -276,6 +321,25 @@ func _build_collision(ents: DotMapEntities, layers: Dictionary) -> void:
 				cs2.shape = s
 				body.add_child(cs2)
 			parent.add_child(body)
+			if phys != null:
+				_make_physbox(phys, body as RigidBody3D, parent)
+
+
+## The drawn meshes of a func_physbox ride its rigid body; its mass follows the hulls' size.
+func _make_physbox(phys: DotMapPhysbox, rb: RigidBody3D, model_node: Node3D) -> void:
+	var volume := 0.0
+	for c in rb.get_children():
+		if c is CollisionShape3D and (c as CollisionShape3D).shape is ConvexPolygonShape3D:
+			var box := AABB()
+			var pts := ((c as CollisionShape3D).shape as ConvexPolygonShape3D).points
+			for i in pts.size():
+				box = box.expand(pts[i]) if i > 0 else AABB(pts[i], Vector3.ZERO)
+			volume += box.get_volume() * 0.6
+	rb.mass = clampf(volume * 150.0, 1.0, 2000.0)
+	for c in model_node.get_children():
+		if c is MeshInstance3D:
+			c.reparent(rb, false)
+	phys.bind_body(rb, io.authoritative)
 
 
 func _on_state(e: DotMapEntity, key: String, _value: Variant, _tick: int) -> void:

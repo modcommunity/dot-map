@@ -101,8 +101,9 @@ func _init() -> void:
 		"prop_physics_override": DotMapBreakable,
 		"math_colorblend": DotMapColorBlend, "logic_measure_movement": DotMapMeasureMovement,
 		"env_global": DotMapGlobal, "point_template": DotMapTemplate,
-		"func_physbox": DotMapBreakable, "func_physbox_multiplayer": DotMapBreakable,
-		"trigger_hurt": DotMapHurt, "trigger_push": DotMapPush, "ambient_generic": DotMapSound,
+		"func_physbox": DotMapPhysbox, "func_physbox_multiplayer": DotMapPhysbox,
+		"env_soundscape": DotMapSoundscape, "env_soundscape_proxy": DotMapSoundscape,
+		"env_soundscape_triggerable": DotMapSoundscape, "trigger_hurt": DotMapHurt, "trigger_push": DotMapPush, "ambient_generic": DotMapSound,
 	}
 	for cls in ["func_door", "func_door_rotating", "func_movelinear", "func_rotating", "func_tracktrain",
 			"func_train", "func_plat", "func_button", "func_rot_button", "prop_door_rotating"]:
