@@ -38,5 +38,7 @@ extends RefCounted
 #     DotMapStateSync.apply refuses an authoritative runtime, an older tick and oversize messages.
 # 18: prop_door_rotating follows opendir/spawnpos (DotMapMover.open_dir, yaw, spawn_side, side_away_from, transform_at side),
 #     DotMapMoverNode replicates a door's chosen side; spawnflag 2 no longer reverses a model door.
-const LEVEL := 18
+# 19: a door's replicated side is clamped to +-1 (0 keeps it), the state sync refuses a side that is not finite or beyond 1,
+#     and an opener with no known position keeps the door's current side.
+const LEVEL := 19
 const OLDEST := 1

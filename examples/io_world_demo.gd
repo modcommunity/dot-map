@@ -10,7 +10,7 @@ extends Node
 ## ([code]examples/bsp_mesh/zm_4way_tunnel.entities.json[/code]); nodes are built here the way
 ## [method DotMapBspMesh.build_node] shapes them (a Node3D per model with a [code]model[/code] meta).
 
-const CHECKS := 162
+const CHECKS := 172
 const SECTIONS := 15
 const TUNNEL := "res://examples/bsp_mesh/zm_4way_tunnel.entities.json"
 
@@ -563,6 +563,33 @@ func _test_door_standin() -> void:
 	joiner.entity_of(0).apply_state(joiner, "side", ae.state()["side"], 0)
 	joiner.entity_of(0).apply_state(joiner, "motion", ae.state()["motion"], 0)
 	_check(joiner.entity_of(0).state()["side"] == -1.0, "the chosen side is state a joiner receives")
+	var forged := _io([_rec(0, "prop_door_rotating", "pd", [])])
+	forged.bind_movers([DotMapMover.from_record(am.record)])
+	var fe := forged.entity_of(0) as DotMapMoverNode
+	_check(fe.apply_state(forged, "side", 1.0e11, 0) and fe._side == 1.0, "a forged side of 1e11 is clamped to +1")
+	fe.apply_state(forged, "side", -5.0, 0)
+	_check(fe._side == -1.0, "a side of -5 is clamped to -1")
+	fe.apply_state(forged, "side", 0.0, 0)
+	_check(fe._side == -1.0, "a side of 0 keeps the current side")
+	forged.authoritative = false
+	var sync := DotMapStateSync.new()
+	var before := forged.now
+	sync.apply(forged, {"type": DotMapStateSync.TYPE_STATE, "tick": before, "changes": [[0, "side", 1.0e11], [0, "side", INF]]})
+	_check(sync.refused == 2 and fe._side == -1.0, "the state sync refuses a side beyond 1 or not finite")
+	var unk := _io([_rec(0, "prop_door_rotating", "pd", [])])
+	var um := DotMapMover.from_record(am.record.merged({"spawn_side": -1.0, "degrees": 90.0}))
+	unk.bind_movers([um])
+	var ue := unk.entity_of(0) as DotMapMoverNode
+	_check(ue._side == -1.0, "a spawn_side of -1 starts on the back")
+	ue.accept(unk, "Open", "", null, null)
+	ue.accept(unk, "Close", "", null, null)
+	unk.advance(40)
+	ue.accept(unk, "Open", "", {"name": "timer"}, null)
+	_check(ue._side == -1.0, "an opener with no position keeps spawn_side")
+	var uj := _io([_rec(0, "prop_door_rotating", "pd", [])])
+	uj.bind_movers([DotMapMover.from_record(um.record if "record" in um else am.record)])
+	uj.entity_of(0).apply_state(uj, "side", ue.state()["side"], 0)
+	_check(uj.entity_of(0).state()["side"] == ue.state()["side"], "a joiner stays consistent with the kept side")
 	var fixed := DotMapMover.from_record({"kind": "rotate", "degrees": -90.0, "open_dir": 2, "spawn_side": 1.0})
 	_check(fixed.side_away_from(Vector3(5, 0, 0)) == 1.0, "opendir 1 and 2 keep the record's own sign whoever opens")
 	var back := DotMapMoverNode.new()

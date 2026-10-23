@@ -231,10 +231,12 @@ func _open(io: DotMapIO, activator: Variant) -> void:
 	if locked or _to >= 1.0:
 		return
 	if mover.open_dir == 0 and fraction_at(io.now, io.rate) <= 0.0:
-		var side := mover.side_away_from(_position_of(activator))
-		if side != _side:
-			_side = side
-			io.report_state(self, "side", side)
+		var opener: Variant = _position_of(activator)
+		if opener is Vector3 and (opener as Vector3).is_finite():
+			var side := mover.side_away_from(opener)
+			if side != _side:
+				_side = side
+				io.report_state(self, "side", side)
 	fire(io, "OnOpen", activator)
 	_move_to(io, 1.0)
 
@@ -472,7 +474,13 @@ func _apply(_io: DotMapIO, key_: String, value: Variant, _tick: int) -> bool:
 			_vf = float(m[4]) if m.size() > 4 else _v
 			_acc = float(m[5]) if m.size() > 5 else 0.0
 		"side":
-			_side = float(value)
+			if not (value is float or value is int):
+				return false
+			var sv := float(value)
+			if is_nan(sv) or is_inf(sv):
+				return false
+			if sv != 0.0:
+				_side = signf(sv)
 		"locked":
 			locked = bool(value)
 		"in":

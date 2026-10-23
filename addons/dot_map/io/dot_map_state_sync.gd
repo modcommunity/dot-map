@@ -142,8 +142,19 @@ func _apply_one(io: DotMapIO, index: int, key: String, value: Variant, tick: int
 	if e == null:
 		refused += 1
 		return 0
+	if key == "side" and not _usable_side(value):
+		refused += 1
+		return 0
 	if not e.apply_state(io, key, value, tick):
 		ignored += 1
 		return 0
 	applied += 1
 	return 1
+
+
+## A door side is a finite number in [-1, 1]; anything else is a forged value.
+static func _usable_side(value: Variant) -> bool:
+	if not (value is float or value is int):
+		return false
+	var v := float(value)
+	return not is_nan(v) and not is_inf(v) and absf(v) <= 1.0
