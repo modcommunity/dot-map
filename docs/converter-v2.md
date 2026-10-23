@@ -1,6 +1,6 @@
 # Converter v2: one lossless store, one replacement layer, one entity runtime
 
-Design for the next generation of `tools/bsp` (`dotbsp`). Status: design, 2026-10-23; nothing below is built unless it says so. The rule it serves: **when an imported map is wrong, fix the converter, the replacement tables or an addon class, then regenerate every map; never patch one map.**
+Design for the next generation of `tools/bsp` (`dotbsp`). Status: design, 2026-10-23; nothing below is built unless it says so. Package 1 (the store, repeated keys, outputs of any name) is built: `dotbsp/store.py`, `bsp.py store`. The rule it serves: **when an imported map is wrong, fix the converter, the replacement tables or an addon class, then regenerate every map; never patch one map.**
 
 ## Why: what today's converter keeps and what it loses
 
