@@ -179,6 +179,33 @@ func material(kind: StringName, tint: Color = Color.WHITE) -> StandardMaterial3D
 	return _cache[key]
 
 
+## A `material_for` callable for [method DotMapBspMesh.build_node] that draws a converted map with its free
+## textures: a surface's `free` key names a surface kind, or a generated flat colour the pack carries as a file
+## beside [param dir] (the pack's directory).
+func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
+	var generated := {}
+	for t: Dictionary in world.licence().get("textures", []):
+		if str(t["kind"]) == "generated":
+			generated[str(t["key"])] = dir.path_join(str(t["file"]))
+	var cache := {}
+	return func(rec: Dictionary) -> Material:
+		var key := str(rec.get("free", ""))
+		if cache.has(key):
+			return cache[key]
+		var m: Material
+		if generated.has(key):
+			var sm := StandardMaterial3D.new()
+			sm.albedo_texture = ImageTexture.create_from_image(Image.load_from_file(generated[key]))
+			sm.uv1_triplanar = true
+			sm.uv1_world_triplanar = true
+			sm.uv1_scale = Vector3.ONE * 0.4
+			m = sm
+		else:
+			m = material(StringName(key.get_slice(":", 0)))
+		cache[key] = m
+		return m
+
+
 ## Drops every cached material (a texture quality change, or a test).
 func clear() -> void:
 	_cache.clear()

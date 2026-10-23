@@ -26,27 +26,7 @@ func _ready() -> void:
 			world.sounds_data().get("ambient", []).size()])
 	var dir := str(args["world"]).get_base_dir()
 	var surfaces := DotMapSurfaces.new()
-	var generated := {}
-	for t: Dictionary in world.licence().get("textures", []):
-		if str(t["kind"]) == "generated":
-			generated[str(t["key"])] = dir.path_join(str(t["file"]))
-	var cache := {}
-	var mat_for := func(rec: Dictionary) -> Material:
-		var key := str(rec.get("free", ""))
-		if cache.has(key):
-			return cache[key]
-		var m: Material
-		if generated.has(key):
-			var sm := StandardMaterial3D.new()
-			sm.albedo_texture = ImageTexture.create_from_image(Image.load_from_file(generated[key]))
-			sm.uv1_triplanar = true
-			sm.uv1_world_triplanar = true
-			sm.uv1_scale = Vector3.ONE * 0.4
-			m = sm
-		else:
-			m = surfaces.material(StringName(key.get_slice(":", 0)))
-		cache[key] = m
-		return m
+	var mat_for := surfaces.world_material_for(world, dir)
 	var built := DotMapWorld.build(world, {"material_for": mat_for})
 	if not built.ok:
 		printerr("cannot build the world: ", built.error)
@@ -57,7 +37,13 @@ func _ready() -> void:
 	if str(args.get("view", "")) == "overview":
 		# a map's fog is set for play inside it: from outside the map it hides the whole thing
 		for we in dw.find_children("*", "WorldEnvironment", true, false):
-			(we as WorldEnvironment).environment.fog_enabled = false
+			var env := (we as WorldEnvironment).environment
+			env.fog_enabled = false
+			# a dark or black sky hides a map seen from outside
+			env.background_mode = Environment.BG_COLOR
+			env.background_color = Color(0.55, 0.62, 0.72)
+			env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+			env.ambient_light_color = Color(0.55, 0.55, 0.6)
 	var node: Node3D = dw.visual
 	if world.build_environment() == null:
 		# A map with no environment of its own would be black: give the frame plain light.
@@ -82,7 +68,7 @@ func _ready() -> void:
 		var l := str(args["look"]).split_floats(",")
 		look = Vector3(l[0], l[1], l[2])
 	add_child(cam)
-	cam.far = 300.0
+	cam.far = maxf(300.0, from.distance_to(look) * 3.0)
 	cam.position = from
 	cam.look_at(look)
 	cam.make_current()
@@ -112,6 +98,16 @@ func _default_view(world: DotMapBspMesh, node: Node3D, view: String) -> Array:
 			var eye := Vector3(p[0], p[1] + 1.6, p[2])
 			var yaw := deg_to_rad(float(e.get("yaw", 0.0)))
 			return [eye, eye + Vector3(-sin(yaw), 0.0, -cos(yaw)) * 10.0]
+	# Giant sea planes and sky hulls make the mesh box useless: where the map has spawns, frame the play area they mark.
+	var pts: Array = []
+	for e: Dictionary in world.manifest.get("spawns", []):
+		pts.append(Vector3(e["at"][0], e["at"][1], e["at"][2]))
+	if not pts.is_empty():
+		var pb := AABB(pts[0], Vector3.ZERO)
+		for q: Vector3 in pts:
+			pb = pb.expand(q)
+		box = pb.grow(maxf(60.0, maxf(pb.size.x, pb.size.z) * 0.6))
+		centre = box.get_center()
 	var r := maxf(box.size.x, box.size.z)
 	var from := centre + Vector3(r * 0.45, maxf(box.size.y, r * 0.7), r * 0.45)
 	return [from, centre]
