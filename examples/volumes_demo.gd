@@ -8,7 +8,7 @@ extends Node
 ## godot --headless --path . res://examples/volumes_demo.tscn
 ## [/codeblock]
 
-const CHECKS := 123
+const CHECKS := 125
 const SECTIONS := 13
 const OFFICE := "res://examples/io/office_io.doc.json"
 
@@ -337,6 +337,18 @@ func _test_boxes() -> void:
 		"a 2 cm slab is touched by a body standing on it, not by one a step above")
 	_check(slab.touches_column(Vector3(2, -1.0, 2), 1.8) and not slab.touches_column(Vector3(5, 0.0, 2), 1.8),
 		"a body whose column crosses it is in it, one beside it is not")
+	var sheet := DotMapVolume.from_record(_vol(-1, "teleport", "trigger_teleport", Vector3(5, 0, 0), Vector3(5.019, 2, 4)))
+	var caught := false
+	var x := 4.0
+	while x < 6.2:
+		caught = caught or sheet.touches_column(Vector3(x, 0, 2), 1.8)
+		x += 0.2
+	_check(caught, "a 2 cm teleport sheet is caught by a body stepping 0.2 m a tick across it")
+	DotMapVolume.min_thickness = 0.0
+	var raw := DotMapVolume.from_record(_vol(-1, "teleport", "trigger_teleport", Vector3(5, 0, 0), Vector3(5.019, 2, 4)))
+	DotMapVolume.min_thickness = 0.25
+	_check(not raw.touches_column(Vector3(4.9, 0, 2), 1.8) and not raw.touches_column(Vector3(5.1, 0, 2), 1.8),
+		"with min_thickness 0 the sheet is the brush as written (and is stepped over)")
 	io.send("lad", "Disable")
 	_check(vols.ladder_boxes().size() == 1, "a disabled ladder entity is off the list")
 	_check(_climb(vols.ladder_boxes()[0]), "a body walked up the ladder box stays inside it from foot to top")

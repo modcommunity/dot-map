@@ -27,6 +27,12 @@ var spawnflags: int = 0
 ## How far under the feet a column reaches, so a body resting on a floor is on a slab laid in it.
 const COLUMN_SLACK := 0.03
 
+## A thin trigger brush is thickened to this many metres (0 turns it off), so a runner covering more
+## than a sheet's width between two ticks cannot step over it. Hurt, water and ladder are never grown:
+## a kill sheet under a floor would reach a body standing on it.
+static var min_thickness: float = 0.25
+const THICKEN_KINDS := ["multiple", "once", "teleport", "push", "gravity"]
+
 var _brushes: Array = []
 
 
@@ -54,7 +60,33 @@ static func from_record(rec: Dictionary) -> DotMapVolume:
 		for p: Array in planes:
 			set.append(Plane(Vector3(p[0], p[1], p[2]), float(p[3])))
 		v._brushes.append(set)
+	if min_thickness > 0.0 and THICKEN_KINDS.has(v.kind):
+		v._thicken(min_thickness)
 	return v
+
+
+## Pushes every plane of a brush thinner than [param thickness] outwards until its thinnest side is that wide.
+func _thicken(thickness: float) -> void:
+	for planes: Array in _brushes:
+		var lo := Vector3(INF, INF, INF)
+		var hi := -lo
+		for i in planes.size():
+			for j in range(i + 1, planes.size()):
+				for k in range(j + 1, planes.size()):
+					var hit: Variant = (planes[i] as Plane).intersect_3(planes[j], planes[k])
+					if hit == null or not _inside(planes, hit):
+						continue
+					lo = lo.min(hit)
+					hi = hi.max(hit)
+		if not lo.is_finite():
+			continue
+		var thin := minf(hi.x - lo.x, minf(hi.y - lo.y, hi.z - lo.z))
+		if thin >= thickness:
+			continue
+		var pad := (thickness - thin) * 0.5
+		for i in planes.size():
+			var p: Plane = planes[i]
+			planes[i] = Plane(p.normal, p.d + pad)
 
 
 ## Whether [param point] (world metres) is inside any of the volume's brushes.
