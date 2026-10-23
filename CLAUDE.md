@@ -36,11 +36,12 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | `examples/bsp_entities_demo.tscn` | the brush-entity suite (37 checks, headless) on a real map's movers, volumes and links, `examples/bsp_mesh/zm_4way_tunnel.entities.json` ([brush-entities](docs/brush-entities.md)) |
 | `examples/bsp_mesh_demo.tscn` | the bsp mesh suite (60 checks, headless) on `examples/bsp_mesh/fixture`, which `tools/bsp/tests/mesh_fixture.py` writes |
 | `examples/bsp_world_shot.tscn`, `tools/screenshot.sh` | one frame of a converted map dressed with its free textures, environment and stand-in props (under Xvfb) |
-| `examples/io_world_demo.tscn` | toggle brushes, breakables, movers and state replication (headless, 172 checks in 15 sections) |
+| `examples/io_world_demo.tscn` | toggle brushes, breakables, movers and state replication (headless, 179 checks in 15 sections) |
 | `examples/io_demo.tscn` | the I/O suite (headless): delays, cycles, the logic classes, and Office's timed hazards from `examples/io/office_io.doc.json` |
 | `examples/volumes_demo.tscn` | `DotMapVolumes`: hurt, push, teleport, gravity, trigger, ladder and water boxes, effects, sounds, the command allow-list, and Office's lava timing (headless, 123 checks in 13 sections) |
 | `examples/world_demo.tscn` | `DotMapWorld` on the converted Office and Dan's course: one call, the hurt room per its own links, replication, manifest settings into the config (headless, 34 checks) |
 | `addons/dot_map/io/` (`dot_map_door_standin`, `dot_map_physbox`, `dot_map_soundscape`) | the drawn `prop_door_rotating`, `func_physbox` bodies and `env_soundscape` classes ([io](docs/io.md)) |
+| `examples/door_shot.tscn`, `tools/door_shot.sh` | frames of one `prop_door_rotating` of a converted map (`--entity=<index>`): closed, then half open from each side, from above and from the opener's eye, the hinge marked by a green post |
 | `examples/map_selftest.tscn` | the suite; includes a real signed pack fetched by a peer |
 | `tools/bsp/` | the family's one converter for community VBSP maps: reader, brush-to-box cutting, the intermediate JSON every game's adapter reads, `list` for a conversion queue, and the pieces every adapter repeated: `Flood` (reachable space), the entity and brush classifiers, prop matching, lights, `.gma` through fastgmad, the open-wall room plan, teleport destinations, the 0.0254 scale. Python, outside the addon so it never ships. [tools/bsp/README.md](tools/bsp/README.md) |
 

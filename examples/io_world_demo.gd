@@ -10,7 +10,7 @@ extends Node
 ## ([code]examples/bsp_mesh/zm_4way_tunnel.entities.json[/code]); nodes are built here the way
 ## [method DotMapBspMesh.build_node] shapes them (a Node3D per model with a [code]model[/code] meta).
 
-const CHECKS := 172
+const CHECKS := 179
 const SECTIONS := 15
 const TUNNEL := "res://examples/bsp_mesh/zm_4way_tunnel.entities.json"
 
@@ -595,6 +595,38 @@ func _test_door_standin() -> void:
 	var back := DotMapMoverNode.new()
 	back.set_mover(fixed)
 	_check(back._side == -1.0 and fixed.rest_fraction() == 0.0, "spawnpos 1 on a back-only door stands at the positive angle")
+	# A door hung off an authored hinge (panel_yaw): the node sits on the hinge, the panel runs from it along that yaw
+	# whatever the entity's angles, and it swings away from the opener about that hinge.
+	var hrec := {"model": null, "classname": "prop_door_rotating", "targetname": "hd", "origin": [10, 0, 20], "axis": [0, 1, 0],
+			"degrees": 90.0, "travel_time": 1.0, "open_dir": 0, "yaw": 0.0, "panel_yaw": 0.0, "panel_width": 1.2, "use": true}
+	var hm := _door_rec(0, "rotate", hrec)
+	var hdoor := DotMapDoorStandIn.build(hm, 270.0)
+	add_child(hdoor)
+	var hpanel := hdoor.get_node("Panel") as MeshInstance3D
+	_check(hdoor.position == Vector3(10, 0, 20) and is_equal_approx(hdoor.rotation.y, 0.0), "a door with a panel_yaw ignores the entity's angles (270) and sits on the hinge")
+	_check(is_equal_approx((hpanel.mesh as BoxMesh).size.z, 1.2) and is_equal_approx(hpanel.position.z, -0.6), "its panel is as wide as the hinge-to-origin line says and starts at the hinge")
+	var bare_rec := hrec.duplicate()
+	bare_rec.erase("panel_yaw")
+	var plain := DotMapDoorStandIn.build(_door_rec(0, "rotate", bare_rec), 270.0)
+	_check(is_equal_approx(plain.rotation.y, deg_to_rad(270.0)) and is_equal_approx((plain.get_node("Panel").mesh as BoxMesh).size.z, DotMapDoorStandIn.SIZE.x), "armed: without panel_yaw the same record takes the angles and the standard width")
+	plain.free()
+	var hio := _io([_rec(0, "prop_door_rotating", "hd", [["angles", "0 270 0"]])])
+	hio.bind_movers([hm])
+	var he := hio.entity_of(0) as DotMapMoverNode
+	he.set_hit_box(Transform3D(), Vector3.ONE)
+	he.bind_node(hdoor)
+	hio.start()
+	for opener: Array in [[Vector3(11, 0, 20), -1.0], [Vector3(9, 0, 20), 1.0]]:
+		he.accept(hio, "Close", "", null, null)
+		hio.advance(80)
+		he.accept(hio, "Open", "", opener[0], null)
+		hio.advance(int(hio.rate * hm.travel_time * 0.5))
+		var tip := hdoor.global_transform * Vector3(0, 0, -1.2)
+		_check(hdoor.position.is_equal_approx(Vector3(10, 0, 20)) and (tip.x - 10.0) * opener[1] > 0.5,
+				"half open for an opener on %s, the tip at %s: swung about the hinge, away from the opener" % [opener[0], tip])
+	_check(not is_equal_approx(DotMapMover.from_record({"kind": "rotate", "yaw": 180.0, "open_dir": 0}).side_away_from(Vector3(1, 0, 0)), DotMapMover.from_record({"kind": "rotate", "yaw": 0.0, "open_dir": 0}).side_away_from(Vector3(1, 0, 0))),
+			"armed: the yaw decides which side is the front, so a wrong yaw would swing the door the wrong way")
+	hdoor.free()
 	var nodoor := DotMapDoorStandIn.build(_door_rec(0, "rotate", {"solid": false}), 0.0)
 	_check(nodoor.get_node_or_null("col_solid") == null, "a passable door gets no body")
 	nodoor.free()

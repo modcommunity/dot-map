@@ -4,7 +4,7 @@ extends RefCounted
 ## The drawn panel of a prop_door_rotating, which is a placed model with no brush: a node at the
 ## hinge, yawed by the entity's [code]angles[/code], with a box panel that lies along the entity's
 ## local +Y (source axes) and a body of its own. [DotMapMoverNode] swings the node, so the panel
-## and its collision turn with it. A real model replaces the panel through [code]door_fn[/code].
+## and its collision turn with it. A door hung off an authored hinge ([code]panel_yaw[/code]) lies along the line from it. A real model replaces the panel through [code]door_fn[/code].
 
 ## Width, height, thickness in metres.
 const SIZE := Vector3(1.02, 2.13, 0.07)
@@ -13,6 +13,10 @@ const SIZE := Vector3(1.02, 2.13, 0.07)
 ## The node for [param mover] (a prop_door_rotating record) with [param yaw_degrees] from the
 ## entity's angles. [param size] overrides [constant SIZE]; [param layer] is the collision layer.
 static func build(mover: DotMapMover, yaw_degrees: float, size: Vector3 = SIZE, layer: int = 1) -> Node3D:
+	if not is_nan(mover.panel_yaw):
+		yaw_degrees = mover.panel_yaw
+		if mover.panel_width > 0.1:
+			size.x = mover.panel_width
 	var root := Node3D.new()
 	root.name = ("Door_%d" % mover.entity)
 	root.position = mover.origin

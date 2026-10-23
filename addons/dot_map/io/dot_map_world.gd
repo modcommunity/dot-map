@@ -235,13 +235,16 @@ func _build_doors(ents: DotMapEntities, hooks: Dictionary, layers: Dictionary) -
 			continue
 		var ang := e.key("angles").split_floats(" ", false)
 		var yaw := float(ang[1]) if ang.size() > 1 else 0.0
+		if not is_nan(m.panel_yaw):
+			yaw = m.panel_yaw
 		var door: Node3D = null
 		if hooks.get("door_fn") is Callable:
 			door = (hooks["door_fn"] as Callable).call(m, yaw)
 		if door == null:
 			door = DotMapDoorStandIn.build(m, yaw, DotMapDoorStandIn.SIZE, int(layers.get("solid", 1)))
 		visual.add_child(door)
-		var half := Vector3(DotMapDoorStandIn.SIZE.z, DotMapDoorStandIn.SIZE.y, DotMapDoorStandIn.SIZE.x) * 0.5
+		var width := m.panel_width if not is_nan(m.panel_yaw) and m.panel_width > 0.1 else DotMapDoorStandIn.SIZE.x
+		var half := Vector3(DotMapDoorStandIn.SIZE.z, DotMapDoorStandIn.SIZE.y, width) * 0.5
 		var yaw_basis := Basis(Vector3.UP, deg_to_rad(yaw))
 		(e as DotMapMoverNode).set_hit_box(Transform3D(yaw_basis, m.origin + yaw_basis * Vector3(0.0, half.y, -half.z)), half)
 		e.bind_node(door)
