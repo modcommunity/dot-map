@@ -39,6 +39,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | `examples/io_world_demo.tscn` | toggle brushes, breakables, movers and state replication (headless, 106 checks in 10 sections) |
 | `examples/io_demo.tscn` | the I/O suite (headless): delays, cycles, the logic classes, and Office's timed hazards from `examples/io/office_io.doc.json` |
 | `examples/volumes_demo.tscn` | `DotMapVolumes`: hurt, push, teleport, gravity, trigger, ladder and water boxes, effects, sounds, the command allow-list, and Office's lava timing (headless, 85 checks in 9 sections) |
+| `examples/world_demo.tscn` | `DotMapWorld` on the converted Office and Dan's course: one call, the hurt room per its own links, replication (headless) |
 | `examples/map_selftest.tscn` | the suite; includes a real signed pack fetched by a peer |
 | `tools/bsp/` | the family's one converter for community VBSP maps: reader, brush-to-box cutting, the intermediate JSON every game's adapter reads, `list` for a conversion queue, and the pieces every adapter repeated: `Flood` (reachable space), the entity and brush classifiers, prop matching, lights, `.gma` through fastgmad, the open-wall room plan, teleport destinations, the 0.0254 scale. Python, outside the addon so it never ships. [tools/bsp/README.md](tools/bsp/README.md) |
 

@@ -79,13 +79,36 @@ func _filter_passes(io: DotMapIO, info: Dictionary) -> bool:
 	var found := io.find(volume.filter)
 	if found.is_empty():
 		return true
-	var f: DotMapEntity = found[0]
+	return _entity_passes(io, found[0], info, 0)
+
+
+## One filter entity against a body: activator name and class, and filter_multi (filtertype 0 all, 1 any
+## of filter01..20, which may name other filters). Another class admits everyone and is counted.
+func _entity_passes(io: DotMapIO, f: DotMapEntity, info: Dictionary, depth: int) -> bool:
 	var match_: bool
 	match f.classname.to_lower():
 		"filter_activator_name":
 			match_ = str(info.get("name", "")).matchn(f.key("filtername"))
 		"filter_activator_class":
 			match_ = str(info.get("class", "")).matchn(f.key("filterclass"))
+		"filter_multi":
+			var any := f.key("filtertype") == "1"
+			match_ = not any
+			if depth < 4:
+				for i in range(1, 21):
+					var nm := f.key("filter%02d" % i)
+					if nm.is_empty():
+						continue
+					var sub := io.find(nm)
+					if sub.is_empty():
+						continue
+					var ok := _entity_passes(io, sub[0], info, depth + 1)
+					if any and ok:
+						match_ = true
+						break
+					if not any and not ok:
+						match_ = false
+						break
 		_:
 			var k := "filter|" + f.classname.to_lower()
 			io.unhandled[k] = int(io.unhandled.get(k, 0)) + 1

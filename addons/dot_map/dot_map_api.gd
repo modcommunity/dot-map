@@ -29,5 +29,6 @@ extends RefCounted
 # 12: world entities on the I/O runtime: DotMapToggleBrush, DotMapBreakable, DotMapMoverNode, DotMapStateSync (io_state/io_snapshot), bind_world.
 # 13: volumes on the I/O runtime: DotMapVolumes (trigger_hurt, push, teleport, gravity, trigger, ladder_boxes, water_boxes),
 #     DotMapHurt, DotMapPush, DotMapEffect, DotMapSound, DotMapCommand, DotMapIO.settle / destinations / area_damage.
-const LEVEL := 13
+# 14: DotMapWorld (one call builds a converted map's world), filter_multi, prop_door_rotating and func_physbox classes.
+const LEVEL := 14
 const OLDEST := 1
