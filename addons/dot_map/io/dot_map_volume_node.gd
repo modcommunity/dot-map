@@ -68,8 +68,8 @@ func _admits(io: DotMapIO, info: Dictionary) -> bool:
 	return _filter_passes(io, info)
 
 
-## A filter entity named by [code]filtername[/code]: filter_activator_name and
-## filter_activator_class are understood (and [code]negated[/code]); another class admits everyone and is counted.
+## A filter entity named by [code]filtername[/code]: filter_activator_name, filter_activator_class and
+## filter_activator_team (the body's "team", Source's 2 and 3) are understood (and [code]negated[/code]); another class admits everyone and is counted.
 func _filter_passes(io: DotMapIO, info: Dictionary) -> bool:
 	if volume.filter.is_empty():
 		return true
@@ -88,6 +88,12 @@ func _entity_passes(io: DotMapIO, f: DotMapEntity, info: Dictionary, depth: int)
 			match_ = str(info.get("name", "")).matchn(f.key("filtername"))
 		"filter_activator_class":
 			match_ = str(info.get("class", "")).matchn(f.key("filterclass"))
+		"filter_activator_team":
+			# A host that gives its bodies no "team" admits everyone, counted, as before.
+			if not info.has("team"):
+				io.unhandled["filter|filter_activator_team"] = int(io.unhandled.get("filter|filter_activator_team", 0)) + 1
+				return true
+			match_ = int(info["team"]) == int(f.key("filterteam"))
 		"filter_multi":
 			var any := f.key("filtertype") == "1"
 			match_ = not any

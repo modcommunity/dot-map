@@ -42,7 +42,7 @@ Work package 7. `DotMapVolumes.build(entities, io)` joins each manifest volume t
 | Class | Does |
 | --- | --- |
 | `trigger_hurt` (`DotMapHurt`) | `damage` a second times `hurtrate` (0.5) per hit, the first on entry, through `damage_fn(body, amount, kind, attacker)`; `damagetype` bit to kind; `damagemodel` 1 doubles to `damagecap`; OnHurt, OnHurtPlayer, SetDamage |
-| `trigger_multiple` / `trigger_once` (`DotMapTrigger`) | OnStartTouch on entry, OnTrigger then the `wait` (again after it while the body stays), OnEndTouch, OnStartTouchAll / OnEndTouchAll, spawnflags by body kind, `filter_activator_name` and `filter_activator_class` (other filter classes admit everyone and are counted in `unhandled`) |
+| `trigger_multiple` / `trigger_once` (`DotMapTrigger`) | OnStartTouch on entry, OnTrigger then the `wait` (again after it while the body stays), OnEndTouch, OnStartTouchAll / OnEndTouchAll, spawnflags by body kind, `filter_activator_name`, `filter_activator_class` and `filter_activator_team` (the body's `team`; a body without one is admitted and counted) (other filter classes admit everyone and are counted in `unhandled`) |
 | `trigger_push` (`DotMapPush`) | the push velocity (a `Vector3`, m/s) to `move_fn` each step; SetPushSpeed (source units), SetPushDirection |
 | `trigger_teleport` | a `Transform3D` to `move_fn` and a `teleport` event; the destination is `io.destinations[name]` (the manifest's `destinations`); `landmark` keeps the body's offset |
 | `trigger_gravity` | a `gravity` event with the scale on entry and 1 on leaving (not with `persist`) |
