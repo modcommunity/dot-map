@@ -13,13 +13,13 @@ extends Node
 ## running, rather than on nothing. It is the reason the load happens before the
 ## teardown, and it is the step that is easiest to "simplify" back out.
 
-const CHECKS := 326
+const CHECKS := 343
 
 ## Sections entered against sections that ran to their last line, and against this. A
 ## runtime error inside a section aborts that function and nothing says so; a section that
 ## bailed out early after a failed guard is counted as not finished on purpose. The CHECKS
 ## total is the other half — see docs/testing.md.
-const SECTIONS := 34
+const SECTIONS := 35
 
 var _passed := 0
 var _failed := 0
@@ -71,6 +71,7 @@ func _run() -> void:
 	_test_rotation_file_layout()
 	_test_zero_config_rotation()
 	_test_rotation_play()
+	_test_map_config()
 
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
@@ -2768,6 +2769,90 @@ func _test_rotation_play() -> void:
 	_check(f.settings_for(cat, &"other") == {"waves": "hard", "profile": "night"}, "settings_for on the file answers per id")
 	_file([{"defaults": {"maps": ["zz_plain"]}}]).apply(rot)
 	_check(cat.get_map(&"zz_camp_a").play.is_empty(), "applying another rotation clears the settings")
+	_done()
+
+
+const CFG_ROOT := "user://mapcfg_test"
+
+
+func _cfg_file(tier: String, name: String, body: String) -> void:
+	var dir := CFG_ROOT.path_join(tier).path_join("dot_map/map")
+	DirAccess.make_dir_recursive_absolute(dir)
+	var f := FileAccess.open(dir.path_join(name + ".yml"), FileAccess.WRITE)
+	f.store_string(body)
+	f.close()
+
+
+func _cfg_clear() -> void:
+	if not DirAccess.dir_exists_absolute(CFG_ROOT):
+		return
+	var stack := [CFG_ROOT]
+	var dirs: Array = []
+	while not stack.is_empty():
+		var d: String = stack.pop_back()
+		dirs.append(d)
+		for sub in DirAccess.get_directories_at(d):
+			stack.append(d.path_join(sub))
+		for f in DirAccess.get_files_at(d):
+			DirAccess.remove_absolute(d.path_join(f))
+	dirs.reverse()
+	for d: String in dirs:
+		DirAccess.remove_absolute(d)
+
+
+func _test_map_config() -> void:
+	_section("per-map settings: precedence, whitelist, restore")
+	_cfg_clear()
+	_cfg_file("addons", "surf_*", "arena_air: 100\narena_gravity: 800\n")
+	_cfg_file("addons", "surf_ab*", "arena_air: 120\n")
+	_cfg_file("addons", "surf_abc", "arena_air: 130\nnot_a_cvar: 1\n")
+	_cfg_file("addons", "SURF_?", "arena_gravity: 700\n")
+	_cfg_file("server/addons", "surf_*", "arena_air: 50\n")
+	_cfg_file("server/addons", "surf_exact", "arena_gravity: 400\n")
+	_cfg_file("addons", "bad_type", "arena_air: fast\nrm: \"quit\"\narena_gravity: -5\n")
+
+	var cfg := DotMapConfig.new()
+	cfg.config_dir = CFG_ROOT
+	cfg.allow("arena_air", {"type": "float"}).allow("arena_gravity", {"type": "float", "min": 0.0})
+	cfg.defaults = {"arena_air": 10, "arena_extra": 1}
+	cfg.allow("arena_extra")
+	var s: Dictionary = cfg.resolve("surf_zzz").value["settings"]
+	_check(s["arena_air"] == 50.0 and s["arena_gravity"] == 800.0, "a server wildcard beats the shipped one, the rest comes from the shipped wildcard (%s)" % [s])
+	s = cfg.resolve("surf_abc").value["settings"]
+	_check(s["arena_air"] == 50.0, "a server wildcard beats a shipped exact file (%s)" % [s])
+	_check(cfg.resolve("surf_exact").value["settings"]["arena_gravity"] == 400.0, "a server exact file wins")
+	DirAccess.remove_absolute(CFG_ROOT.path_join("server/addons/dot_map/map/surf_*.yml"))
+	DirAccess.remove_absolute(CFG_ROOT.path_join("server/addons/dot_map/map/surf_exact.yml"))
+	s = cfg.resolve("surf_zzz").value["settings"]
+	_check(s["arena_air"] == 100.0 and s["arena_gravity"] == 800.0, "the wildcard sets a surf map's keys (%s)" % [s])
+	_check(cfg.resolve("surf_abx").value["settings"]["arena_air"] == 120.0, "the more specific wildcard wins")
+	var abc: Dictionary = cfg.resolve("surf_abc").value
+	_check(abc["settings"]["arena_air"] == 130.0, "the exact file beats every wildcard")
+	_check(abc["settings"]["arena_gravity"] == 800.0, "a key the exact file lacks falls through to the wildcard")
+	_check(not (abc["settings"] as Dictionary).has("not_a_cvar") and abc["rejected"].size() == 1 and abc["rejected"][0]["key"] == "not_a_cvar", "an unknown key is reported and not applied (%s)" % [abc["rejected"]])
+	_check(cfg.resolve("SURF_1").value["settings"]["arena_gravity"] == 700.0, "`?` matches one character, case does not matter, equal literals break on the longer pattern")
+	var plain: Dictionary = cfg.resolve("dm_plain").value
+	_check(plain["settings"].size() == 2 and plain["settings"]["arena_air"] == 10.0 and plain["settings"]["arena_extra"] == 1, "a map no file matches gets the converter default only (%s)" % [plain["settings"]])
+	var bad: Dictionary = cfg.resolve("bad_type").value
+	_check(bad["settings"].get("arena_gravity") == 0.0, "a minimum clamps (%s)" % [bad["settings"]])
+	_check(bad["rejected"].size() == 2 and not bad["settings"].has("arena_air") and not bad["settings"].has("rm"), "a non-number and an unlisted command key are both refused (%s)" % [bad["rejected"]])
+	_check(cfg.resolve("surf_abc").value["sources"]["arena_air"].ends_with("surf_abc.yml"), "each key records its file")
+
+	var live := {"arena_air": 150.0, "arena_gravity": 800.0, "arena_extra": 0}
+	cfg.defaults = {}
+	cfg.get_fn = func(k: String) -> Variant: return live.get(k)
+	cfg.set_fn = func(k: String, v: Variant) -> bool:
+		live[k] = v
+		return true
+	_check(cfg.apply("surf_zzz").ok and live["arena_air"] == 100.0, "apply sets the surf map's key")
+	_check(cfg.apply("dm_plain").ok and live["arena_air"] == 150.0 and live["arena_gravity"] == 800.0, "the next, non-surf map has the defaults back")
+	cfg.apply("surf_zzz")
+	live["arena_air"] = 77.0
+	cfg.apply("dm_plain")
+	_check(live["arena_air"] == 77.0, "a value changed since is not stomped on restore")
+	var bare := DotMapConfig.new()
+	_check(not bare.apply("x").ok, "apply without hooks fails")
+	_cfg_clear()
 	_done()
 
 
