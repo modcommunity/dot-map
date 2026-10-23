@@ -6,3 +6,4 @@ Every glb is CC0 1.0 from Kenney (https://kenney.nl), copied unchanged; `Texture
 - [Survival Kit](https://kenney.nl/assets/survival-kit): crate, crate_large, barrel, chest, bucket, signpost, fence_post
 - [Nature Kit](https://kenney.nl/assets/nature-kit): tree, tree_pine, fence, rock, log, stump, bush
 - [Car Kit](https://kenney.nl/assets/car-kit) (ids `vehicles/<name>`, with their own `Textures/colormap.png`): truck, sedan, van (the kit's delivery), garbage-truck
+- [Factory Kit](https://kenney.nl/assets/factory-kit) (`factory/`: door, pipe, window), [Graveyard Kit](https://kenney.nl/assets/graveyard-kit) (`graveyard/`: gravestone, cross, lamppost), [Pirate Kit](https://kenney.nl/assets/pirate-kit) (`pirate/`: boat, palm, bottle), [Prototype Kit](https://kenney.nl/assets/prototype-kit) (`prototype/`: ladder) and the Car Kit's `vehicles/cone`: each folder carries that kit's own `Textures/colormap.png`.
