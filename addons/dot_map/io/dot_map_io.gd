@@ -16,6 +16,9 @@ const CODE_SOURCE_FORMAT := "dot-bsp-source"
 ## An entity changed: [code]key[/code] is "enabled", "color" or a logic class's own value.
 signal state_changed(entity: DotMapEntity, key: String, value: Variant, tick: int)
 
+## A call that ran logic has finished and the state it changed is settled; [DotMapStateSync] sends here.
+signal settled(tick: int)
+
 ## Ticks of the authoritative simulation per second; a link's delay is rounded to whole ticks.
 var rate := 60
 ## The tick now: [method advance] moves it.
@@ -28,6 +31,9 @@ var max_chain := 64
 var max_events_per_tick := 8192
 ## Cvar names (or [code]prefix*[/code] patterns) a map command may set; the rest is denied.
 var command_allow := PackedStringArray()
+## False on a client: it takes state from the host ([DotMapStateSync]), advances only its clock and
+## its views, and runs no logic (no queue, no inputs, no damage).
+var authoritative := true
 ## Keep [member history] of every state change (tests and replays).
 var record_history := false
 
@@ -41,8 +47,19 @@ var effect_fn := Callable()
 var event_fn := Callable()
 ## [code]actor(body, input, param, caller)[/code] for inputs aimed at [code]!activator[/code]/[code]!player[/code].
 var actor_fn := Callable()
+## [code]propdata(model_path) -> {health, material}[/code]: the game's model table, for breakable props.
+var propdata_fn := Callable()
 ## [code]player() -> Variant[/code] for [code]!player[/code]; the activator when unset.
 var player_fn := Callable()
+
+## Metres per source unit, and where the map's origin sits in the game's world.
+var unit_scale := 0.0254
+var world_offset := Vector3.ZERO
+## Where a teleport may send a body: [code]{name: {at: [x, y, z], yaw}}[/code] from the manifest.
+var destinations: Dictionary = {}
+## Area damage queued by explosions and fires: [code]{origin, radius, amount, kind, source}[/code];
+## [DotMapVolumes] applies it to the bodies it knows and clears it.
+var area_damage: Array = []
 
 var entities: Array = []
 var history: Array = []
@@ -58,6 +75,7 @@ var delivered := 0
 var loop_trips := 0
 var unresolved: Dictionary = {}
 
+var _animated: Array = []
 var _queue: Array = []
 var _seq := 0
 var _running := false
@@ -77,9 +95,21 @@ func _init() -> void:
 		"logic_case": DotMapCase, "logic_compare": DotMapCompare, "logic_branch": DotMapBranch,
 		"logic_auto": DotMapAuto, "trigger_multiple": DotMapTrigger, "trigger_once": DotMapTrigger,
 		"point_servercommand": DotMapServerCommand, "point_clientcommand": DotMapServerCommand,
+		"func_brush": DotMapToggleBrush, "func_wall_toggle": DotMapToggleBrush, "func_illusionary": DotMapToggleBrush,
+		"func_breakable": DotMapBreakable, "func_breakable_surf": DotMapBreakable,
+		"prop_physics": DotMapBreakable, "prop_physics_multiplayer": DotMapBreakable,
+		"prop_physics_override": DotMapBreakable,
 		"math_colorblend": DotMapColorBlend, "logic_measure_movement": DotMapMeasureMovement,
 		"env_global": DotMapGlobal, "point_template": DotMapTemplate,
+		"trigger_hurt": DotMapHurt, "trigger_push": DotMapPush, "ambient_generic": DotMapSound,
 	}
+	for cls in ["func_door", "func_door_rotating", "func_movelinear", "func_rotating", "func_tracktrain",
+			"func_train", "func_plat", "func_button", "func_rot_button"]:
+		_classes[cls] = DotMapMoverNode
+	for c in ["env_sprite", "env_spritetrail", "env_lightglow", "point_spotlight", "env_laser", "env_beam",
+			"env_spark", "env_steam", "env_fire", "env_smokestack", "env_explosion", "env_shake", "env_fade",
+			"info_particle_system", "env_screenoverlay"]:
+		_classes[c] = DotMapEffect
 
 
 ## Builds from a source document ([code]dot-bsp-source[/code], the lossless store's
@@ -101,6 +131,7 @@ func load_records(records: Array) -> DotResult:
 	entities = []
 	_by_name = {}
 	_by_index = {}
+	_animated = []
 	_queue = []
 	globals = {}
 	for r: Variant in records:
@@ -163,6 +194,26 @@ func register_handler(classname: String, handler: Callable) -> DotResult:
 	return DotResult.success()
 
 
+## The entity with the map's [param index], or null.
+func entity_of(index: int) -> DotMapEntity:
+	return _by_index.get(index)
+
+
+## Gives each [code]ambient_generic[/code] its free stand-in from the manifest's
+## [code]sounds.ambient[/code] records ([code]entity, stand_in, volume, pitch, radius, looped[/code]).
+## Returns how many sounds have one; the rest stay silent.
+func attach_sounds(records: Array) -> int:
+	var n := 0
+	for rec: Dictionary in records:
+		var e: Variant = _by_index.get(int(rec.get("entity", -1)))
+		if e is DotMapSound and not str(rec.get("stand_in", "")).is_empty():
+			var snd := e as DotMapSound
+			snd.stand_in = str(rec["stand_in"])
+			snd.looped = bool(rec.get("looped", snd.looped))
+			n += 1
+	return n
+
+
 ## The class catalogue ([code]classes: {name: {inputs: {lower: name}}}[/code]) lets
 ## [method coverage] tell an input the engine has from a typo.
 func set_catalogue(classes: Dictionary) -> void:
@@ -203,6 +254,8 @@ func start() -> void:
 	for e: DotMapEntity in entities.duplicate():
 		e.on_map_spawn(self)
 	_flush()
+	_views()
+	settled.emit(now)
 
 
 ## Moves time forward by [param ticks] and runs every event that falls due, in (tick, order).
@@ -210,7 +263,11 @@ func advance(ticks: int = 1) -> void:
 	for i in ticks:
 		now += 1
 		_tick_events = 0
-		_flush()
+		if authoritative:
+			_flush()
+		_views()
+	if authoritative:
+		settled.emit(now)
 
 
 func seconds() -> float:
@@ -225,8 +282,10 @@ func ticks_for(delay: float) -> int:
 func send(target: String, input: String, param: String = "", delay: float = 0.0, activator: Variant = null) -> DotResult:
 	if resolve(target, null, activator).is_empty() and not target.begins_with("!"):
 		return DotResult.fail(DotError.CODE_INVALID, "no entity named %s" % target)
+	if not authoritative:
+		return DotResult.fail(DotError.CODE_INVALID, "a client runs no logic")
 	_enqueue(target, input, param, now + ticks_for(delay), activator, null, null, 0)
-	_flush()
+	_settle()
 	return DotResult.success()
 
 
@@ -234,18 +293,101 @@ func send(target: String, input: String, param: String = "", delay: float = 0.0,
 func raise(index: int, output: String, activator: Variant = null) -> DotResult:
 	if not _by_index.has(index):
 		return DotResult.fail(DotError.CODE_INVALID, "no entity %d" % index)
+	if not authoritative:
+		return DotResult.fail(DotError.CODE_INVALID, "a client runs no logic")
 	(_by_index[index] as DotMapEntity).fire(self, output, activator)
-	_flush()
+	_settle()
 	return DotResult.success()
 
 
 ## A body touched the trigger with the map's entity [param index]; the trigger class decides what that fires.
 func touch(index: int, activator: Variant = null) -> DotResult:
-	if not _by_index.get(index) is DotMapTrigger:
-		return DotResult.fail(DotError.CODE_INVALID, "entity %d is not a trigger" % index)
-	(_by_index[index] as DotMapTrigger).touch(self, activator)
-	_flush()
+	if not authoritative:
+		return DotResult.fail(DotError.CODE_INVALID, "a client runs no logic")
+	var e: Variant = _by_index.get(index)
+	if e is DotMapTrigger:
+		(e as DotMapTrigger).touch(self, activator)
+	elif not e is DotMapEntity or not (e as DotMapEntity).touched(self, activator, false):
+		return DotResult.fail(DotError.CODE_INVALID, "entity %d is not a trigger or a mover that is touched" % index)
+	_settle()
 	return DotResult.success()
+
+
+## A body used (pressed E on) the entity with the map's [param index]: a button presses, a door
+## toggles, unless it is locked (then it fires its locked output).
+func use(index: int, activator: Variant = null) -> DotResult:
+	if not authoritative:
+		return DotResult.fail(DotError.CODE_INVALID, "a client runs no logic")
+	var e: Variant = _by_index.get(index)
+	if not e is DotMapEntity or not (e as DotMapEntity).touched(self, activator, true):
+		return DotResult.fail(DotError.CODE_INVALID, "entity %d cannot be used" % index)
+	_settle()
+	return DotResult.success()
+
+
+## Damage from the game to the breakable with the map's [param index] (the authority only).
+## Returns true when it broke.
+func hurt(index: int, amount: float, at: Vector3 = Vector3.ZERO, by: Variant = null) -> bool:
+	var e: Variant = _by_index.get(index)
+	if not authoritative or not e is DotMapBreakable:
+		return false
+	var broke: bool = (e as DotMapBreakable).hurt(self, amount, at, by)
+	_settle()
+	return broke
+
+
+## Gives the movers their records (a [DotMapEntities].movers list); returns how many entities took one.
+func bind_movers(movers: Array) -> int:
+	var n := 0
+	for m: Variant in movers:
+		var e: Variant = _by_index.get((m as DotMapMover).entity)
+		if e is DotMapMoverNode:
+			(e as DotMapMoverNode).set_mover(m)
+			if not _animated.has(e):
+				_animated.append(e)
+			n += 1
+		else:
+			_missing("bind_mover." + (m as DotMapMover).classname)
+	return n
+
+
+## Gives breakable entities the manifest's [code]breakables[/code] records (health, material).
+func bind_breakables(records: Array) -> int:
+	var n := 0
+	for r: Variant in records:
+		var e: Variant = _by_index.get(int((r as Dictionary).get("entity", -1)))
+		if e is DotMapBreakable:
+			(e as DotMapBreakable).set_record(r)
+			n += 1
+	return n
+
+
+## Binds every brush entity to the drawn model under [param root] that carries its model number
+## (the [code]model[/code] key "*N"; the node's [code]model[/code] meta), and a [DotMapGlass] of that
+## model to its breakable. [param root] is what [method DotMapBspMesh.build_node] returned, or a
+## tree a game built the same way. Returns the entities that got a node.
+func bind_world(root: Node) -> int:
+	var by_model := {}
+	var glass_by_model := {}
+	for c in root.find_children("*", "Node3D", true, false):
+		if c is DotMapGlass:
+			glass_by_model[(c as DotMapGlass).model] = c
+		elif c.has_meta(&"model"):
+			by_model[int(c.get_meta(&"model"))] = c
+	var n := 0
+	for e: DotMapEntity in entities:
+		var mk := e.key("model")
+		if not mk.begins_with("*"):
+			continue
+		var model := int(mk.substr(1))
+		if e is DotMapBreakable and glass_by_model.has(model):
+			(e as DotMapBreakable).glass = glass_by_model[model]
+		if by_model.has(model):
+			e.bind_node(by_model[model])
+			if e.animated:
+				e.tick_view(self)
+			n += 1
+	return n
 
 
 ## Entities that [param target] names: a targetname, a class name, or a [code]*[/code] pattern; the
@@ -362,6 +504,9 @@ func rename(e: DotMapEntity, new_name: String) -> void:
 
 ## Records a state change for listeners (and [member history] when asked).
 func report_state(e: DotMapEntity, key: String, value: Variant) -> void:
+	e._view_changed(key, value)
+	if e.animated:
+		e.tick_view(self)
 	state_changed.emit(e, key, value, now)
 	if record_history:
 		history.append({"tick": now, "entity": e.index, "name": e.targetname, "key": key, "value": value})
@@ -376,21 +521,16 @@ func stream_for(e: DotMapEntity) -> DotRandomStream:
 
 ## Records one map command and sends allowed ones to the game; nothing is ever executed here.
 func record_command(e: DotMapEntity, text: String) -> Dictionary:
-	var clean := text.strip_edges()
-	var parts := clean.split(" ", false, 1)
-	var name := parts[0].to_lower() if parts.size() > 0 else ""
-	var rec := {"tick": now, "entity": e.index, "text": clean, "name": name, "kind": "denied", "allowed": false}
-	if name == "say" or name == "say_team":
-		rec["kind"] = "say"
-		rec["allowed"] = true
-	elif not name.is_empty() and _cvar_allowed(name):
-		rec["kind"] = "cvar"
-		rec["allowed"] = true
-	commands.append(rec)
-	if rec["allowed"]:
-		event(str(rec["kind"]), rec)
-	else:
-		DotLog.info(CHANNEL, "map command denied", {"command": clean})
+	var rec := {}
+	for part in DotMapCommand.split(text):
+		var v := DotMapCommand.judge(part, command_allow)
+		rec = {"tick": now, "entity": e.index, "text": part, "name": v["name"], "kind": v["kind"] if v["allowed"] else "denied",
+				"allowed": v["allowed"], "reason": v["reason"]}
+		commands.append(rec)
+		if rec["allowed"]:
+			event(str(rec["kind"]), rec)
+		else:
+			DotLog.info(CHANNEL, "map command denied", {"command": part, "reason": v["reason"]})
 	return rec
 
 
@@ -460,13 +600,6 @@ func _denied() -> int:
 	return n
 
 
-func _cvar_allowed(name: String) -> bool:
-	for pat in command_allow:
-		if name.matchn(pat):
-			return true
-	return false
-
-
 func _missing(what: String) -> void:
 	missing_callables[what] = int(missing_callables.get(what, 0)) + 1
 
@@ -509,6 +642,22 @@ func _flush() -> void:
 		_current_depth = ev["depth"]
 		_deliver(ev)
 	_running = false
+
+
+## Delivers what is due now: a game calls it after it fed bodies in, so a zero-delay reaction lands this tick.
+func settle() -> void:
+	_settle()
+
+
+func _settle() -> void:
+	_flush()
+	_views()
+	settled.emit(now)
+
+
+func _views() -> void:
+	for e: DotMapEntity in _animated:
+		e.tick_view(self)
 
 
 func _deliver(ev: Dictionary) -> void:

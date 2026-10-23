@@ -17,6 +17,10 @@ var alive := true
 var color := ""
 ## The record this was built from, so a template can make a copy.
 var record: Dictionary = {}
+## The drawn model this entity drives, bound by [method DotMapIO.bind_world]; the logic runs without one.
+var node: Node3D = null
+## Asked every tick for a view to update ([method tick_view]); set by classes that move.
+var animated := false
 
 
 ## Fills from one entity record of the source document ([code]pairs[/code] and [code]outputs[/code]).
@@ -125,6 +129,95 @@ func add_output(io: DotMapIO, param: String) -> void:
 		_key_changed(io, k.to_lower(), v)
 
 
+## Puts [param n] under this entity's control and shows the state it already has.
+func bind_node(n: Node3D) -> void:
+	node = n
+	_bound()
+	var st := state()
+	for k: Variant in st:
+		_view_changed(str(k), st[k])
+
+
+## Runs the entity's own on-tick view update (a mover's pose); [param io] says what tick it is.
+func tick_view(_io: DotMapIO) -> void:
+	pass
+
+
+## A game or client touched/used it: a class that answers returns true. Doors and buttons do.
+func touched(_io: DotMapIO, _activator: Variant, _use: bool) -> bool:
+	return false
+
+
+## Takes a state change from the authority ([method state] keys) without running any logic, and
+## shows it. Returns false for a key this class does not know.
+func apply_state(io: DotMapIO, key: String, value: Variant, tick: int) -> bool:
+	match key:
+		"enabled":
+			enabled = bool(value)
+			_enabled_changed(io, enabled)
+		"alive":
+			alive = bool(value)
+		"color":
+			color = str(value)
+		_:
+			if not _apply(io, key, value, tick):
+				return false
+	io.report_state(self, key, value)
+	return true
+
+
+## Shows [param on] on [member node] and every body under it: drawn and solid, or neither. A body's
+## own layers are kept in metadata so it comes back as it was.
+static func set_active(n: Node, on: bool, solid: bool = true) -> void:
+	if n == null:
+		return
+	if n is Node3D:
+		(n as Node3D).visible = on
+	set_solid(n, on and solid)
+
+
+static func set_solid(n: Node, on: bool) -> void:
+	if n is CollisionObject3D:
+		var co := n as CollisionObject3D
+		if not co.has_meta(&"dm_layers"):
+			co.set_meta(&"dm_layers", [co.collision_layer, co.collision_mask])
+		var l: Array = co.get_meta(&"dm_layers")
+		co.collision_layer = int(l[0]) if on else 0
+		co.collision_mask = int(l[1]) if on else 0
+	for c in n.get_children():
+		set_solid(c, on)
+
+
+## A body entered this entity's volume ([param info]: id, body, position, kind, name, class).
+## The default fires [code]OnStartTouch[/code]; a class with a volume of its own overrides it.
+func body_enter(io: DotMapIO, info: Dictionary) -> void:
+	fire(io, "OnStartTouch", info.get("body"))
+
+
+## A body left the volume.
+func body_leave(io: DotMapIO, info: Dictionary) -> void:
+	fire(io, "OnEndTouch", info.get("body"))
+
+
+## Once a step for each body still inside (after [method body_enter]).
+func body_inside(_io: DotMapIO, _info: Dictionary) -> void:
+	pass
+
+
+## The entity's [code]origin[/code] key in the game's metres and axes ([member DotMapIO.unit_scale],
+## [member DotMapIO.world_offset]).
+func origin(io: DotMapIO) -> Vector3:
+	var f := key("origin", "0 0 0").split_floats(" ", false)
+	if f.size() < 3:
+		return io.world_offset
+	return Vector3(f[0], f[2], -f[1]) * io.unit_scale + io.world_offset
+
+
+## A Source direction vector (x, y, z) in Godot axes.
+static func to_godot_dir(v: Vector3) -> Vector3:
+	return Vector3(v.x, v.z, -v.y)
+
+
 ## Called once the keys are read.
 func _configure() -> void:
 	pass
@@ -142,6 +235,22 @@ func on_map_spawn(_io: DotMapIO) -> void:
 
 func _enabled_changed(_io: DotMapIO, _on: bool) -> void:
 	pass
+
+
+## A bound node arrived; remember what you need from it.
+func _bound() -> void:
+	pass
+
+
+## A state key changed (here or from the authority): show it on [member node].
+func _view_changed(key: String, value: Variant) -> void:
+	if node != null and key == "alive" and not bool(value):
+		set_active(node, false)
+
+
+## A class's own keys from the authority; true when it took the key.
+func _apply(_io: DotMapIO, _key: String, _value: Variant, _tick: int) -> bool:
+	return false
 
 
 func _key_changed(_io: DotMapIO, _name: String, _value: String) -> void:

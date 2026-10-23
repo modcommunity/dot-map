@@ -35,6 +35,45 @@
 
 `examples/io_demo.tscn` (headless) runs delays, fire-once counts, cycles, the logic classes, the extension points and Office's real chains from `examples/io/office_io.doc.json`, the part of `mg_office_coursee`'s source document reachable from its map-start logic and its timed trigger. The expected times are read from the map's own links first. Findings: the map has 11 hurt volumes that start disabled (nine in `Obstacle6`, one in `Obstacle2`, `Spawn_HURT`). `Obstacle2`'s trigger, on entry, undoes everything at once, turns the hurt volume, the four steam entities and the red colour on at 3 s and re-arms itself at 6 s; nothing turns the hurt volume off at 6 s, it stays on until the next entry. `Obstacle6` enables one random hurt volume per lane at map start (three `logic_case` picks), and `Spawn_HURT` comes on 20 s after map start.
 
+## Volumes: hurt, push, teleport, gravity, trigger, ladder, water
+
+Work package 7. `DotMapVolumes.build(entities, io)` joins each manifest volume to its `DotMapEntity` by index (the geometry is the volume's, the behaviour and outputs the entity's) and `step(bodies)` runs once a tick after `io.advance(1)`. A body is `{id, body, position (feet), height, kind: player|npc|pushable|physics, name, class}`; the volume tests the feet, the middle and the head. A disabled or killed entity makes its volume empty, so enabling it again with somebody still inside is a new entry, as the original does, and that is what makes a timed hazard catch a player who waits.
+
+| Class | Does |
+| --- | --- |
+| `trigger_hurt` (`DotMapHurt`) | `damage` a second times `hurtrate` (0.5) per hit, the first on entry, through `damage_fn(body, amount, kind, attacker)`; `damagetype` bit to kind; `damagemodel` 1 doubles to `damagecap`; OnHurt, OnHurtPlayer, SetDamage |
+| `trigger_multiple` / `trigger_once` (`DotMapTrigger`) | OnStartTouch on entry, OnTrigger then the `wait` (again after it while the body stays), OnEndTouch, OnStartTouchAll / OnEndTouchAll, spawnflags by body kind, `filter_activator_name` and `filter_activator_class` (other filter classes admit everyone and are counted in `unhandled`) |
+| `trigger_push` (`DotMapPush`) | the push velocity (a `Vector3`, m/s) to `move_fn` each step; SetPushSpeed (source units), SetPushDirection |
+| `trigger_teleport` | a `Transform3D` to `move_fn` and a `teleport` event; the destination is `io.destinations[name]` (the manifest's `destinations`); `landmark` keeps the body's offset |
+| `trigger_gravity` | a `gravity` event with the scale on entry and 1 on leaving (not with `persist`) |
+| `func_ladder`, water brushes | `ladder_boxes()` and `water_boxes()`: one box per brush, for dot-player-controller's `DotFpsLadderMode.volumes` and `DotFpsSwimMode.volumes`; nothing here names that addon |
+| `env_*` (`DotMapEffect`) | state to `effect_fn(kind, entity, on)` at map start and on each input; one-shots (explosion, shake, fade, spark) to `event_fn`; an explosion and a burning `env_fire` hurt bodies in range through `damage_fn` |
+| `ambient_generic` (`DotMapSound`) | PlaySound, StopSound, ToggleSound, Volume, Pitch, fades to `effect_fn("sound", entity, on)`; `io.attach_sounds(manifest.sounds.ambient)` gives each its free stand-in, and one with none stays silent |
+
+Map commands go through `DotMapCommand.judge`: a line is split on `;`, a chat line (200 characters) or a cvar on `command_allow` with a plain value is allowed, a list of verbs (`quit`, `exec`, `rcon*`, passwords, `bind`, `map`...) is never allowed even if listed, and every verdict is recorded.
+
+`examples/volumes_demo.tscn` (headless, 85 checks in 9 sections) runs all of it, and shows Office's lava room from its own links: the trigger starts a 3 s timer, the hurt volume comes on at tick 181 and hits at once, then every 0.5 s while the player stays; leaving stops the hits; the trigger re-arms at 6 s and a second entry turns the hurt volume off before it can hit. The volume geometry there is a stand-in box, since the repository keeps Office's logic and not its brushes.
+
+Not done: `env_soundscape`, `func_water_analog` swimming physics (the controller's), damage once and damage force on hurt, `filter_multi`.
+
+## Toggle brushes, breakables, movers and replication
+
+Work package 6. `bind_world(world_root, manifest)` joins each entity to the drawn node whose `model` meta matches its `model "*N"` key, then `bind_movers` and `bind_breakables` hand the manifest's records to the entities. Motion is stored as (from, to, start tick, travel ticks) and the pose is computed for any tick, so a client that knows the tick draws the same frame; arrivals are self-scheduled events with a generation counter that drops stale ones.
+
+| Class | Does |
+| --- | --- |
+| `func_brush`, `func_wall_toggle`, `func_illusionary` (`DotMapToggleBrush`) | Enable/Disable/Toggle, Alpha, SetSolid; shows, hides and switches collision on the bound node |
+| `func_breakable`, `func_breakable_surf`, `prop_physics*` (`DotMapBreakable`) | health, `min_damage`, the break-on-trigger flag, Break/Shatter/SetHealth/AddHealth/RemoveHealth, OnTakeDamage/OnHealthChanged/OnBreak; a `break` effect and `broken` state; a `DotMapGlass` child is told to shatter (`apply_broken`) instead of duplicating glass code; `io.propdata_fn` supplies health for props |
+| `func_door`, `func_door_rotating`, `func_movelinear`, `func_button`, `func_rot_button`, `func_plat` (`DotMapMoverNode`) | Open/Close/Toggle/Lock/Unlock/SetPosition/SetSpeed, autoclose by `wait`, OnOpen/OnClose/OnFullyOpen/OnFullyClosed |
+| `func_rotating` | Start/Stop/Toggle/Reverse/SetSpeed |
+| `func_tracktrain`, `func_train` and `path_track` | StartForward/StartBackward/Stop/Toggle/SetSpeed/TeleportToPathTrack along the record's `path`; corner speeds and OnPass; a looping ring |
+
+Replication: the server is authoritative (`io.authoritative`), a client runs no logic and refuses `send`, `raise` and `touch`. `DotMapStateSync` batches every `state_changed` on the `settled` signal into one `io_state` message (`tick`, `[index, key, value]` changes), sends it through each peer's `send_fn`, and `add_peer` sends an `io_snapshot` of every entity first (join in progress). `apply()` on the client sets its clock, applies the changes and counts unknown entities in `refused` and unknown keys in `ignored`.
+
+`examples/io_world_demo.tscn` (headless, 106 checks in 10 sections) covers all of it, including a two-peer exchange and a determinism run.
+
+Not done: blocked-damage and bodies pushed by movers, tank-style train rotation, spin-up ramps, `func_physbox`, `prop_door_rotating`, and the wiring of `DotMapStateSync` to a transport (it takes a `send_fn`).
+
 ## Correction: the Office lava room
 
 An earlier description of Office's lava talked about a `logic_timer` and a `logic_relay` turning the hazard on and off. There is neither. The only 5 s in the map's logic is the chat line a `logic_auto` says at map start (`point_servercommand`, delay 5). The hazard is the chain `Obstacle2_trigger` (a `trigger_multiple`) to `Obstacle2_Hurt`, `Obstacle2_Steam` and `Obstacle2_Brush`, with `Spawn_HURT` (20 s after map start) and the nine `Obstacle6_Hurt_*` volumes that `Obstacle6_CaseA/B/C` enable at map start, one random pick per lane. On entry the trigger undoes everything at once (hurt `Disable`, brush green, steam off, itself `Disable`), then 3 s later enables the hurt volume, turns the steam on and the brush red, and 6 s later re-enables itself. Nothing turns the hurt volume off at 6 s; it stays on until the next entry undoes it. So a lava that appears to last 5 s is not in these outputs: whatever a game shows must come from the outputs as written (the hurt volume is live from 3 s after entry until the next entry), or from the game's own hurt rules (damage per second, a respawn), never from a timer the map does not have. `examples/io_demo.tscn` asserts this timeline tick by tick against `office_io.doc.json` (the stored Office entry's entities), reading the 3 s and 6 s from the links themselves: hurt on at entry + 180 ticks at 60 Hz, trigger re-armed at + 360, hurt still on afterwards, off again at the next entry.
