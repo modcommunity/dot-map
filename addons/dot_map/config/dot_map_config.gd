@@ -90,9 +90,7 @@ func resolve(map_name: String) -> DotResult:
 			merged[_norm(k)] = (parsed.value as Dictionary)[k]
 			sources[_norm(k)] = entry["path"]
 
-	var overrides := PackedStringArray()
-	DotAddonConfig._apply_layer("%s.%s" % [ADDON, SUBDIR], merged, PackedStringArray(), overrides, PackedStringArray())
-	for line in overrides:
+	for line in DotAddonConfig.apply_overrides("%s.%s" % [ADDON, SUBDIR], merged):
 		sources[line.get_slice(" <- ", 0)] = line.get_slice(" <- ", 1)
 
 	var settings := {}
@@ -210,12 +208,10 @@ func _check(key: String, value: Variant) -> DotResult:
 ## Files whose name matches, weakest first (the order they are merged in).
 func _matching_files(name: String) -> Array:
 	var found: Array = []
-	var saved := DotAddonConfig.game
-	DotAddonConfig.game = game
 	for group in 2:
 		var tiers: PackedStringArray = TIERS_SERVER if group == 1 else TIERS_SHIPPED
 		for t in tiers.size():
-			var dirs: PackedStringArray = DotAddonConfig._tier_dirs(ADDON, tiers[t], config_dir)
+			var dirs: PackedStringArray = DotAddonConfig.tier_dirs(ADDON, tiers[t], config_dir, game)
 			for r in dirs.size():
 				var dir := dirs[r].path_join(SUBDIR)
 				if not DirAccess.dir_exists_absolute(dir):
@@ -228,7 +224,6 @@ func _matching_files(name: String) -> Array:
 					if (wild and name.matchn(pattern)) or (not wild and name == pattern):
 						found.append({"path": dir.path_join(f), "pattern": pattern, "group": group,
 							"exact": 0 if wild else 1, "literal": _literal(pattern), "tier": t, "root": r})
-	DotAddonConfig.game = saved
 	found.sort_custom(_weaker)
 	return found
 
