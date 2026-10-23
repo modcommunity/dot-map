@@ -153,6 +153,7 @@ func _test_hurt_cycle() -> void:
 	vols.step(two)
 	var who: Array = hits.map(func(h: Array) -> String: return str(h[1]))
 	_check(who == ["b1"], "spawnflag 1 hurts clients only, an npc standing in it is spared: %s" % [who])
+	io.damage_fn = Callable()  # the lambda captures io: a cycle, reported as a leak at exit
 	_done()
 
 
@@ -463,6 +464,7 @@ func _test_office_timing(doc: Dictionary) -> void:
 	_run_ticks(io, vols, 90, provider)
 	var ticks: Array = hits.map(func(h: Array) -> int: return h[0])
 	_check(ticks == [t0 + 180, t0 + 210, t0 + 240, t0 + 270], "and again every 0.5 s while he stays: %s" % [ticks])
+	io.damage_fn = Callable()  # the lambda captures io: a cycle, reported as a leak at exit
 	_done()
 
 
@@ -498,4 +500,5 @@ func _test_office_second_entry(doc: Dictionary) -> void:
 	_check(not hurt.enabled and hits.is_empty(), "entering again undoes the hurt volume before it can hit")
 	var snap := io.snapshot()
 	_check((snap["entities"][128] as Dictionary)["enabled"] == false, "a joiner's snapshot says it is off")
+	io.damage_fn = Callable()  # the lambda captures io: a cycle, reported as a leak at exit
 	_done()
