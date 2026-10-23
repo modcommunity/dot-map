@@ -14,8 +14,8 @@ const KINDS := {1: "crush", 2: "bullet", 4: "slash", 8: "burn", 16: "vehicle", 3
 		128: "club", 256: "shock", 512: "sonic", 1024: "energybeam", 16384: "drown", 32768: "paralyze",
 		65536: "nervegas", 131072: "poison", 262144: "radiation", 1048576: "acid", 2097152: "slowburn"}
 
-## The spawnflag bit that means "hurt a given body only once"; 0 until a map confirms which bit
-## it is, so the key [code]damageonce[/code] 1 (set by a map's author or a test) is what turns it on.
+## A spawnflag bit that means "hurt once"; stays 0: no stored map has such a bit (docs/io.md), and
+## bit 8 is the base trigger's "physics objects". [code]damageonce[/code] 1 is what turns it on.
 static var once_flag := 0
 
 ## Damage per second.

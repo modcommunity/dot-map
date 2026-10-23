@@ -10,8 +10,8 @@ extends Node
 ## ([code]examples/bsp_mesh/zm_4way_tunnel.entities.json[/code]); nodes are built here the way
 ## [method DotMapBspMesh.build_node] shapes them (a Node3D per model with a [code]model[/code] meta).
 
-const CHECKS := 124
-const SECTIONS := 12
+const CHECKS := 149
+const SECTIONS := 15
 const TUNNEL := "res://examples/bsp_mesh/zm_4way_tunnel.entities.json"
 
 var _passed := 0
@@ -40,6 +40,9 @@ func _run() -> void:
 	_test_determinism()
 	_test_door_standin()
 	_test_physbox()
+	_test_spin_up()
+	_test_physbox_pose()
+	_test_state_transport()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -573,4 +576,128 @@ func _test_physbox() -> void:
 	_check(io.snapshot()["entities"][0].has("motion"), "its motion state is in a joiner's snapshot")
 	for n in [rb, rb2, rb3]:
 		n.free()
+	_done()
+
+
+func _test_spin_up() -> void:
+	_section("func_rotating with fanfriction ramps to speed and down again, the same on a client")
+	var recs := [_rec(0, "func_rotating", "fan", [["model", "*0"]])]
+	var rec := {"entity": 0, "model": 0, "kind": "spin", "classname": "func_rotating", "axis": [0, 1, 0],
+			"degrees_per_second": 90.0, "fan_friction": 20.0}
+	var io := _io(recs)
+	io.bind_movers([DotMapMover.from_record(rec)])
+	var fan := io.entity_of(0) as DotMapMoverNode
+	io.send("fan", "Start")
+	io.advance(20)
+	_check(is_equal_approx(fan.angle_at(io.now, 20), deg_to_rad(45.0)), "one second to full speed: half the angle of a flat start after that second")
+	_check(is_equal_approx(fan.spin_velocity_at(io.now, 20), deg_to_rad(90.0)), "and at full speed after it")
+	io.advance(20)
+	_check(is_equal_approx(fan.angle_at(io.now, 20), deg_to_rad(135.0)), "then 90 degrees a second")
+	io.send("fan", "Stop")
+	io.advance(10)
+	_check(is_equal_approx(fan.spin_velocity_at(io.now, 20), deg_to_rad(45.0)), "Stop slows it, not at once")
+	io.advance(40)
+	var held := fan.angle_at(io.now, 20)
+	io.advance(20)
+	_check(is_equal_approx(held, deg_to_rad(135.0 + 45.0)) and fan.angle_at(io.now, 20) == held, "it coasts to a stop 45 degrees on and stays")
+	var client := _io(recs)
+	client.authoritative = false
+	client.bind_movers([DotMapMover.from_record(rec)])
+	var sync := DotMapStateSync.new()
+	_check(sync.apply(client, {"type": "io_state", "tick": io.now, "changes": [[0, "spin", io.entity_of(0).state()["spin"]]]}).ok
+			and is_equal_approx((client.entity_of(0) as DotMapMoverNode).angle_at(io.now, 20), held), "a client given the state agrees on the angle")
+	_done()
+
+
+func _pose_count(inbox: Array) -> int:
+	var n := 0
+	for m: Dictionary in inbox:
+		for c: Array in m.get("changes", []):
+			n += 1 if c[1] == "pose" else 0
+	return n
+
+
+func _test_physbox_pose() -> void:
+	_section("a physbox's pose is reported while it moves and a client follows it")
+	var recs := [_rec(0, "func_physbox", "crate", [["model", "*3"]])]
+	var host := _io(recs)
+	var rb := RigidBody3D.new()
+	add_child(rb)
+	(host.entity_of(0) as DotMapPhysbox).bind_body(rb, true)
+	var sync := DotMapStateSync.new()
+	var inbox: Array = []
+	sync.attach_host(host, func(_p: Variant, msg: Dictionary) -> void: inbox.append(msg))
+	sync.add_peer("a")
+	host.start()
+	host.advance(5)
+	_check(_pose_count(inbox) == 0, "a body that is not moving reports no pose")
+	rb.transform = Transform3D(Basis(Vector3.UP, 0.5), Vector3(1, 2, 3))
+	host.advance(5)
+	_check(_pose_count(inbox) == 1, "a moved one reports once")
+	host.advance(10)
+	_check(_pose_count(inbox) == 1 and sync.snapshot_message()["entities"][0].has("pose"), "and not again while still, and a joiner's snapshot has the pose")
+	var client := _io(recs)
+	client.authoritative = false
+	var crb := RigidBody3D.new()
+	add_child(crb)
+	(client.entity_of(0) as DotMapPhysbox).bind_body(crb, false)
+	var csync := DotMapStateSync.new()
+	for m: Dictionary in inbox:
+		csync.apply(client, m)
+	for i in 20:
+		(client.entity_of(0) as DotMapPhysbox).tick_view(client)
+	_check(crb.transform.origin.distance_to(Vector3(1, 2, 3)) < 0.01, "the client's body is where the host's is")
+	var pose: Array = host.snapshot()["entities"][0]["pose"]
+	csync.apply(client, {"type": "io_state", "tick": 30, "changes": [[0, "pose", [4.0, 2.0, 3.0, pose[3], pose[4], pose[5], pose[6]]]]})
+	for i in 12:
+		(client.entity_of(0) as DotMapPhysbox).tick_view(client)
+	_check(crb.transform.origin.distance_to(Vector3(4, 2, 3)) < 0.05, "a later pose is eased to")
+	csync.apply(client, {"type": "io_state", "tick": 31, "changes": [[0, "pose", [1.0]]]})
+	_check(csync.ignored == 1 and crb.transform.origin.distance_to(Vector3(4, 2, 3)) < 0.05, "a malformed pose is ignored")
+	rb.free()
+	crb.free()
+	_done()
+
+
+func _test_state_transport() -> void:
+	_section("DotMapStateTransport batches a tick's messages per peer and a client unpacks them")
+	var recs := [_rec(0, "func_brush", "wall", [["model", "*1"]]), _rec(1, "func_brush", "wall2", [["model", "*2"]])]
+	var host := _io(recs)
+	var t := DotMapStateTransport.new()
+	var wire: Array = []
+	t.raw_send = func(peer: Variant, payload: Dictionary) -> void: wire.append([peer, payload])
+	var sync := DotMapStateSync.new()
+	sync.attach_host(host, t.send)
+	t.flush_on(host)
+	sync.add_peer("a")
+	sync.add_peer("b")
+	t.flush()
+	_check(wire.size() == 2 and wire[0][1]["type"] == "io_snapshot", "each joiner's snapshot is sent on flush")
+	wire.clear()
+	host.start()
+	host.send("wall", "Disable")
+	host.advance(1)
+	host.send("wall2", "Disable")
+	host.advance(1)
+	_check(wire.size() == 4 and wire[0][1]["type"] == "io_state", "each tick's changes leave as their own payload per peer, never a batch of one")
+	wire.clear()
+	t.send("a", {"type": "io_state", "tick": 1, "changes": []})
+	t.send("a", {"type": "io_state", "tick": 2, "changes": []})
+	t.flush()
+	_check(wire.size() == 1 and wire[0][1]["type"] == "io_batch" and (wire[0][1]["messages"] as Array).size() == 2, "two messages to one peer travel as one batch")
+	wire.clear()
+	t.max_bytes = 40
+	t.send("a", {"type": "io_state", "tick": 1, "changes": []})
+	t.send("a", {"type": "io_state", "tick": 2, "changes": []})
+	t.flush()
+	_check(wire.size() == 2, "a batch splits at max_bytes")
+	t.max_bytes = 1100
+	var client := _io(recs)
+	client.authoritative = false
+	var csync := DotMapStateSync.new()
+	var batch := {"type": "io_batch", "messages": [sync.snapshot_message(), {"type": "io_state", "tick": 9, "changes": [[0, "enabled", true]]}]}
+	_check(DotMapStateTransport.is_state_payload(batch) and not DotMapStateTransport.is_state_payload({"type": "chat"}), "state payloads are told from the game's others")
+	var r := t.receive(client, csync, batch)
+	_check(r.ok and (client.entity_of(0) as DotMapEntity).enabled and not (client.entity_of(1) as DotMapEntity).enabled, "a client applies a whole batch in order")
+	_check(not t.receive(client, csync, {"type": "io_batch", "messages": [5]}).ok, "a malformed batch is refused")
 	_done()

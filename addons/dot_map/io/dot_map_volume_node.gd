@@ -5,7 +5,7 @@ extends RefCounted
 ## [DotMapEntity] that carries its outputs. [method step] finds who is inside and tells the entity
 ## (and, for push, teleport and gravity, the game) about entries, exits and bodies that stay.
 
-const TRIGGER_KINDS := ["multiple", "once", "teleport", "push", "hurt", "gravity"]
+const TRIGGER_KINDS := ["multiple", "once", "teleport", "push", "hurt", "gravity", "soundscape"]
 ## Body kind to the trigger spawnflag that admits it (clients, NPCs, pushables, physics objects).
 const KIND_FLAG := {"player": 1, "npc": 2, "pushable": 4, "physics": 8}
 

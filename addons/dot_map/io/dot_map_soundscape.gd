@@ -11,6 +11,8 @@ var radius := 128.0
 var scape := ""
 ## True for env_soundscape_triggerable, which a player must be told to hear (inputs only).
 var triggerable := false
+## Body ids a [DotMapTriggerSoundscape] has put inside, which hear a triggerable scape wherever they stand.
+var listeners: Dictionary = {}
 var _heard := false
 
 
@@ -47,8 +49,10 @@ func positions(io: DotMapIO) -> Array[Vector3]:
 	return out
 
 
-## Whether [param at] (metres) is inside the radius.
-func covers(io: DotMapIO, at: Vector3) -> bool:
+## Whether [param at] (metres) is inside the radius, or body [param id] was put inside by a trigger_soundscape.
+func covers(io: DotMapIO, at: Vector3, id: Variant = null) -> bool:
+	if triggerable and listeners.has(id):
+		return true
 	if triggerable and not _heard:
 		return false
 	return radius < 0.0 or at.distance_to(origin(io)) <= radius * io.unit_scale

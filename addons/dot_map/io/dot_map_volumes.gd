@@ -101,9 +101,9 @@ func _soundscapes(bodies: Array) -> void:
 		var best_d := INF
 		var at: Vector3 = info["position"]
 		for s: DotMapSoundscape in _scapes:
-			if not s.alive or not s.enabled or not s.covers(io, at):
+			if not s.alive or not s.enabled or not s.covers(io, at, info["id"]):
 				continue
-			var d := at.distance_to(s.origin(io))
+			var d := -1.0 if s.listeners.has(info["id"]) else at.distance_to(s.origin(io))
 			if d < best_d:
 				best_d = d
 				best = s

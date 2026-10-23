@@ -113,6 +113,13 @@ func spin_rate() -> float:
 	return deg_to_rad(float(record.get("degrees_per_second", 0.0)))
 
 
+## Radians a second squared a spinner speeds up and slows down at; 0 (instant) unless the map sets
+## [code]fanfriction[/code]. 20 reaches full speed in a second, 100 in a fifth: an approximation of the engine's friction.
+func spin_acceleration() -> float:
+	var f := float(record.get("fan_friction", 0.0))
+	return absf(spin_rate()) * f / 20.0 if f > 0.0 else 0.0
+
+
 ## Corners of a train's path, [code][{name, at, speed?, wait?}][/code]; empty for others.
 func path() -> Array:
 	return record.get("path", [])

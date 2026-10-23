@@ -32,5 +32,6 @@ extends RefCounted
 # 14: DotMapWorld (one call builds a converted map's world), filter_multi, prop_door_rotating and func_physbox classes.
 # 15: DotMapDoorStandIn, DotMapPhysbox, DotMapSoundscape, DotMapMoverNode.push_bodies / pose_delta, DotMapWorld.doors and
 #     the door_fn hook, hurt once/force, manifest settings as the config's weakest layer.
-const LEVEL := 15
+# 16: DotMapStateTransport (batching send_fn), DotMapTriggerSoundscape, physbox pose replication, func_rotating fanfriction ramps.
+const LEVEL := 16
 const OLDEST := 1

@@ -52,11 +52,15 @@ Work package 7. `DotMapVolumes.build(entities, io)` joins each manifest volume t
 
 Map commands go through `DotMapCommand.judge`: a line is split on `;`, a chat line (200 characters) or a cvar on `command_allow` with a plain value is allowed, a list of verbs (`quit`, `exec`, `rcon*`, passwords, `bind`, `map`...) is never allowed even if listed, and every verdict is recorded.
 
-`examples/volumes_demo.tscn` (headless, 109 checks in 12 sections) runs all of it, and shows Office's lava room from its own links: the trigger starts a 3 s timer, the hurt volume comes on at tick 181 and hits at once, then every 0.5 s while the player stays; leaving stops the hits; the trigger re-arms at 6 s and a second entry turns the hurt volume off before it can hit. The volume geometry there is a stand-in box, since the repository keeps Office's logic and not its brushes.
+`examples/volumes_demo.tscn` (headless, 114 checks in 13 sections) runs all of it, and shows Office's lava room from its own links: the trigger starts a 3 s timer, the hurt volume comes on at tick 181 and hits at once, then every 0.5 s while the player stays; leaving stops the hits; the trigger re-arms at 6 s and a second entry turns the hurt volume off before it can hit. The volume geometry there is a stand-in box, since the repository keeps Office's logic and not its brushes.
 
-`trigger_hurt` honours `damageonce` (a body is hit once per stay; `DotMapHurt.once_flag` names a spawnflag bit that also means it, 0 until the bit is confirmed) and `damageforce` (sent as the `damage_force` event `{body, force, source}` in m/s, zeroed by `nodmgforce`). `env_soundscape`, `_proxy` and `_triggerable` are `DotMapSoundscape`: the nearest enabled one covering a player fires the `soundscape` event `{body, name, entity, positions}` when it changes, and its `OnPlay` output.
+`trigger_hurt` honours `damageonce` (a body is hit once per stay; `DotMapHurt.once_flag` stays 0, see below) and `damageforce` (sent as the `damage_force` event `{body, force, source}` in m/s, zeroed by `nodmgforce`). `env_soundscape`, `_proxy` and `_triggerable` are `DotMapSoundscape`: the nearest enabled one covering a player fires the `soundscape` event `{body, name, entity, positions}` when it changes, and its `OnPlay` output.
 
-Not done: `func_water_analog` swimming physics (the controller's), `trigger_soundscape` wiring to `env_soundscape_triggerable`.
+`trigger_soundscape` is `DotMapTriggerSoundscape` (its volume kind is `soundscape`): a player inside hears the `env_soundscape_triggerable` it names wherever it stands, and the choice reverts on leaving (the usual `soundscape` event).
+
+Damage once is no spawnflag. Across 1401 `trigger_hurt` entities in the 105 stored maps none sets a `damageonce` key, and no bit outside the base trigger filters (1 clients, 2 NPCs, 8 physics objects, 64 everything, 1024 debris) appears. Bit 8 is set on 25 of them, almost all with a lethal `damage` (999 to 10^12) and several with bits 1 and 2 beside it ("clients, NPCs, physics"), which is the base trigger's physics-objects filter, not a hit-once switch. So `once_flag` stays 0 and only the `damageonce` key turns it on. Re-run the sample with a scan of `~/mapsrc/store/*/doc.json`.
+
+Not done: `func_water_analog` swimming physics (the controller's).
 
 ## Toggle brushes, breakables, movers and replication
 
@@ -72,11 +76,15 @@ Work package 6. `bind_world(world_root, manifest)` joins each entity to the draw
 
 Replication: the server is authoritative (`io.authoritative`), a client runs no logic and refuses `send`, `raise` and `touch`. `DotMapStateSync` batches every `state_changed` on the `settled` signal into one `io_state` message (`tick`, `[index, key, value]` changes), sends it through each peer's `send_fn`, and `add_peer` sends an `io_snapshot` of every entity first (join in progress). `apply()` on the client sets its clock, applies the changes and counts unknown entities in `refused` and unknown keys in `ignored`.
 
-`examples/io_world_demo.tscn` (headless, 124 checks in 12 sections) covers all of it, including a two-peer exchange and a determinism run.
+`examples/io_world_demo.tscn` (headless, 149 checks in 15 sections) covers all of it, including a two-peer exchange and a determinism run.
 
 Movers push bodies (`DotMapMoverNode.push_bodies`, run by `DotMapVolumes.step`, through `move_fn`); a body pushed that does not move at least half the push is blocked: the `dmg` key is applied as `crush` damage every 0.25 s, `OnBlockedOpening` / `OnBlockedClosing` fire, and a slide, hinge or plat with `wait >= 0` reverses. `func_physbox` is `DotMapPhysbox` (a `RigidBody3D`; `damagetoenablemotion` / `forcetoenablemotion`, `EnableMotion` and the other inputs, `OnMotionEnabled`).
 
-Not done: tank-style train rotation, spin-up ramps, physbox pose replication to clients, and the wiring of `DotMapStateSync` to a transport (it takes a `send_fn`).
+A `func_rotating` with a `fanfriction` (the converter writes `fan_friction` only when the map sets it) ramps to and from speed at `speed * friction / 20` per second, in the stored `spin` state (`[angle, target, tick, dir, velocity_at_tick, acceleration]`); the engine's own friction curve is not reproduced. A physbox reports its body's `pose` (`[x y z qx qy qz qw]`, local to the model node) at most ten times a second while it moves, in snapshots too, and a client eases its frozen body toward it.
+
+`DotMapStateTransport` is the reference `send_fn`: `sync.attach_host(io, t.send)` (or the world's `send_fn` hook) queues each peer's messages, `t.flush_on(io)` sends them when a tick settles, as one `io_batch` per peer up to `max_bytes` (1100) of JSON; a bigger message, a snapshot say, goes alone. It names no net addon: `t.raw_send(peer, payload)` is the game's reliable channel, and on the client `DotMapStateTransport.is_state_payload(payload)` then `t.receive(io, sync, payload)` unpacks it. The payloads are plain dictionaries, so the channel only has to carry one of those.
+
+Not done: tank-style train rotation.
 
 ## Correction: the Office lava room
 
@@ -96,4 +104,4 @@ Every tick the game calls `world.step(bodies)` (advance the logic, then the volu
 
 A `prop_door_rotating` is drawn by `DotMapDoorStandIn` (a panel hung at the hinge, with an `AnimatableBody3D` when solid; the hook `door_fn(mover, yaw)` replaces it with the game's model; `world.doors` lists them). Which side the panel hangs on is a guess until compared with the real model. The manifest's `settings` (the map's own `point_servercommand` cvars, written by the converter) are the weakest layer of the config. `<prefix>.doc.json` is shipped beside each converted map by `bsp.py regen` and the importer.
 
-Not done: tank trains, spin-up ramps, physbox pose replication, a transport for `send_fn` (the game's).
+Not done: tank trains.

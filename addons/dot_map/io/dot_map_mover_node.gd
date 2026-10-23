@@ -15,7 +15,8 @@ extends DotMapEntity
 ## ticks is blocked: the [code]dmg[/code] key hurts it, OnBlockedOpening / OnBlockedClosing fire,
 ## and a door or lift with [code]wait[/code] of 0 or more reverses, as the original does.
 ##
-## Not done: spin-up ramps, a train's rotation to follow its path, tank trains.
+## A func_rotating with a [code]fanfriction[/code] ramps to and from speed (see [method DotMapMover.spin_acceleration]).
+## Not done: a train's rotation to follow its path, tank trains.
 
 ## Ticks a body may stay inside a moving mover before it counts as blocked.
 const BLOCK_TICKS := 3
@@ -40,6 +41,9 @@ var _gen := 0
 var _a0 := 0.0
 var _v := 0.0
 var _last_dir := 1.0
+## A spinner's velocity at [code]_t0[/code] and its acceleration (rad/s^2, 0 for none); it ramps from one to [code]_v[/code].
+var _vf := 0.0
+var _acc := 0.0
 var _base := Transform3D.IDENTITY
 var _cum: PackedFloat64Array = PackedFloat64Array()
 var _corners: Array = []
@@ -65,6 +69,8 @@ func set_mover(m: DotMapMover) -> void:
 		_build_path()
 	elif m.is_spinner():
 		_v = m.spin_rate() if m.start_open else 0.0
+		_vf = _v
+		_acc = m.spin_acceleration()
 
 
 ## The solid a body can be pushed or blocked by, at rest: [param frame] places a box of
@@ -91,7 +97,21 @@ func fraction_at(tick: int, rate: int) -> float:
 
 ## A spinner's angle in radians at [param tick].
 func angle_at(tick: int, rate: int) -> float:
-	return _a0 + _v * float(tick - _t0) / float(rate)
+	var dt := float(tick - _t0) / float(rate)
+	if _acc <= 0.0 or _vf == _v:
+		return _a0 + _v * dt
+	var dv := _v - _vf
+	var tr := absf(dv) / _acc
+	if dt >= tr:
+		return _a0 + _vf * tr + dv * 0.5 * tr + _v * (dt - tr)
+	return _a0 + _vf * dt + signf(dv) * _acc * dt * dt * 0.5
+
+
+## A spinner's angular velocity in rad/s at [param tick], on its ramp up or down.
+func spin_velocity_at(tick: int, rate: int) -> float:
+	if _acc <= 0.0:
+		return _v
+	return move_toward(_vf, _v, _acc * float(tick - _t0) / float(rate))
 
 
 ## A train's distance along its path (metres) at [param tick].
@@ -284,9 +304,10 @@ func _spin_input(io: DotMapIO, name: String, param: String) -> bool:
 
 func _spin(io: DotMapIO, rate_rad: float) -> void:
 	_a0 = angle_at(io.now, io.rate)
+	_vf = spin_velocity_at(io.now, io.rate)
 	_t0 = io.now
 	_v = rate_rad
-	io.report_state(self, "spin", [_a0, _v, _t0, _last_dir])
+	io.report_state(self, "spin", [_a0, _v, _t0, _last_dir, _vf, _acc])
 
 
 func _build_path() -> void:
@@ -427,6 +448,8 @@ func _apply(_io: DotMapIO, key_: String, value: Variant, _tick: int) -> bool:
 			_v = float(m[1])
 			_t0 = int(m[2])
 			_last_dir = float(m[3])
+			_vf = float(m[4]) if m.size() > 4 else _v
+			_acc = float(m[5]) if m.size() > 5 else 0.0
 		"locked":
 			locked = bool(value)
 		"in":
@@ -558,5 +581,5 @@ func state() -> Dictionary:
 	s["locked"] = locked
 	s["in"] = _in
 	s["motion"] = [_from, _to, _t0, _tt]
-	s["spin"] = [_a0, _v, _t0, _last_dir]
+	s["spin"] = [_a0, _v, _t0, _last_dir, _vf, _acc]
 	return s

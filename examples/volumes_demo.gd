@@ -8,8 +8,8 @@ extends Node
 ## godot --headless --path . res://examples/volumes_demo.tscn
 ## [/codeblock]
 
-const CHECKS := 109
-const SECTIONS := 12
+const CHECKS := 114
+const SECTIONS := 13
 const OFFICE := "res://examples/io/office_io.doc.json"
 
 var _passed := 0
@@ -35,6 +35,7 @@ func _run() -> void:
 	_test_commands()
 	_test_hurt_once_and_force()
 	_test_soundscapes()
+	_test_trigger_soundscape()
 	_test_movers_push_and_block()
 	var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(OFFICE))
 	if doc is Dictionary:
@@ -494,6 +495,37 @@ func _test_soundscapes() -> void:
 	io.send("sc_a", "Enable")
 	_run_ticks(io, vols, 1, provider)
 	_check(ev.size() == 5 and ev[4]["name"] == "Alley", "enabled again: heard again")
+	io.event_fn = Callable()
+	_done()
+
+
+func _test_trigger_soundscape() -> void:
+	_section("trigger_soundscape: standing in the volume plays the triggerable scape it names, wherever the player is")
+	var w := _world([
+			_rec(0, "env_soundscape_triggerable", "sc_t", [["origin", "5000 0 0"], ["radius", "100"], ["soundscape", "Cave"]]),
+			_rec(1, "trigger_soundscape", "ts", [["soundscape", "sc_t"]])],
+			[_vol(1, "soundscape", "trigger_soundscape", Vector3(0, 0, 0), Vector3(4, 3, 4), {"targetname": "ts"})])
+	var io: DotMapIO = w[0]
+	var vols: DotMapVolumes = w[1]
+	var ev: Array = []
+	io.event_fn = func(kind: String, data: Dictionary) -> void:
+		if kind == "soundscape":
+			ev.append(data)
+	io.start()
+	var pos := [Vector3(10, 0, 0)]
+	var provider := func(_t: int) -> Array: return [_body(1, pos[0])]
+	_run_ticks(io, vols, 2, provider)
+	_check(ev.is_empty(), "far from a triggerable scape and outside the volume: silence")
+	pos[0] = Vector3(1, 0, 1)
+	_run_ticks(io, vols, 2, provider)
+	_check(ev.size() == 1 and ev[0]["name"] == "Cave", "entering the trigger plays its scape, though the scape's radius is far away")
+	pos[0] = Vector3(10, 0, 0)
+	_run_ticks(io, vols, 2, provider)
+	_check(ev.size() == 2 and ev[1]["name"] == "", "leaving it stops the scape")
+	io.send("ts", "Disable")
+	pos[0] = Vector3(1, 0, 1)
+	_run_ticks(io, vols, 2, provider)
+	_check(ev.size() == 2, "a disabled trigger plays nothing")
 	io.event_fn = Callable()
 	_done()
 
