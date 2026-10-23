@@ -63,6 +63,12 @@ const KINDS := {
 	&"carpet_red": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
 	&"carpet_blue": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
 	&"snow": {"meters": 3.0, "rough": 1.0, "metal": 0.0},
+	&"rock": {"meters": 4.0, "rough": 1.0, "metal": 0.0},
+	&"sand": {"meters": 3.0, "rough": 1.0, "metal": 0.0},
+	&"stone_block": {"meters": 3.0, "rough": 1.0, "metal": 0.0},
+	&"roof_clay": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
+	&"ceiling_tile": {"meters": 2.4, "rough": 1.0, "metal": 0.0},
+	&"plaster_worn": {"meters": 2.5, "rough": 1.0, "metal": 0.0},
 }
 
 ## Names a generator already uses for a surface, to the kind that draws it. A map document that

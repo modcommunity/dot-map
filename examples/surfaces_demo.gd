@@ -15,7 +15,7 @@ extends Node3D
 ## map that is inside out, or a texture twice the size it should be, so the frames have to be
 ## looked at.
 
-const CHECKS := 81
+const CHECKS := 99
 const SECTIONS := 4
 
 const COLUMNS := 5
@@ -87,7 +87,7 @@ func _check(ok: bool, what: String) -> void:
 func _test_kinds() -> void:
 	_section("every kind loads")
 	var kinds := _surfaces.kinds()
-	_check(kinds.size() == 20, "twenty kinds")
+	_check(kinds.size() == 26, "twenty-six kinds")
 	for k in kinds:
 		var res := _surfaces.try_material(StringName(k))
 		_check(res.ok, "%s loads" % k)
@@ -112,7 +112,7 @@ func _test_material_flags() -> void:
 	_check(_surfaces.material(&"brick", Color(0.5, 0.5, 0.5)) != m, "a tint is another material")
 	_check(_surfaces.material(&"metal").metallic > 0.0, "metal is metallic")
 	_check(_surfaces.material(&"plaster").metallic == 0.0, "plaster is not")
-	_check(_surfaces.describe()["kinds"] == 20, "describe counts kinds")
+	_check(_surfaces.describe()["kinds"] == 26, "describe counts kinds")
 	_done()
 
 

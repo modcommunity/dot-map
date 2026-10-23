@@ -26,5 +26,13 @@ Each folder holds `albedo.jpg` (the Color map), `normal.jpg` (NormalGL, the Open
 | carpet_red | Carpet013 | https://ambientcg.com/view?id=Carpet013 |
 | carpet_blue | Carpet012 | https://ambientcg.com/view?id=Carpet012 |
 | snow | Snow004 | https://ambientcg.com/view?id=Snow004 |
+| rock | Rock023 | https://ambientcg.com/view?id=Rock023 |
+| sand | Ground080 | https://ambientcg.com/view?id=Ground080 |
+| stone_block | Bricks076A | https://ambientcg.com/view?id=Bricks076A |
+| roof_clay | RoofingTiles014A | https://ambientcg.com/view?id=RoofingTiles014A |
+| ceiling_tile | OfficeCeiling005 | https://ambientcg.com/view?id=OfficeCeiling005 |
+| plaster_worn | Plaster003 | https://ambientcg.com/view?id=Plaster003 |
 
 The carpet and snow kinds were added 2026-10-22 from the same source, author and licence (CC0 1.0, read on each asset page); all are 1024x1024 1K-JPG, re-encoded at quality 85.
+
+The rock, sand, stone_block, roof_clay, ceiling_tile and plaster_worn kinds were added 2026-10-23 for the Zombie Zone maps (cliff faces, dunes, cut stone, clay roofs, office ceilings, weathered plaster); same source, author and licence (CC0 1.0, read on each asset page), 1024x1024 1K-JPG, NormalGL, re-encoded at quality 85.
