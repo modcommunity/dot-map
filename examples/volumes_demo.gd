@@ -8,7 +8,7 @@ extends Node
 ## godot --headless --path . res://examples/volumes_demo.tscn
 ## [/codeblock]
 
-const CHECKS := 120
+const CHECKS := 123
 const SECTIONS := 13
 const OFFICE := "res://examples/io/office_io.doc.json"
 
@@ -199,10 +199,13 @@ func _test_triggers() -> void:
 		_rec(3, "filter_activator_name", "f", [["filtername", "alice"]]),
 		_rec(4, "math_counter", "c"), _rec(5, "math_counter", "t"), _rec(6, "math_counter", "o"),
 		_rec(7, "math_counter", "n"), _rec(8, "math_counter", "all"), _rec(9, "math_counter", "none"), _rec(10, "math_counter", "e"),
+		_rec(11, "trigger_multiple", "teamed", [["wait", "0"], ["filtername", "ft"]], [["OnStartTouch", "tm", "Add", "1"]]),
+		_rec(12, "filter_activator_team", "ft", [["filterteam", "2"]]), _rec(13, "math_counter", "tm"),
 	], [
 		_vol(0, "multiple", "trigger_multiple", Vector3(0, 0, 0), Vector3(2, 2, 2), {"wait": 2.0}),
 		_vol(1, "once", "trigger_once", Vector3(10, 0, 0), Vector3(12, 2, 2), {"wait": -1.0}),
 		_vol(2, "multiple", "trigger_multiple", Vector3(20, 0, 0), Vector3(22, 2, 2), {"wait": 0.0, "filter": "f"}),
+		_vol(11, "multiple", "trigger_multiple", Vector3(30, 0, 0), Vector3(32, 2, 2), {"wait": 0.0, "filter": "ft"}),
 	])
 	var io: DotMapIO = w[0]
 	var vols: DotMapVolumes = w[1]
@@ -233,6 +236,16 @@ func _test_triggers() -> void:
 	bodies[0] = [_body(5, Vector3(21, 0, 1), "player", "alice")]
 	_run_ticks(io, vols, 3, provider)
 	_check(cv.call("n") == 1.0, "and lets the right one in, once (the output has times=1)")
+	var teamed := func(id: int, team: int) -> Dictionary: return _body(id, Vector3(31, 0, 1)).merged({"team": team})
+	bodies[0] = [teamed.call(6, 3)]
+	_run_ticks(io, vols, 3, provider)
+	_check(cv.call("tm") == 0.0, "filter_activator_team keeps out a body of another team")
+	bodies[0] = [teamed.call(7, 2)]
+	_run_ticks(io, vols, 3, provider)
+	_check(cv.call("tm") == 1.0, "and lets in a body whose team matches")
+	bodies[0] = [_body(8, Vector3(31, 0, 1))]
+	_run_ticks(io, vols, 3, provider)
+	_check(cv.call("tm") == 2.0 and io.unhandled.has("filter|filter_activator_team"), "a body with no team is admitted and counted")
 	io.send("multi", "Disable")
 	bodies[0] = [_body(1, Vector3(1, 0, 1))]
 	var before: float = cv.call("c")
