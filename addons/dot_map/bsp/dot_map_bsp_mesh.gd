@@ -574,8 +574,33 @@ func build_props(scene_for: Callable = Callable()) -> Node3D:
 		n.position = Vector3(at[0], at[1], at[2])
 		n.rotation_degrees.y = float(rec.get("yaw", 0.0)) + PROP_FACING_DEGREES
 		n.scale = Vector3.ONE * float(rec.get("scale", 1.0))
+		var size := float(rec.get("size", 0.0))
+		if size > 0.0:
+			# A small thing (a can, a phone) on a furniture-sized stand-in: fit its longest side to `size`.
+			var longest := _longest_side(n)
+			if longest > 0.001:
+				n.scale *= size / longest
 		root.add_child(n)
 	return root
+
+
+## The longest side of the meshes under [param n], in the node's own space (its scale ignored).
+static func _longest_side(n: Node3D) -> float:
+	var box := AABB()
+	var first := true
+	for m in n.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		var t := Transform3D.IDENTITY
+		var p: Node = mi
+		while p != null and p != n:
+			t = (p as Node3D).transform * t
+			p = p.get_parent()
+		var b := t * mi.mesh.get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	return 0.0 if first else maxf(box.size.x, maxf(box.size.y, box.size.z))
 
 
 func counts() -> Dictionary:
