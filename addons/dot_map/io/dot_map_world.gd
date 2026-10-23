@@ -360,7 +360,8 @@ func _effect(kind: String, e: DotMapEntity, on: bool) -> void:
 		var tn := e.targetname
 		var nm := (tn if not tn.is_empty() else "amb_%d" % e.index).validate_node_name()
 		var node := sounds.get_node_or_null(nm)
-		if node is AudioStreamPlayer3D or node is AudioStreamPlayer:
+		# Not in the tree yet (a spawn output during the build): play() errors; autoplay starts it on entry.
+		if (node is AudioStreamPlayer3D or node is AudioStreamPlayer) and node.is_inside_tree():
 			node.call("play" if on else "stop")
 	if effect_fn.is_valid():
 		effect_fn.call(kind, e, on)

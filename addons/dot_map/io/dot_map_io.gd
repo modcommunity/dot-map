@@ -74,6 +74,8 @@ var missing_callables: Dictionary = {}
 ## env_global state: [code]globalstate -> {on: bool, counter: int}[/code], shared by every entity naming it.
 var globals: Dictionary = {}
 var delivered := 0
+## Events delivered, by the index of the entity whose output queued them (tests tell a press's effect from a timer's).
+var delivered_from := {}
 var loop_trips := 0
 var unresolved: Dictionary = {}
 
@@ -703,6 +705,8 @@ func _deliver(ev: Dictionary) -> void:
 	var source: Variant = ev["caller"]
 	var activator: Variant = ev["activator"]
 	var param: String = ev["param"]
+	if source is DotMapEntity:
+		delivered_from[source.index] = int(delivered_from.get(source.index, 0)) + 1
 	if target.begins_with("#"):
 		var idx := int(target.substr(1))
 		if _by_index.has(idx):
