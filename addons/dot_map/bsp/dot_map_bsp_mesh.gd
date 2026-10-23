@@ -560,6 +560,9 @@ func build_props(scene_for: Callable = Callable()) -> Node3D:
 	root.name = "Props"
 	var cache := {}
 	for rec: Dictionary in manifest.get("props", []):
+		if rec.has("box"):
+			root.add_child(_support_block(rec))
+			continue
 		var id := str(rec.get("stand_in", ""))
 		if not cache.has(id):
 			cache[id] = scene_for.call(id) if scene_for.is_valid() \
@@ -582,6 +585,22 @@ func build_props(scene_for: Callable = Callable()) -> Node3D:
 				n.scale *= size / longest
 		root.add_child(n)
 	return root
+
+
+## A neutral block of the measured size, for a model something rests on and no stand-in fits.
+static func _support_block(rec: Dictionary) -> MeshInstance3D:
+	var dims: Array = rec["box"]
+	var box := BoxMesh.new()
+	box.size = Vector3(dims[0], dims[1], dims[2])
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.62, 0.6, 0.57)
+	box.material = mat
+	var mi := MeshInstance3D.new()
+	mi.mesh = box
+	var at: Array = rec.get("at", [0, 0, 0])
+	mi.position = Vector3(at[0], at[1], at[2])
+	mi.rotation_degrees.y = float(rec.get("yaw", 0.0))
+	return mi
 
 
 ## The longest side of the meshes under [param n], in the node's own space (its scale ignored).
