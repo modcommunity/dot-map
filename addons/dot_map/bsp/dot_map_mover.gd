@@ -41,6 +41,12 @@ var wait: float = 0.0
 var locked: bool = false
 var toggle: bool = false
 var start_open: bool = false
+## A prop_door_rotating's opendir: 0 swings away from whoever opens it, 1 forward only, 2 back only (the sign of [member degrees]).
+var open_dir: int = 1
+## The yaw (degrees, source angles) whose local +X is the door's front; only [member open_dir] 0 reads it.
+var yaw: float = 0.0
+## 1 or -1: the side a door that starts open stands on (spawnpos), 0 for none.
+var spawn_side: float = 0.0
 var use: bool = false
 var touch: bool = false
 var solid: bool = true
@@ -69,6 +75,9 @@ static func from_record(rec: Dictionary) -> DotMapMover:
 	m.locked = bool(rec.get("locked", false))
 	m.toggle = bool(rec.get("toggle", false))
 	m.start_open = bool(rec.get("start_open", rec.get("start_on", false)))
+	m.open_dir = int(rec.get("open_dir", 1))
+	m.yaw = float(rec.get("yaw", 0.0))
+	m.spawn_side = float(rec.get("spawn_side", 0.0))
 	m.use = bool(rec.get("use", false))
 	m.touch = bool(rec.get("touch", false))
 	m.solid = bool(rec.get("solid", true))
@@ -94,17 +103,26 @@ func is_spinner() -> bool:
 	return kind == KIND_SPIN
 
 
+## The side (1 or -1) a door swings to for an opener at [param opener] (map metres): away from
+## it. A door with a fixed direction, or no known opener, keeps 1.
+func side_away_from(opener: Variant) -> float:
+	if open_dir != 0 or not opener is Vector3:
+		return 1.0
+	var front := Basis(Vector3.UP, deg_to_rad(yaw)) * Vector3.RIGHT
+	return 1.0 if (opener as Vector3 - origin).dot(front) >= 0.0 else -1.0
+
+
 ## Where the node's rest pose is along its travel: 1 for a door that starts open, else 0.
 func rest_fraction() -> float:
 	return 1.0 if start_open else 0.0
 
 
 ## The node's transform relative to the closed pose at [param fraction] (0 closed, 1 fully
-## travelled). A hinge turns about the node's own origin, so the node must sit at [member origin].
-func transform_at(fraction: float) -> Transform3D:
+## travelled); [param side] (1 or -1) turns a hinge the other way. A hinge turns about the node's own origin, so the node must sit at [member origin].
+func transform_at(fraction: float, side: float = 1.0) -> Transform3D:
 	var f := clampf(fraction, 0.0, 1.0)
 	if kind in [KIND_HINGE, KIND_HINGE_BUTTON]:
-		return Transform3D(Basis(axis.normalized(), deg_to_rad(degrees) * f), Vector3.ZERO)
+		return Transform3D(Basis(axis.normalized(), deg_to_rad(degrees) * f * side), Vector3.ZERO)
 	return Transform3D(Basis.IDENTITY, direction * distance * f)
 
 

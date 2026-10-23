@@ -76,7 +76,7 @@ Work package 6. `bind_world(world_root, manifest)` joins each entity to the draw
 
 Replication: the server is authoritative (`io.authoritative`), a client runs no logic and refuses `send`, `raise` and `touch`. `DotMapStateSync` batches every `state_changed` on the `settled` signal into one `io_state` message (`tick`, `[index, key, value]` changes), sends it through each peer's `send_fn`, and `add_peer` sends an `io_snapshot` of every entity first (join in progress). `apply()` on the client sets its clock, applies the changes and counts unknown entities in `refused` and unknown keys in `ignored`.
 
-`examples/io_world_demo.tscn` (headless, 149 checks in 15 sections) covers all of it, including a two-peer exchange and a determinism run.
+`examples/io_world_demo.tscn` (headless, 162 checks in 15 sections) covers all of it, including a two-peer exchange and a determinism run.
 
 Movers push bodies (`DotMapMoverNode.push_bodies`, run by `DotMapVolumes.step`, through `move_fn`); a body pushed that does not move at least half the push is blocked: the `dmg` key is applied as `crush` damage every 0.25 s, `OnBlockedOpening` / `OnBlockedClosing` fire, and a slide, hinge or plat with `wait >= 0` reverses. `func_physbox` is `DotMapPhysbox` (a `RigidBody3D`; `damagetoenablemotion` / `forcetoenablemotion`, `EnableMotion` and the other inputs, `OnMotionEnabled`).
 
@@ -102,6 +102,6 @@ Every tick the game calls `world.step(bodies)` (advance the logic, then the volu
 
 `examples/world_demo.tscn` runs it on the converted Office and Dan's course (from `mg-wipeout-maps/worlds` and the store) and asserts the hurt room against its own links.
 
-A `prop_door_rotating` is drawn by `DotMapDoorStandIn` (a panel hung at the hinge, with an `AnimatableBody3D` when solid; the hook `door_fn(mover, yaw)` replaces it with the game's model; `world.doors` lists them). Which side the panel hangs on is a guess until compared with the real model. The manifest's `settings` (the map's own `point_servercommand` cvars, written by the converter) are the weakest layer of the config. `<prefix>.doc.json` is shipped beside each converted map by `bsp.py regen` and the importer.
+A `prop_door_rotating` is drawn by `DotMapDoorStandIn` (a panel hung at the hinge, with an `AnimatableBody3D` when solid; the hook `door_fn(mover, yaw)` replaces it with the game's model; `world.doors` lists them). Its direction follows the source keys: `opendir` 0 swings away from whoever opens it (the side is picked on opening from the opener's position, a `Vector3`, `Node3D` or body dictionary, and replicated as the `side` state), 1 forward, 2 back; `spawnpos` 1 or 2 (and spawnflag 1) starts it open on that side; spawnflag 2 is not "reverse" on a model door. Not done: the hinge is the model origin, though 16 of the 304 stored doors have an `axis` key elsewhere (the engine's own use of that key is unverified), and which side the panel hangs on is a guess until compared with the real model. The manifest's `settings` (the map's own `point_servercommand` cvars, written by the converter) are the weakest layer of the config. `<prefix>.doc.json` is shipped beside each converted map by `bsp.py regen` and the importer.
 
 Not done: tank trains.

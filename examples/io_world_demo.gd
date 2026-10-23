@@ -10,7 +10,7 @@ extends Node
 ## ([code]examples/bsp_mesh/zm_4way_tunnel.entities.json[/code]); nodes are built here the way
 ## [method DotMapBspMesh.build_node] shapes them (a Node3D per model with a [code]model[/code] meta).
 
-const CHECKS := 155
+const CHECKS := 162
 const SECTIONS := 15
 const TUNNEL := "res://examples/bsp_mesh/zm_4way_tunnel.entities.json"
 
@@ -544,6 +544,30 @@ func _test_door_standin() -> void:
 	io.send("pd", "Close")
 	io.advance(20)
 	_check(door.transform.basis.is_equal_approx(Basis(Vector3.UP, deg_to_rad(90.0))), "closing swings it back")
+	# opendir 0: the door swings away from whoever opens it, decided once on opening and replicated.
+	var away := _io([_rec(0, "prop_door_rotating", "pd", [["angles", "0 0 0"]])])
+	var am := _door_rec(0, "rotate", {"model": null, "classname": "prop_door_rotating", "targetname": "pd",
+			"origin": [0, 0, 0], "axis": [0, 1, 0], "degrees": 90.0, "travel_time": 1.0, "open_dir": 0, "yaw": 0.0, "use": true})
+	away.bind_movers([am])
+	var ae := away.entity_of(0) as DotMapMoverNode
+	ae.accept(away, "Open", "", Vector3(2, 0, 0), null)
+	away.advance(20)
+	_check(ae.pose_delta(away.now, 20).basis.is_equal_approx(Basis(Vector3.UP, deg_to_rad(90.0))), "an opener on the front (+X) side: the panel swings the positive way, away from it")
+	ae.accept(away, "Close", "", null, null)
+	away.advance(20)
+	ae.accept(away, "Open", "", Vector3(-2, 0, 0), null)
+	away.advance(20)
+	_check(ae.pose_delta(away.now, 20).basis.is_equal_approx(Basis(Vector3.UP, deg_to_rad(-90.0))), "an opener behind it: the other way")
+	var joiner := _io([_rec(0, "prop_door_rotating", "pd", [])])
+	joiner.bind_movers([DotMapMover.from_record(am.record)])
+	joiner.entity_of(0).apply_state(joiner, "side", ae.state()["side"], 0)
+	joiner.entity_of(0).apply_state(joiner, "motion", ae.state()["motion"], 0)
+	_check(joiner.entity_of(0).state()["side"] == -1.0, "the chosen side is state a joiner receives")
+	var fixed := DotMapMover.from_record({"kind": "rotate", "degrees": -90.0, "open_dir": 2, "spawn_side": 1.0})
+	_check(fixed.side_away_from(Vector3(5, 0, 0)) == 1.0, "opendir 1 and 2 keep the record's own sign whoever opens")
+	var back := DotMapMoverNode.new()
+	back.set_mover(fixed)
+	_check(back._side == -1.0 and fixed.rest_fraction() == 0.0, "spawnpos 1 on a back-only door stands at the positive angle")
 	var nodoor := DotMapDoorStandIn.build(_door_rec(0, "rotate", {"solid": false}), 0.0)
 	_check(nodoor.get_node_or_null("col_solid") == null, "a passable door gets no body")
 	nodoor.free()

@@ -36,5 +36,7 @@ extends RefCounted
 # 17: DotMapClientCommand + record_client_command (point_clientcommand is its own kind, never run), longer DotMapCommand.NEVER, chat starting with ! or / refused,
 #     DotMapConfig restore compares to what the cvar holds after apply and logs a refusal, inf/nan refused, ints clamped,
 #     DotMapStateSync.apply refuses an authoritative runtime, an older tick and oversize messages.
-const LEVEL := 17
+# 18: prop_door_rotating follows opendir/spawnpos (DotMapMover.open_dir, yaw, spawn_side, side_away_from, transform_at side),
+#     DotMapMoverNode replicates a door's chosen side; spawnflag 2 no longer reverses a model door.
+const LEVEL := 18
 const OLDEST := 1

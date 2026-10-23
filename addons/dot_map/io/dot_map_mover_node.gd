@@ -36,6 +36,8 @@ var _to := 0.0
 var _t0 := 0
 var _tt := 1.0
 var _in := false
+## A hinge's turn direction, 1 or -1 times the record's degrees; a door that opens away from its opener picks it on opening.
+var _side := 1.0
 var _gen := 0
 ## Spin: angle (radians) at the start tick and the signed turn rate; a train: distance along its path and signed speed.
 var _a0 := 0.0
@@ -60,6 +62,9 @@ func set_mover(m: DotMapMover) -> void:
 	_tt = m.travel_time if m.travel_time > 0.0 else 0.0
 	_from = m.rest_fraction()
 	_to = _from
+	_side = 1.0
+	if m.spawn_side != 0.0 and m.degrees != 0.0:
+		_side = m.spawn_side * signf(m.degrees)
 	_in = false
 	if m.record.has("mins") and m.record.has("maxs"):
 		var lo := DotMapMover._vec(m.record["mins"])
@@ -225,8 +230,24 @@ func _press(io: DotMapIO, activator: Variant) -> void:
 func _open(io: DotMapIO, activator: Variant) -> void:
 	if locked or _to >= 1.0:
 		return
+	if mover.open_dir == 0 and fraction_at(io.now, io.rate) <= 0.0:
+		var side := mover.side_away_from(_position_of(activator))
+		if side != _side:
+			_side = side
+			io.report_state(self, "side", side)
 	fire(io, "OnOpen", activator)
 	_move_to(io, 1.0)
+
+
+## Where an activator stands (map metres): a Vector3, a Node3D, or a body dictionary with [code]position[/code].
+static func _position_of(activator: Variant) -> Variant:
+	if activator is Vector3:
+		return activator
+	if activator is Node3D:
+		return (activator as Node3D).global_position
+	if activator is Dictionary and (activator as Dictionary).get("position") is Vector3:
+		return (activator as Dictionary)["position"]
+	return null
 
 
 func _close(io: DotMapIO, activator: Variant) -> void:
@@ -450,6 +471,8 @@ func _apply(_io: DotMapIO, key_: String, value: Variant, _tick: int) -> bool:
 			_last_dir = float(m[3])
 			_vf = float(m[4]) if m.size() > 4 else _v
 			_acc = float(m[5]) if m.size() > 5 else 0.0
+		"side":
+			_side = float(value)
 		"locked":
 			locked = bool(value)
 		"in":
@@ -478,7 +501,7 @@ func pose_delta(tick: int, rate: int) -> Transform3D:
 		_:
 			if not mover.is_animatable():
 				return Transform3D.IDENTITY
-			var t := mover.transform_at(fraction_at(tick, rate))
+			var t := mover.transform_at(fraction_at(tick, rate), _side)
 			if mover.kind in [DotMapMover.KIND_HINGE, DotMapMover.KIND_HINGE_BUTTON]:
 				return _about(mover.origin, t.basis)
 			return Transform3D(Basis.IDENTITY, t.origin)
@@ -569,7 +592,7 @@ func _view(io: DotMapIO) -> void:
 			f = fraction_at(io.now, io.rate)
 			if not mover.is_animatable():
 				return
-			var t := mover.transform_at(f)
+			var t := mover.transform_at(f, _side)
 			pose = Transform3D(t.basis * _base.basis, _base.origin + t.origin)
 	if f != _shown:
 		_shown = f
@@ -580,6 +603,7 @@ func state() -> Dictionary:
 	var s := super.state()
 	s["locked"] = locked
 	s["in"] = _in
+	s["side"] = _side
 	s["motion"] = [_from, _to, _t0, _tt]
 	s["spin"] = [_a0, _v, _t0, _last_dir, _vf, _acc]
 	return s
