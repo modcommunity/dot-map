@@ -46,6 +46,14 @@ A link is `{from, from_name, from_class, output, target, input, param, delay, ti
 
 Logic, paths and every class with no row in `dotbsp/classes.py` are in `entities` with every key (not the outputs, which are links), their `treatment` (`data` or `unknown`) and `origin`. `bsp.py mesh` fails on an unknown class unless `--allow-unknown`, and prints the unknown classes and the link counts; `DotMapEntities.unknown_classes()` lists them at load time.
 
+## Glass and breakables
+
+A surface whose texture maps (in `source_textures.tsv`) to a generic id starting `glass` (`glass`, `glass_frosted`; a tint column multiplies the colour), or that belongs to a `func_reflective_glass`, carries `glass: <kind>` in its record. `DotMapBspMesh.build_meshes` gives such a surface an alpha-blended material of its kind (`glass_material`, or the game's `glass_material_for`) without asking the game's material callback, in meshes of their own, and `build_node` turns shadow casting off for them. A new kind is a row in the table, an entry in `GLASS_LOOKS`, and a row in `free_textures.tsv`.
+
+A texture the compiler flags translucent that maps to neither glass nor water is drawn opaque and named in the manifest's `notes` (with face counts), never guessed: a fence and a pane look alike to the flag. Add a row to the table to settle it.
+
+The manifest's `breakables` lists every `func_breakable` and `func_breakable_surf` model with its `health` (1 when the map gives none) and `glass` (the kind when all its surfaces are glass). `build_breakables(root)` makes a `DotMapGlass` body for each glass one: solid on the layer given, hurt by `hurt()` on the authoritative end, then hidden, non-solid and shedding shards, with the `broken` signal for a sound or effect and `apply_broken()` for a client following the host. Glass that does not break is an ordinary hull of kind `glass`: a game keeps that kind off the layer its bullets and projectiles hit if they should pass.
+
 ## Testing
 
 `python3 -I tools/bsp/tests/test_mesh.py` (the `Entities` tests) and `res://examples/bsp_entities_demo.tscn` (32 checks) run on `examples/bsp_mesh/zm_4way_tunnel.entities.json`, the entity data of a real map with three lifts whose buttons lock and unlock one another (`tools/bsp/tests/entities_fixture.py` rewrites it from the downloaded map; only the derived data is in the repository).

@@ -42,6 +42,8 @@ var manifest: Dictionary = {}
 var surfaces: Array = []
 var hulls: Array = []
 var source_path: String = ""
+## Takes a glass surface record, returns its [Material]; the built-in [method glass_material] when unset.
+var glass_material_for: Callable = Callable()
 
 var _blob: PackedByteArray = PackedByteArray()
 var _movers: Dictionary = {}
@@ -166,15 +168,55 @@ func surface_arrays(rec: Dictionary) -> Array:
 	return arrays
 
 
+## The look of each glass kind: colour with alpha, roughness.
+const GLASS_LOOKS := {
+	&"glass": {"colour": Color(0.72, 0.86, 0.92, 0.22), "roughness": 0.05},
+	&"glass_frosted": {"colour": Color(0.85, 0.9, 0.93, 0.55), "roughness": 0.55},
+}
+static var _glass_cache: Dictionary = {}
+
+
+## The shared transparent material of a glass kind (an unknown kind is clear glass), multiplied by
+## [param tint] (r, g, b) when the map gave one. Alpha-blended, so it sorts and shows what is behind.
+static func glass_material(glass_kind: StringName, tint: Array = []) -> StandardMaterial3D:
+	if not GLASS_LOOKS.has(glass_kind):
+		glass_kind = &"glass"
+	var key := "%s|%s" % [glass_kind, tint]
+	if _glass_cache.has(key):
+		return _glass_cache[key]
+	var look: Dictionary = GLASS_LOOKS[glass_kind]
+	var c: Color = look["colour"]
+	if tint.size() >= 3:
+		c = Color(c.r * float(tint[0]), c.g * float(tint[1]), c.b * float(tint[2]), c.a)
+	var m := StandardMaterial3D.new()
+	m.albedo_color = c
+	m.roughness = float(look["roughness"])
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.resource_name = str(glass_kind)
+	_glass_cache[key] = m
+	return m
+
+
+func _glass_for(rec: Dictionary) -> Material:
+	if glass_material_for.is_valid():
+		var m: Variant = glass_material_for.call(rec)
+		if m is Material:
+			return m
+	return glass_material(StringName(str(rec["glass"])), rec.get("tint", []))
+
+
 ## A model's surfaces as meshes, grouped by chunk (the converter's columns of the world), each
 ## mesh under [constant MAX_SURFACES]. [param material_for] takes a surface record, returns a
-## [Material] or null. Returns [code][{mesh: ArrayMesh, chunk: Array, sky3d: bool}][/code].
+## [Material] or null; a glass surface (record key [code]glass[/code]) never asks it and gets
+## [member glass_material_for] or the built-in glass, in meshes of their own so they can skip shadows.
+## Returns [code][{mesh: ArrayMesh, chunk: Array, sky3d: bool, glass: bool}][/code].
 func build_meshes(model: int, material_for: Callable = Callable()) -> Array[Dictionary]:
 	var groups := {}
 	for rec: Dictionary in surfaces:
 		if int(rec["model"]) != model:
 			continue
-		var key := "%s|%s" % [str(rec.get("chunk", [])), rec.get("sky3d", false)]
+		var key := "%s|%s|%s" % [str(rec.get("chunk", [])), rec.get("sky3d", false), rec.has("glass")]
 		if not groups.has(key):
 			groups[key] = []
 		(groups[key] as Array).append(rec)
@@ -184,11 +226,14 @@ func build_meshes(model: int, material_for: Callable = Callable()) -> Array[Dict
 		for rec: Dictionary in groups[key]:
 			if mesh == null or mesh.get_surface_count() >= MAX_SURFACES:
 				mesh = ArrayMesh.new()
-				out.append({"mesh": mesh, "chunk": rec.get("chunk", []), "sky3d": bool(rec.get("sky3d", false))})
+				out.append({"mesh": mesh, "chunk": rec.get("chunk", []), "sky3d": bool(rec.get("sky3d", false)),
+						"glass": rec.has("glass")})
 			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays(rec))
 			var s := mesh.get_surface_count() - 1
 			mesh.surface_set_name(s, str(rec.get("material", "")))
-			if material_for.is_valid():
+			if rec.has("glass"):
+				mesh.surface_set_material(s, _glass_for(rec))
+			elif material_for.is_valid():
 				var mat: Variant = material_for.call(rec)
 				if mat is Material:
 					mesh.surface_set_material(s, mat)
@@ -259,8 +304,50 @@ func build_node(material_for: Callable = Callable()) -> Node3D:
 			mi.position = -parent.position
 			var c: Array = g["chunk"]
 			mi.name = "sky3d" if g["sky3d"] else ("chunk_%d_%d" % [c[0], c[1]] if c.size() == 2 else "mesh")
+			if g["glass"]:
+				mi.name = "glass_" + str(mi.name)
+				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			parent.add_child(mi)
 	return root
+
+
+## The map's breakable brush entities: [code]{model, entity, classname, targetname, health, glass, material}[/code]
+## ([code]glass[/code] is the kind when every drawn surface is glass, else empty).
+func breakables() -> Array:
+	return manifest.get("breakables", [])
+
+
+## A [DotMapGlass] for each breakable glass model of [param root] (a [method build_node] result): its
+## hulls as the body on [param collision_layer], the model's node as what it hides. Non-breaking glass
+## is no different from a wall: its hulls have kind [code]glass[/code] from [method hull_shapes], and a
+## game leaves that kind off the layer its bullets and projectiles collide with.
+func build_breakables(root: Node3D, collision_layer: int = 1, authoritative: bool = true) -> Array[DotMapGlass]:
+	var out: Array[DotMapGlass] = []
+	for rec: Dictionary in breakables():
+		if rec.get("glass") == null or str(rec.get("glass")).is_empty() or rec.get("model") == null:
+			continue
+		var model := int(rec["model"])
+		var visual: Node3D = null
+		for c in root.get_children():
+			if c.has_meta(&"model") and int(c.get_meta(&"model")) == model:
+				visual = c as Node3D
+		var pane := DotMapGlass.new()
+		pane.name = "breakable_%d" % model
+		pane.model = model
+		pane.kind = StringName(str(rec["glass"]))
+		pane.health = float(rec.get("health", 1.0))
+		pane.authoritative = authoritative
+		pane.visual = visual
+		pane.collision_layer = collision_layer
+		pane.collision_mask = 0
+		pane.position = model_origin(model)
+		for h: Dictionary in hull_shapes(model):
+			var cs := CollisionShape3D.new()
+			cs.shape = h["shape"]
+			pane.add_child(cs)
+		root.add_child(pane)
+		out.append(pane)
+	return out
 
 
 ## Where [method build_sounds] and [method build_props] look for a stand-in by id when the

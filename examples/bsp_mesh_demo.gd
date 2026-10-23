@@ -11,9 +11,10 @@ extends Node3D
 ## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
 ## thick at (256, 256, 16), at 0.01905 m per unit.
 
-const CHECKS := 38
-const SECTIONS := 4
+const CHECKS := 60
+const SECTIONS := 5
 const FIXTURE := "res://examples/bsp_mesh/fixture"
+const GLASS := "res://examples/bsp_mesh/glass"
 const U := 0.01905
 
 var _passed := 0
@@ -35,6 +36,7 @@ func _run() -> void:
 		_test_build(world)
 		_test_environment(world)
 		await _test_collide(world)
+		await _test_glass()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -211,4 +213,68 @@ func _test_collide(world: DotMapBspMesh) -> void:
 	_check(hit.is_empty(), "a raised door lets the ray through: %s" % hit.get("position"))
 	hit = space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(5, 1, -1), Vector3(5, 1, -11)))
 	_check(not hit.is_empty() and absf(hit["position"].z + 496 * U) < 0.01, "the wall stops a ray at its face: %s" % hit.get("position"))
+	_done()
+
+
+func _test_glass() -> void:
+	_section("glass is transparent, shadowless and breakable")
+	var res := DotMapBspMesh.load_prefix(GLASS)
+	_check(res.ok, "the glass fixture reads")
+	if not res.ok:
+		_done()
+		return
+	var world: DotMapBspMesh = res.value
+	var glass_recs := world.surfaces.filter(func(r: Dictionary) -> bool: return r.has("glass"))
+	_check(glass_recs.size() == 2, "two glass surfaces (the pane wall and the breakable): %d" % glass_recs.size())
+	_check(world.surfaces.any(func(r: Dictionary) -> bool: return not r.has("glass")), "the floor is not glass")
+	var seen: Array = []
+	var plain := func(rec: Dictionary) -> Material:
+		seen.append(rec.get("glass", ""))
+		return StandardMaterial3D.new()
+	var root := world.build_node(plain)
+	add_child(root)
+	_check(not seen.has("glass"), "a glass surface never asks the game's callback")
+	var glass_nodes: Array = []
+	var other_nodes: Array = []
+	for model in root.get_children():
+		for mi: MeshInstance3D in model.get_children():
+			(glass_nodes if str(mi.name).begins_with("glass_") else other_nodes).append(mi)
+	_check(glass_nodes.size() == 2 and not other_nodes.is_empty(), "glass sits in its own mesh instances: %d" % glass_nodes.size())
+	var gi: MeshInstance3D = glass_nodes[0]
+	_check(gi.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "glass casts no shadow")
+	_check(other_nodes.all(func(m: MeshInstance3D) -> bool: return m.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF),
+			"walls still cast one")
+	var mat := gi.mesh.surface_get_material(0) as StandardMaterial3D
+	_check(mat != null and mat.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA and mat.albedo_color.a < 0.5,
+			"glass is alpha-blended and see-through")
+	_check(DotMapBspMesh.glass_material(&"glass_frosted").albedo_color.a > DotMapBspMesh.glass_material(&"glass").albedo_color.a,
+			"frosted is more opaque than clear")
+	_check(DotMapBspMesh.glass_material(&"nonsense") == DotMapBspMesh.glass_material(&"glass"), "an unknown kind is clear glass, shared")
+	_check(world.breakables().size() == 1 and str(world.breakables()[0]["glass"]) == "glass", "one breakable glass model")
+	var panes := world.build_breakables(root)
+	_check(panes.size() == 1 and panes[0].health == 20.0 and panes[0].model == 1, "a pane with the map's health")
+	var pane: DotMapGlass = panes[0]
+	_check(world.hull_shapes(1)[0]["kind"] == "glass", "its hull has kind glass")
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var space := get_world_3d().direct_space_state
+	var ray := PhysicsRayQueryParameters3D.create(Vector3(1, 1, -256 * U), Vector3(9, 1, -256 * U))
+	_check(space.intersect_ray(ray).get("collider") == pane, "the pane stops a ray")
+	var events: Array = []
+	pane.broken.connect(func(at: Vector3, by: StringName) -> void: events.append(by))
+	_check(not pane.hurt(5.0, Vector3(1, 1, -5), &"u1") and not pane.is_broken(), "a light hit does not break it")
+	pane.authoritative = false
+	_check(not pane.hurt(99.0) and not pane.is_broken(), "a client cannot break it")
+	pane.authoritative = true
+	_check(pane.hurt(15.0, Vector3(0.2, 1, -5), &"u2") and pane.is_broken() and events == [&"u2"], "enough damage breaks it once")
+	_check(not pane.hurt(9.0) and events.size() == 1, "a broken pane breaks no more")
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_check(not (pane.visual as Node3D).visible, "it is hidden")
+	_check(not space.intersect_ray(ray).has("collider"), "a ray goes through where it stood")
+	_check(root.get_children().any(func(c: Node) -> bool: return c is CPUParticles3D), "shards were spawned")
+	var twin := DotMapGlass.new()
+	add_child(twin)
+	twin.apply_broken(Vector3.ONE, &"host")
+	_check(twin.is_broken(), "the host's word breaks it on a client")
 	_done()
