@@ -11,7 +11,7 @@ extends Node3D
 ## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
 ## thick at (256, 256, 16), at 0.01905 m per unit.
 
-const CHECKS := 81
+const CHECKS := 84
 const SECTIONS := 6
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
@@ -170,6 +170,15 @@ func _test_environment(world: DotMapBspMesh) -> void:
 	var _d := driver.handle("sound_spin", {"entity": 1, "seconds": 0.0, "from": 100.0, "to": 1.0e9})
 	_check(is_equal_approx(pl.pitch_scale, 4.0), "an absurd pitch is clamped")
 	_check(not driver.handle("sound_fade", {"entity": 99, "name": "nobody", "seconds": 1.0}) and not driver.handle("beat", {}), "an unknown player or event does nothing")
+	_d = driver.handle("sound_fade", {"entity": 1, "seconds": NAN, "from": NAN, "to": INF})
+	_check(is_finite(pl.volume_db) and is_finite(pl.pitch_scale), "NaN and infinite event values are replaced, never tweened")
+	add_child(snd)
+	_d = driver.handle("sound_fade", {"entity": 1, "seconds": 5.0, "from": 1.0, "to": 0.5})
+	_check(driver._tweens.size() == 1, "a timed fade keeps one tween")
+	pl.free()
+	_d = driver.handle("sound_fade", {"entity": 99, "seconds": 1.0})
+	driver._prune()
+	_check(driver._tweens.is_empty(), "the tween of a freed player is dropped")
 	snd.free()
 	driver.free()
 	var hooked := []
