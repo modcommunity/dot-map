@@ -11,7 +11,7 @@ extends Node
 ## from its map-start logic and its timed trigger (Obstacle2): the expected times are read from
 ## the map's own links, then compared with the simulation.
 
-const CHECKS := 165
+const CHECKS := 166
 const SECTIONS := 13
 const OFFICE := "res://examples/io/office_io.doc.json"
 
@@ -479,6 +479,7 @@ func _test_catalogue_and_new_classes() -> void:
 	io.advance(1)
 	_check(io.entities.size() == before + 2, "point_template: ForceSpawn adds a copy of each template (%d)" % (io.entities.size() - before))
 	_check(events.filter(func(e: Array) -> bool: return e[0] == "template_spawn").size() == 2, "and tells the game for each")
+	_check(events.filter(func(e: Array) -> bool: return e[0] == "template_spawn")[0][1]["maker"] == -1, "an input from nowhere has no maker")
 	var copy := io.entities.back() as DotMapEntity
 	_check(copy.targetname == "crate2" and copy.index == 8 and copy.classname == "prop_physics", "the copy keeps its name and gets the next free index")
 	_check(io.unhandled.is_empty(), "no input went unhandled: %s" % [io.unhandled])
