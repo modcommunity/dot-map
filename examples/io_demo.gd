@@ -11,7 +11,7 @@ extends Node
 ## from its map-start logic and its timed trigger (Obstacle2): the expected times are read from
 ## the map's own links, then compared with the simulation.
 
-const CHECKS := 180
+const CHECKS := 184
 const SECTIONS := 14
 const OFFICE := "res://examples/io/office_io.doc.json"
 
@@ -532,6 +532,21 @@ func _test_catalogue_and_new_classes() -> void:
 	_check(events.filter(func(e: Array) -> bool: return e[0] == "template_spawn")[0][1]["maker"] == -1, "an input from nowhere has no maker")
 	var copy := io.entities.back() as DotMapEntity
 	_check(copy.targetname == "crate2" and copy.index == 8 and copy.classname == "prop_physics", "the copy keeps its name and gets the next free index")
+	var io3 := _io([_rec(0, "point_template", "tpl3", [["template01", "streak"], ["template02", "spark"]]),
+		_rec(1, "func_door", "streak", [["model", "*5"]], [["OnOpen", "spark", "Kill"], ["OnOpen", "other", "Kill"]]),
+		_rec(2, "info_target", "spark"), _rec(3, "info_target", "other")])
+	io3.start()
+	io3.send("tpl3", "ForceSpawn")
+	io3.send("tpl3", "ForceSpawn")
+	io3.advance(1)
+	var streaks := io3.entities.filter(func(e: DotMapEntity) -> bool: return e.classname == "func_door")
+	var second := streaks.back() as DotMapEntity
+	_check(streaks.size() == 3 and second.targetname == "streak&0002", "template copies take a numbered name per spawn")
+	var kills := second.links.map(func(l: Dictionary) -> String: return str(l["target"]))
+	_check(kills == ["spark&0002", "other"], "a copy's outputs follow the set's numbering and leave outside names alone: %s" % [kills])
+	second.fire(io3, "OnOpen", null)
+	io3.advance(1)
+	_check(io3.find("spark&0002").is_empty() and io3.find("spark&0001").size() == 1 and io3.find("spark").size() == 1, "a copy kills its own set's copy, not the original or the first")
 	_check(io.unhandled.is_empty(), "no input went unhandled: %s" % [io.unhandled])
 	var r := io.load_catalogue()
 	_check(r.ok, "the shipped catalogue loads: %s" % r)
