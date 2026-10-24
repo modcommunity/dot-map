@@ -105,6 +105,7 @@ func _init() -> void:
 		"prop_physics_override": DotMapBreakable,
 		"math_colorblend": DotMapColorBlend, "logic_measure_movement": DotMapMeasureMovement,
 		"env_global": DotMapGlobal, "point_template": DotMapTemplate,
+		"game_score": DotMapGameScore, "game_ui": DotMapGameUi, "logic_collision_pair": DotMapCollisionPair,
 		"func_physbox": DotMapPhysbox, "func_physbox_multiplayer": DotMapPhysbox,
 		"env_soundscape": DotMapSoundscape, "env_soundscape_proxy": DotMapSoundscape,
 		"env_soundscape_triggerable": DotMapSoundscape, "trigger_soundscape": DotMapTriggerSoundscape, "trigger_hurt": DotMapHurt, "trigger_push": DotMapPush, "ambient_generic": DotMapSound,
@@ -304,6 +305,19 @@ func raise(index: int, output: String, activator: Variant = null) -> DotResult:
 	(_by_index[index] as DotMapEntity).fire(self, output, activator)
 	_settle()
 	return DotResult.success()
+
+
+## The buttons a player holds, for the active game_ui with the map's [param index] (see [method DotMapGameUi.feed]).
+func feed_ui(index: int, held: Dictionary) -> void:
+	var e: Variant = _by_index.get(index)
+	if e is DotMapGameUi and authoritative:
+		(e as DotMapGameUi).feed(self, held)
+		_settle()
+
+
+## Every game_ui that is active (a game feeds each one the holder's buttons every tick).
+func active_uis() -> Array:
+	return entities.filter(func(e: DotMapEntity) -> bool: return e is DotMapGameUi and (e as DotMapGameUi).active)
 
 
 ## A body touched the trigger with the map's entity [param index]; the trigger class decides what that fires.

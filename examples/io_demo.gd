@@ -11,8 +11,8 @@ extends Node
 ## from its map-start logic and its timed trigger (Obstacle2): the expected times are read from
 ## the map's own links, then compared with the simulation.
 
-const CHECKS := 154
-const SECTIONS := 12
+const CHECKS := 165
+const SECTIONS := 13
 const OFFICE := "res://examples/io/office_io.doc.json"
 
 var _passed := 0
@@ -39,6 +39,7 @@ func _run() -> void:
 	_test_commands_and_document()
 	_test_map_scripts()
 	_test_catalogue_and_new_classes()
+	_test_score_ui_and_pairs()
 	var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(OFFICE))
 	if doc is Dictionary:
 		_test_office_start(doc)
@@ -392,6 +393,51 @@ func _test_map_scripts() -> void:
 	_check(io.load_document({"format": "dot-bsp-source", "version": 1, "entities": [_rec(0, "lua_run", "a", [["code", hostile]])]}).ok, "a stored document with a script loads")
 	_check(io.entities[0] is DotMapScript and io.scripts.size() == 7, "loading a document runs nothing")
 	_check(io.entities[0].keys.get("code", "") == hostile and events.size() == 2, "the code key is kept as data only")
+	_done()
+
+
+func _test_score_ui_and_pairs() -> void:
+	_section("game_score, game_ui and logic_collision_pair")
+	var io := _io([
+		_rec(0, "game_score", "pts", [["points", "20"], ["spawnflags", "2"]]),
+		_rec(1, "game_ui", "ui", [["spawnflags", "480"]], [["PressedAttack2", "lamp", "FireUser1"], ["UnpressedAttack2", "lamp", "FireUser2"],
+				["PlayerOn", "lamp", "FireUser3"], ["PlayerOff", "lamp", "FireUser4"]]),
+		_rec(2, "env_light", "lamp"),
+		_rec(3, "logic_collision_pair", "", [["attach1", "seat"], ["attach2", "base"]]),
+		_rec(4, "logic_collision_pair", "off", [["attach1", "a"], ["attach2", "b"], ["startdisabled", "0"]])])
+	var events: Array = []
+	io.event_fn = func(kind: String, data: Dictionary) -> void: events.append([kind, data])
+	io.start()
+	var pair_events: Array = events.filter(func(e: Array) -> bool: return e[0] == "collision_pair")
+	_check(pair_events.size() == 2 and pair_events[0][1]["collide"] == false and pair_events[1][1]["collide"] == true, "a pair starts without collisions unless StartDisabled is 0")
+	io.send("off", "DisableCollisions")
+	io.advance(1)
+	_check(events.filter(func(e: Array) -> bool: return e[0] == "collision_pair").back()[1]["collide"] == false, "DisableCollisions is told to the game")
+	io.send("pts", "ApplyScore", "", 0.0, "bob")
+	io.send("pts", "AddScoreCT")
+	io.advance(1)
+	var scores: Array = events.filter(func(e: Array) -> bool: return e[0] == "score")
+	_check(scores.size() == 2 and scores[0][1]["points"] == 20 and scores[0][1]["activator"] == "bob" and scores[0][1]["to_team"] == true, "ApplyScore tells the game the points and who")
+	_check(scores[1][1]["team"] == 3, "AddScoreCT names the team")
+	io.feed_ui(1, {"attack2": true})
+	_check(io.active_uis().is_empty(), "a game_ui that was never activated ignores the buttons")
+	io.send("ui", "Activate", "", 0.0, "bob")
+	io.advance(1)
+	var ui_events: Array = events.filter(func(e: Array) -> bool: return e[0] == "ui_active")
+	_check(ui_events.size() == 1 and ui_events[0][1]["on"] and ui_events[0][1]["freeze"] and ui_events[0][1]["player"] == "bob", "Activate freezes the holder through the game")
+	io.feed_ui(1, {"attack2": true})
+	io.advance(1)
+	_check(io.delivered_from.get(1, 0) >= 2, "the held button fires PressedAttack2 and PlayerOn (%s)" % [io.delivered_from])
+	io.feed_ui(1, {"attack2": true})
+	io.advance(1)
+	var after_hold: int = io.delivered_from.get(1, 0)
+	io.feed_ui(1, {})
+	io.advance(1)
+	_check(io.delivered_from.get(1, 0) == after_hold + 1, "a held button fires once, its release fires Unpressed")
+	io.feed_ui(1, {"jump": true})
+	io.advance(1)
+	_check(io.active_uis().is_empty() and not (events.filter(func(e: Array) -> bool: return e[0] == "ui_active").back()[1]["on"]), "jump gives the controls back (spawnflag 256)")
+	_check(io.unhandled.is_empty(), "no input went unhandled: %s" % [io.unhandled])
 	_done()
 
 
