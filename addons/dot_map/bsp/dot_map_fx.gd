@@ -17,6 +17,9 @@ var max_sprites := 160
 var max_cones := 40
 var max_lights := 6
 var max_decals := 120
+var max_trails := 24
+## [code](parentname) -> Node3D[/code] or null: the thing a trail follows. Without it a trail follows itself.
+var trail_target_fn := Callable()
 ## Metres beyond which a sprite, cone or light is not drawn.
 var view_range := 60.0
 var decal_range := 22.0
@@ -34,21 +37,25 @@ func build(records: Array) -> Node3D:
 	var sprites: Array = []
 	var cones: Array = []
 	var decals: Array = []
+	var trails: Array = []
 	for r: Variant in records:
 		if not r is Dictionary:
 			continue
 		var rec: Dictionary = r
 		match str(rec.get("classname", "")):
-			"env_sprite", "env_lightglow", "env_spritetrail":
+			"env_sprite", "env_lightglow":
 				sprites.append(rec)
+			"env_spritetrail":
+				trails.append(rec)
 			"point_spotlight":
 				cones.append(rec)
 			"infodecal":
 				decals.append(rec)
-	stats = {"sprites": 0, "cones": 0, "lights": 0, "decals": 0, "decals_unplaced": 0, "skipped": 0}
+	stats = {"sprites": 0, "cones": 0, "lights": 0, "decals": 0, "decals_unplaced": 0, "trails": 0, "skipped": 0}
 	_sprites(root, sprites)
 	_cones(root, cones)
 	_decals(root, decals)
+	_trails(root, trails)
 	DotLog.info(CHANNEL, "drawn", stats)
 	return root
 
@@ -98,7 +105,7 @@ func _sprites(root: Node3D, recs: Array) -> void:
 		var glow := cls == "env_lightglow" or _is_glow(model)
 		var start_on := (int(k.get("spawnflags", "0")) & 1) != 0
 		var named := str(k.get("targetname", "")) != ""
-		if cls == "env_spritetrail" or not glow or str(k.get("parentname", "")) != "" or (named and not start_on and cls == "env_sprite"):
+		if not glow or str(k.get("parentname", "")) != "" or (named and not start_on and cls == "env_sprite"):
 			stats["skipped"] += 1
 			continue
 		if _origin(k) == null:
@@ -178,6 +185,31 @@ func _glow_texture() -> Texture2D:
 			img.set_pixel(x, y, Color(1, 1, 1, a))
 	_tex["glow"] = ImageTexture.create_from_image(img)
 	return _tex["glow"]
+
+
+func _trails(root: Node3D, recs: Array) -> void:
+	var keep: Array = []
+	for rec: Dictionary in recs:
+		var k := _keys(rec)
+		if _origin(k) == null:
+			stats["skipped"] += 1
+			continue
+		keep.append([rec, k])
+	for pair: Array in _spread(keep, max_trails):
+		var k: Dictionary = pair[1]
+		var t := DotMapTrail.new()
+		t.position = _origin(k)
+		t.lifetime = clampf(float(k.get("lifetime", "0.5")), 0.05, 10.0)
+		t.start_width = clampf(float(k.get("startwidth", "8")) * unit_scale, 0.02, 2.0)
+		t.end_width = clampf(float(k.get("endwidth", "1")) * unit_scale, 0.0, 2.0)
+		t.colour = _colour(k)
+		var parent_name := str(k.get("parentname", ""))
+		if parent_name != "" and trail_target_fn.is_valid():
+			var target: Variant = trail_target_fn.call(parent_name)
+			if target is Node3D:
+				t.follow = target
+		root.add_child(t)
+		stats["trails"] += 1
 
 
 # --- spotlights --------------------------------------------------------------------------------

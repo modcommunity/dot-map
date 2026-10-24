@@ -11,8 +11,8 @@ extends Node
 ## from its map-start logic and its timed trigger (Obstacle2): the expected times are read from
 ## the map's own links, then compared with the simulation.
 
-const CHECKS := 166
-const SECTIONS := 13
+const CHECKS := 178
+const SECTIONS := 14
 const OFFICE := "res://examples/io/office_io.doc.json"
 
 var _passed := 0
@@ -40,6 +40,7 @@ func _run() -> void:
 	_test_map_scripts()
 	_test_catalogue_and_new_classes()
 	_test_score_ui_and_pairs()
+	_test_beats_and_winlose()
 	var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(OFFICE))
 	if doc is Dictionary:
 		_test_office_start(doc)
@@ -437,6 +438,47 @@ func _test_score_ui_and_pairs() -> void:
 	io.feed_ui(1, {"jump": true})
 	io.advance(1)
 	_check(io.active_uis().is_empty() and not (events.filter(func(e: Array) -> bool: return e[0] == "ui_active").back()[1]["on"]), "jump gives the controls back (spawnflag 256)")
+	_check(io.unhandled.is_empty(), "no input went unhandled: %s" % [io.unhandled])
+	_done()
+
+
+func _test_beats_and_winlose() -> void:
+	_section("logic_beats as a beat signal and logic_winlose's ending")
+	var io := _io([
+		_rec(0, "logic_beats", "tempo", [["bpm", "120"], ["beatsperbar", "3"], ["disableannoucner", "1"]], [["OnBeat", "nb", "Add", "1"]]),
+		_rec(1, "logic_beats", "silent"),
+		_rec(2, "logic_winlose", "ending", [["slowmo", "0.25"], ["slowmoseconds", "3"], ["origin", "100 200 300"]],
+				[["OnWin", "nw", "Add", "1"], ["OnLose", "nw", "Add", "10"]]),
+		_rec(3, "logic_winlose", "plain"),
+		_rec(4, "math_counter", "nb", [["max", "999"]]), _rec(5, "math_counter", "nw", [["max", "999"]])], 20)
+	var events: Array = []
+	io.event_fn = func(kind: String, data: Dictionary) -> void: events.append([kind, data])
+	var tempo := io.find("tempo")[0] as DotMapBeats
+	io.start()
+	io.advance(40)
+	var beats: Array = events.filter(func(e: Array) -> bool: return e[0] == "beat")
+	_check(beats.size() == 4, "120 bpm on a 20 Hz tick is four beats in two seconds (%d)" % beats.size())
+	_check(beats[0][1]["downbeat"] == true and beats[1][1]["downbeat"] == false and beats[3][1]["downbeat"] == true and beats[3][1]["bar"] == 1, "a bar of three: the downbeat starts each")
+	_check((io.find("nb")[0] as DotMapCounter).value == 4.0, "OnBeat is an output")
+	_check(tempo.announcer_off() and not (io.find("silent")[0] as DotMapBeats).announcer_off(), "DisableAnnoucner is read as before")
+	io.send("silent", "SetBPM", "60")
+	io.send("tempo", "Stop")
+	io.advance(40)
+	beats = events.filter(func(e: Array) -> bool: return e[0] == "beat")
+	_check(beats.size() == 6, "SetBPM starts a silent entity, Stop ends the other (%d)" % beats.size())
+	_check((io.find("silent")[0] as DotMapBeats).interval() == 1.0 and tempo.interval() == 0.5, "interval follows the tempo")
+	events.clear()
+	io.send("plain", "Lose")
+	io.advance(1)
+	var d: Array = events.filter(func(e: Array) -> bool: return e[0] == "round_decide")
+	_check(d.size() == 1 and d[0][1]["won"] == false, "Lose asks the game to decide")
+	(io.find("ending")[0] as DotMapWinLose).decided(io, true)
+	(io.find("plain")[0] as DotMapWinLose).decided(io, false)
+	var ends: Array = events.filter(func(e: Array) -> bool: return e[0] == "round_end")
+	_check(ends.size() == 2 and ends[0][1]["time_scale"] == 0.25 and ends[0][1]["seconds"] == 3.0 and ends[0][1]["won"] == true, "decided tells the game the slow motion the keys name")
+	_check(ends[0][1]["camera"] is Vector3 and ends[1][1]["camera"] == null and ends[1][1]["time_scale"] == 1.0, "a camera only when the entity has an origin; no slow motion by default")
+	io.advance(1)
+	_check((io.find("nw")[0] as DotMapCounter).value == 1.0, "OnWin fires on the decision")
 	_check(io.unhandled.is_empty(), "no input went unhandled: %s" % [io.unhandled])
 	_done()
 

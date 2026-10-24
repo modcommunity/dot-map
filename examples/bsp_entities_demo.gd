@@ -11,8 +11,8 @@ extends Node3D
 ## (toggle doors moved by buttons that lock and unlock one another), hinged doors, shutters, and
 ## classes the converter keeps as data.
 
-const CHECKS := 37
-const SECTIONS := 5
+const CHECKS := 42
+const SECTIONS := 6
 const REAL := "res://examples/bsp_mesh/zm_4way_tunnel.entities.json"
 
 var _passed := 0
@@ -38,6 +38,7 @@ func _run() -> void:
 		_test_links(ents)
 		_test_generic(ents)
 		_test_push()
+	_test_trails()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -157,6 +158,35 @@ func _test_generic(ents: DotMapEntities) -> void:
 	_check(e.links.unresolved().size() == 1 and e.links.fired_by(7, "OnThing")[0]["delay"] == 0.5, "its outputs are in the graph")
 	var empty := DotMapEntities.from_manifest({})
 	_check(empty.movers.is_empty() and empty.links.size() == 0 and empty.mover_named("x") == null, "an old manifest with none of it reads as empty")
+	_done()
+
+
+func _test_trails() -> void:
+	_section("env_spritetrail draws a ribbon behind what it follows")
+	var mk := func(cls: String, pairs: Array) -> Dictionary: return {"classname": cls, "pairs": pairs}
+	var fx := DotMapFx.new()
+	var mover := Node3D.new()
+	fx.trail_target_fn = func(n: String) -> Node3D: return mover if n == "rocket" else null
+	var root := fx.build([mk.call("env_spritetrail", [["origin", "0 0 100"], ["lifetime", "1"], ["startwidth", "20"], ["endwidth", "0"],
+			["rendercolor", "255 120 0"], ["parentname", "rocket"]]), mk.call("env_spritetrail", [["targetname", "no origin"]]),
+			mk.call("env_sprite", [["origin", "0 0 0"], ["model", "sprites/glow01.vmt"]])])
+	add_child(root)
+	_check(int(fx.stats["trails"]) == 1 and int(fx.stats["skipped"]) == 1 and int(fx.stats["sprites"]) == 1, "one trail drawn, one without an origin skipped, sprites unchanged: %s" % [fx.stats])
+	var t: DotMapTrail = null
+	for c in root.get_children():
+		if c is DotMapTrail:
+			t = c
+	_check(t.follow == mover and is_equal_approx(t.lifetime, 1.0) and t.start_width > t.end_width and t.colour.r > 0.99, "it follows its parent and takes the entity's lifetime, widths and colour")
+	var eye := Vector3(0, 5, 5)
+	var n := 0
+	for i in 10:
+		n = t.advance(0.05, Vector3(i * 0.2, 0, 0), eye)
+	_check(n == 10, "a moving point adds a sample each step (%d)" % n)
+	_check(t.advance(0.05, Vector3(1.8, 0, 0), eye) == 10, "standing still adds none")
+	n = t.advance(2.0, Vector3(1.8, 0, 0), eye)
+	_check(n == 0, "old samples expire past the lifetime (%d)" % n)
+	root.free()
+	mover.free()
 	_done()
 
 

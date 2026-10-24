@@ -105,7 +105,7 @@ func _init() -> void:
 		"prop_physics_override": DotMapBreakable,
 		"math_colorblend": DotMapColorBlend, "logic_measure_movement": DotMapMeasureMovement,
 		"env_global": DotMapGlobal, "point_template": DotMapTemplate,
-		"game_score": DotMapGameScore, "game_ui": DotMapGameUi, "logic_collision_pair": DotMapCollisionPair,
+		"logic_beats": DotMapBeats, "logic_winlose": DotMapWinLose, "game_score": DotMapGameScore, "game_ui": DotMapGameUi, "logic_collision_pair": DotMapCollisionPair,
 		"func_physbox": DotMapPhysbox, "func_physbox_multiplayer": DotMapPhysbox,
 		"env_soundscape": DotMapSoundscape, "env_soundscape_proxy": DotMapSoundscape,
 		"env_soundscape_triggerable": DotMapSoundscape, "trigger_soundscape": DotMapTriggerSoundscape, "trigger_hurt": DotMapHurt, "trigger_push": DotMapPush, "ambient_generic": DotMapSound,
