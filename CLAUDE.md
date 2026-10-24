@@ -34,7 +34,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | `examples/surfaces_demo.tscn` | the surfaces suite (headless) and, with `-- --shot=<prefix>`, three frames of every kind on boxes |
 | `examples/brushes_demo.tscn` | the brushes suite (62 checks, headless) and, under `xvfb-run` with `-- --shot=<prefix>`, three frames |
 | `examples/bsp_entities_demo.tscn` | the brush-entity suite (37 checks, headless) on a real map's movers, volumes and links, `examples/bsp_mesh/zm_4way_tunnel.entities.json` ([brush-entities](docs/brush-entities.md)) |
-| `examples/bsp_mesh_demo.tscn` | the bsp mesh suite (68 checks, headless) on `examples/bsp_mesh/fixture`, which `tools/bsp/tests/mesh_fixture.py` writes, and `terrain_fixture.json` (`tools/bsp/tests/test_terrain.py --write`) |
+| `examples/bsp_mesh_demo.tscn` | the bsp mesh suite (73 checks, headless) on `examples/bsp_mesh/fixture`, which `tools/bsp/tests/mesh_fixture.py` writes, and `terrain_fixture.json` (`tools/bsp/tests/test_terrain.py --write`) |
 | `examples/bsp_world_shot.tscn`, `tools/screenshot.sh` | one frame of a converted map dressed with its free textures, environment and stand-in props (under Xvfb) |
 | `examples/io_world_demo.tscn` | toggle brushes, breakables, movers and state replication (headless, 183 checks in 15 sections) |
 | `examples/io_demo.tscn` | the I/O suite (headless): delays, cycles, the logic classes, and Office's timed hazards from `examples/io/office_io.doc.json` |

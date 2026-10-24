@@ -11,7 +11,7 @@ extends Node3D
 ## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
 ## thick at (256, 256, 16), at 0.01905 m per unit.
 
-const CHECKS := 68
+const CHECKS := 73
 const SECTIONS := 6
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
@@ -306,6 +306,25 @@ func _test_terrain() -> void:
 	var faces := t.faces()
 	_check(faces.size() == int(fx["faces"]), "faces %d, converter %d (the hole is kept)" % [faces.size(), fx["faces"]])
 	_check((faces[1] - faces[0]).cross(faces[2] - faces[0]).y < 0.0, "faces wind clockwise seen from above, so they face up")
+	var want := PackedStringArray()
+	var got := t.skirt_edges()
+	for k in range(0, got.size(), 4):
+		want.append("%d,%d,%d,%d" % [got[k], got[k + 1], got[k + 2], got[k + 3]])
+	want.sort()
+	var theirs := PackedStringArray(str(fx["skirt_edges"]).split(";"))
+	theirs.sort()
+	_check(want == theirs, "the skirt's rim edges are the converter's (%d), the enclosed hole has none" % want.size())
+	var wall := t.skirt_faces()
+	_check(wall.size() == want.size() * 6 and not is_nan(t.skirt_y), "a skirt of one quad per rim edge hangs to %.2f" % t.skirt_y)
+	var lowest := INF
+	for v in wall:
+		lowest = minf(lowest, v.y)
+	_check(is_equal_approx(lowest, t.skirt_y), "the wall reaches the skirt level, under the lowest ground")
+	_check(t.build_shape().get_faces().size() == faces.size() and t.build_shape(true).get_faces().size() == faces.size() + wall.size(),
+			"collision is the field alone unless the skirt is asked for")
+	var plain: Dictionary = fx["terrain"].duplicate()
+	plain.erase("skirt")
+	_check(DotMapTerrain.from_dict(plain).value.skirt_faces().is_empty(), "a field written without a skirt draws none")
 	var newer: Dictionary = fx["terrain"].duplicate()
 	newer["format"] = DotMapTerrain.FORMAT + 1
 	_check(DotMapTerrain.from_dict(newer).code() == DotError.CODE_VERSION, "a newer format is refused as a version error")

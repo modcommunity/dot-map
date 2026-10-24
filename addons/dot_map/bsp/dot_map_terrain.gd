@@ -25,6 +25,8 @@ var heights := PackedFloat64Array()
 var walk := PackedByteArray()
 ## The surface kind the converter named (`grass`), or empty.
 var mat: String = ""
+## Height the outer rim's skirt drops to; NAN when the converter wrote none (no skirt).
+var skirt_y: float = NAN
 
 
 ## Reads [param d] (the converter's dictionary). Fails on a newer format or damaged data.
@@ -42,6 +44,8 @@ static func from_dict(d: Dictionary) -> DotResult:
 	t.origin_x = float(org[0])
 	t.origin_z = float(org[1])
 	t.mat = str(d.get("mat", ""))
+	if d.has("skirt"):
+		t.skirt_y = float(d["skirt"])
 	var n := t.nx * t.nz
 	if t.nx < 2 or t.nz < 2 or n > MAX_SAMPLES or t.cell <= 0.0:
 		return DotResult.fail(DotError.CODE_PARSE, "terrain grid %dx%d of %s m is not usable" % [t.nx, t.nz, t.cell])
@@ -140,24 +144,112 @@ func faces() -> PackedVector3Array:
 	return out
 
 
+## The skirt: a wall under every edge where the field's outer rim meets open air (not a hole
+## the field surrounds, which holds a building), down to [member skirt_y], so no rim floats
+## with sky under it. Empty without a skirt. Walls are one quad, 6 vertices, per edge.
+func skirt_faces() -> PackedVector3Array:
+	var out := PackedVector3Array()
+	if is_nan(skirt_y):
+		return out
+	var edges := skirt_edges()
+	for e in range(0, edges.size(), 4):
+		var a := _point(edges[e], edges[e + 1])
+		var b := _point(edges[e + 2], edges[e + 3])
+		var low := minf(skirt_y, minf(a.y, b.y))
+		var a0 := Vector3(a.x, low, a.z)
+		var b0 := Vector3(b.x, low, b.z)
+		out.append_array([a, b, b0, a, b0, a0])
+	return out
+
+
+## Sample pairs (i, j, i, j) of the rim's edges, four ints each: an edge of a present triangle
+## whose other side is outside the grid or a missing triangle open to it (dotbsp.terrain.outer_edges).
+func skirt_edges() -> PackedInt32Array:
+	var out := PackedInt32Array()
+	var w := nx - 1
+	var h := nz - 1
+	var count := w * h * 2
+	var present := PackedByteArray()
+	present.resize(count)
+	for j in h:
+		for i in w:
+			var k := (j * w + i) * 2
+			present[k] = 1 if not is_nan(sample(i, j)) and not is_nan(sample(i + 1, j)) and not is_nan(sample(i + 1, j + 1)) else 0
+			present[k + 1] = 1 if not is_nan(sample(i, j)) and not is_nan(sample(i, j + 1)) and not is_nan(sample(i + 1, j + 1)) else 0
+	# open[k]: a missing triangle the outside reaches through missing triangles.
+	var open := PackedByteArray()
+	open.resize(count)
+	var stack := PackedInt32Array()
+	for k in count:
+		if present[k] == 0 and open[k] == 0 and _tri_neighbours(k, w, h).has(-1):
+			open[k] = 1
+			stack.append(k)
+		while not stack.is_empty():
+			var cur := stack[stack.size() - 1]
+			stack.resize(stack.size() - 1)
+			for nb in _tri_neighbours(cur, w, h):
+				if nb >= 0 and present[nb] == 0 and open[nb] == 0:
+					open[nb] = 1
+					stack.append(nb)
+	for k in count:
+		if present[k] == 0:
+			continue
+		var i := (k >> 1) % w
+		var j := (k >> 1) / w
+		var nbs := _tri_neighbours(k, w, h)
+		# Edge order matches _tri_neighbours: for A top, right, diagonal; for B bottom, left, diagonal.
+		var ends: Array
+		if k & 1 == 0:
+			ends = [[i, j, i + 1, j], [i + 1, j, i + 1, j + 1], [i, j, i + 1, j + 1]]
+		else:
+			ends = [[i, j + 1, i + 1, j + 1], [i, j, i, j + 1], [i, j, i + 1, j + 1]]
+		for e in 3:
+			var nb: int = nbs[e]
+			if nb == -1 or open[nb] == 1:
+				out.append_array(PackedInt32Array(ends[e]))
+	return out
+
+
+## The triangles across each of triangle [param k]'s three edges (-1 outside the grid).
+static func _tri_neighbours(k: int, w: int, h: int) -> Array:
+	var c := k >> 1
+	var i := c % w
+	var j := c / w
+	if k & 1 == 0:
+		return [(((j - 1) * w + i) * 2 + 1) if j > 0 else -1, ((j * w + i + 1) * 2 + 1) if i < w - 1 else -1, c * 2 + 1]
+	return [(((j + 1) * w + i) * 2) if j < h - 1 else -1, ((j * w + i - 1) * 2) if i > 0 else -1, c * 2]
+
+
 func _point(i: int, j: int) -> Vector3:
 	return Vector3(origin_x + i * cell, sample(i, j), origin_z + j * cell)
 
 
-## One [ConcavePolygonShape3D] of [method faces], in world space.
-func build_shape() -> ConcavePolygonShape3D:
+## One [ConcavePolygonShape3D] of [method faces], in world space. The skirt is never part of
+## it unless [param with_skirt]: ground a body stands on is the field, not its curtain.
+func build_shape(with_skirt: bool = false) -> ConcavePolygonShape3D:
 	var shape := ConcavePolygonShape3D.new()
-	shape.set_faces(faces())
+	var f := faces()
+	if with_skirt:
+		f.append_array(skirt_faces())
+	shape.set_faces(f)
 	return shape
 
 
-## A drawable mesh of [method faces] with normals and UVs in metres (x, z).
+## A drawable mesh of [method faces] with normals and UVs in metres (x, z), then the skirt
+## (both sides, UVs along the edge and down).
 func build_mesh() -> ArrayMesh:
 	var tool := SurfaceTool.new()
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for p in faces():
 		tool.set_uv(Vector2(p.x, p.z))
 		tool.add_vertex(p)
+	var wall := skirt_faces()
+	for k in range(0, wall.size(), 3):
+		for side in 2:
+			for v in 3:
+				var p := wall[k + (v if side == 0 else 2 - v)]
+				tool.set_uv(Vector2(p.x + p.z, p.y))
+				tool.add_vertex(p)
 	tool.generate_normals()
 	return tool.commit()
 
