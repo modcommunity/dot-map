@@ -8,7 +8,7 @@ The reasoning behind maps as content, one subject per file. [CLAUDE.md](../CLAUD
 | [changing.md](changing.md) | The order of a change, the five-message sync protocol and its rules, game vs map changes, the commands, what a host may name, template scenes, transport |
 | [rotation.md](rotation.md) | The rotation's cooldown and seed, `DotMapVote`, `DotMapTimeLimit`, `map_over`, hibernation |
 | [history.md](history.md) | The bugs, and how each looked |
-| [surfaces.md](surfaces.md) | `DotMapSurfaces`: a material per surface kind, world-space triplanar, loaded by path for packs, sizes and credits |
+| [surfaces.md](surfaces.md) | `DotMapSurfaces`: a material per surface kind, world-space triplanar, loaded by path for packs, sizes and credits; see-through generics and `keep_coverage`; `DotMapFx` (sprites, glows, cones, decals) |
 | [brushes.md](brushes.md) | `DotMapBrush`: map-building solids as data, convex collision, UVs in metres |
 | [brush-entities.md](brush-entities.md) | The converter's doors, buttons, lifts, triggers and output links as manifest data, and `DotMapEntities` reading them |
 | [converter-v2.md](converter-v2.md) | The next converter: a lossless store of each source map, a replacement layer with a coverage report, the entity-class library and the I/O runtime, and the migration plan |
