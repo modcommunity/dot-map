@@ -11,7 +11,7 @@ extends Node3D
 ## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
 ## thick at (256, 256, 16), at 0.01905 m per unit.
 
-const CHECKS := 73
+const CHECKS := 75
 const SECTIONS := 6
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
@@ -251,6 +251,21 @@ func _test_glass() -> void:
 			"glass is alpha-blended and see-through")
 	_check(DotMapBspMesh.glass_material(&"glass_frosted").albedo_color.a > DotMapBspMesh.glass_material(&"glass").albedo_color.a,
 			"frosted is more opaque than clear")
+	var fence_tex := DotMapBspMesh.cutout_texture(&"diamond")
+	var fence_img := fence_tex.get_image()
+	var covered := func(level: int) -> float:
+		var lvl := Image.create_from_data(fence_img.get_width(), fence_img.get_height(), true, fence_img.get_format(), fence_img.get_data())
+		var n := 0
+		var w := maxi(fence_img.get_width() >> level, 1)
+		var off := lvl.get_mipmap_offset(level)
+		var d := lvl.get_data()
+		for i in w * w:
+			if d[off + i * 4 + 3] >= 128:
+				n += 1
+		return float(n) / float(w * w)
+	_check(absf(covered.call(1) - covered.call(0)) < 0.12 and covered.call(2) > 0.1,
+			"a thin cutout keeps its coverage in the mips, so a fence does not vanish at distance (%.2f, %.2f vs %.2f)" % [covered.call(1), covered.call(2), covered.call(0)])
+	_check(DotMapBspMesh.glass_material(&"fence").alpha_antialiasing_mode == BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE, "cutouts use alpha to coverage")
 	_check(DotMapBspMesh.glass_material(&"nonsense") == DotMapBspMesh.glass_material(&"glass"), "an unknown kind is clear glass, shared")
 	_check(world.breakables().size() == 1 and str(world.breakables()[0]["glass"]) == "glass", "one breakable glass model")
 	var panes := world.build_breakables(root)

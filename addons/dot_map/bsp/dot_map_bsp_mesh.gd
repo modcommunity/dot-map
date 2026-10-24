@@ -208,6 +208,7 @@ static func glass_material(glass_kind: StringName, tint: Array = []) -> Standard
 	if mode == &"cut":
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 		m.alpha_scissor_threshold = 0.5
+		m.alpha_antialiasing_mode = BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE
 		m.albedo_texture = cutout_texture(StringName(look["pattern"]))
 	elif mode == &"glow":
 		m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
@@ -266,9 +267,61 @@ static func cutout_texture(pattern: StringName) -> ImageTexture:
 						if Vector2(dx * 0.7, dy * 1.2).length() <= r:
 							img.set_pixel(posmod(int(c.x) + dx, n), posmod(int(c.y) + dy, n), col)
 	img.generate_mipmaps()
+	img = keep_coverage(img)
 	var tex := ImageTexture.create_from_image(img)
 	_cutouts[pattern] = tex
 	return tex
+
+
+## [param img] (RGBA8, with mipmaps) with each mip's alpha scaled so the share of texels past the 0.5
+## scissor threshold equals the top level's. Averaged alpha of a thin line falls under 0.5 a mip or
+## two down, so a fence would vanish at distance; this keeps it as a thinner, fainter-edged line.
+static func keep_coverage(img: Image) -> Image:
+	var top := img.duplicate() as Image
+	top.clear_mipmaps()
+	var want := 0
+	for y in top.get_height():
+		for x in top.get_width():
+			if top.get_pixel(x, y).a >= 0.5:
+				want += 1
+	var share := float(want) / float(top.get_width() * top.get_height())
+	var data := img.get_data()
+	var w := img.get_width()
+	var h := img.get_height()
+	for level in range(1, img.get_mipmap_count() + 1):
+		w = maxi(w >> 1, 1)
+		h = maxi(h >> 1, 1)
+		var base := img.get_mipmap_offset(level)
+		var count := w * h
+		var alphas := PackedFloat32Array()
+		alphas.resize(count)
+		for i in count:
+			alphas[i] = float(data[base + i * 4 + 3]) / 255.0
+		if share <= 0.0 or share >= 1.0:
+			continue
+		var sorted := alphas.duplicate()
+		sorted.sort()
+		# The lowest alpha that lets no more than ~30% over the wanted share past the threshold. A level
+		# gone near-uniform (no line left to keep) has none and is left to alpha-to-coverage.
+		var cut := -1.0
+		var k := count - 1
+		while k >= 0:
+			var v := sorted[k]
+			var j := k
+			while j > 0 and sorted[j - 1] == v:
+				j -= 1
+			if float(count - j) > float(count) * share * 1.3:
+				break
+			cut = v
+			k = j - 1
+		if cut < 0.004:
+			continue
+		var scale := 0.5 / cut
+		if scale <= 1.0:
+			continue
+		for i in count:
+			data[base + i * 4 + 3] = int(round(minf(alphas[i] * scale, 1.0) * 255.0))
+	return Image.create_from_data(img.get_width(), img.get_height(), true, img.get_format(), data)
 
 
 func _glass_for(rec: Dictionary) -> Material:
