@@ -43,34 +43,34 @@ const DEFAULT_ROOT := "res://addons/dot_map/surfaces"
 ## [code]rough[/code] scales the roughness map (a photo's own roughness is a little glossy for
 ## a mid-2000s look under one hard light); [code]metal[/code] is the metallic value.
 const KINDS := {
-	&"concrete": {"meters": 2.5, "rough": 1.0, "metal": 0.0},
-	&"concrete_clean": {"meters": 3.0, "rough": 1.0, "metal": 0.0},
-	&"plaster": {"meters": 2.5, "rough": 1.0, "metal": 0.0},
-	&"brick": {"meters": 3.0, "rough": 1.0, "metal": 0.0},
-	&"tile_white": {"meters": 2.4, "rough": 1.0, "metal": 0.0},
-	&"tile_dark": {"meters": 3.0, "rough": 1.0, "metal": 0.0},
-	&"tile_checker": {"meters": 3.0, "rough": 1.0, "metal": 0.0},
-	&"wood_floor": {"meters": 1.6, "rough": 1.0, "metal": 0.0},
-	&"wood_planks": {"meters": 1.2, "rough": 1.0, "metal": 0.0},
-	&"asphalt": {"meters": 3.0, "rough": 1.0, "metal": 0.0},
-	&"metal": {"meters": 2.0, "rough": 1.0, "metal": 0.6},
-	&"rust": {"meters": 2.0, "rough": 1.0, "metal": 0.3},
-	&"corrugated": {"meters": 3.0, "rough": 1.0, "metal": 0.5},
-	&"grass": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
-	&"ground": {"meters": 3.0, "rough": 1.0, "metal": 0.0},
-	&"carpet_grey": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
-	&"carpet_pattern": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
-	&"carpet_red": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
-	&"carpet_blue": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
-	&"snow": {"meters": 3.0, "rough": 1.0, "metal": 0.0},
-	&"rock": {"meters": 4.0, "rough": 1.0, "metal": 0.0},
-	&"sand": {"meters": 3.0, "rough": 1.0, "metal": 0.0},
-	&"stone_block": {"meters": 3.0, "rough": 1.0, "metal": 0.0},
-	&"roof_clay": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
-	&"ceiling_tile": {"meters": 2.4, "rough": 1.0, "metal": 0.0},
-	&"plaster_worn": {"meters": 2.5, "rough": 1.0, "metal": 0.0},
-	&"wallpaper": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
-	&"wallpaper_decrepit": {"meters": 2.0, "rough": 1.0, "metal": 0.0},
+	&"concrete": {"meters": 2.5, "rough": 1.0, "metal": 0.0, "mean": [0.567, 0.531, 0.452]},
+	&"concrete_clean": {"meters": 3.0, "rough": 1.0, "metal": 0.0, "mean": [0.723, 0.723, 0.723]},
+	&"plaster": {"meters": 2.5, "rough": 1.0, "metal": 0.0, "mean": [0.745, 0.748, 0.732]},
+	&"brick": {"meters": 3.0, "rough": 1.0, "metal": 0.0, "mean": [0.522, 0.415, 0.327]},
+	&"tile_white": {"meters": 2.4, "rough": 1.0, "metal": 0.0, "mean": [0.973, 0.972, 0.971]},
+	&"tile_dark": {"meters": 3.0, "rough": 1.0, "metal": 0.0, "mean": [0.209, 0.211, 0.214]},
+	&"tile_checker": {"meters": 3.0, "rough": 1.0, "metal": 0.0, "mean": [0.333, 0.295, 0.265]},
+	&"wood_floor": {"meters": 1.6, "rough": 1.0, "metal": 0.0, "mean": [0.359, 0.294, 0.224]},
+	&"wood_planks": {"meters": 1.2, "rough": 1.0, "metal": 0.0, "mean": [0.724, 0.596, 0.411]},
+	&"asphalt": {"meters": 3.0, "rough": 1.0, "metal": 0.0, "mean": [0.271, 0.265, 0.264]},
+	&"metal": {"meters": 2.0, "rough": 1.0, "metal": 0.6, "mean": [0.433, 0.429, 0.418]},
+	&"rust": {"meters": 2.0, "rough": 1.0, "metal": 0.3, "mean": [0.547, 0.299, 0.152]},
+	&"corrugated": {"meters": 3.0, "rough": 1.0, "metal": 0.5, "mean": [0.509, 0.508, 0.506]},
+	&"grass": {"meters": 2.0, "rough": 1.0, "metal": 0.0, "mean": [0.378, 0.426, 0.190]},
+	&"ground": {"meters": 3.0, "rough": 1.0, "metal": 0.0, "mean": [0.598, 0.576, 0.343]},
+	&"carpet_grey": {"meters": 2.0, "rough": 1.0, "metal": 0.0, "mean": [0.578, 0.569, 0.544]},
+	&"carpet_pattern": {"meters": 2.0, "rough": 1.0, "metal": 0.0, "mean": [0.448, 0.451, 0.454]},
+	&"carpet_red": {"meters": 2.0, "rough": 1.0, "metal": 0.0, "mean": [0.657, 0.359, 0.353]},
+	&"carpet_blue": {"meters": 2.0, "rough": 1.0, "metal": 0.0, "mean": [0.205, 0.231, 0.284]},
+	&"snow": {"meters": 3.0, "rough": 1.0, "metal": 0.0, "mean": [0.928, 0.953, 0.977]},
+	&"rock": {"meters": 4.0, "rough": 1.0, "metal": 0.0, "mean": [0.550, 0.546, 0.537]},
+	&"sand": {"meters": 3.0, "rough": 1.0, "metal": 0.0, "mean": [0.709, 0.620, 0.443]},
+	&"stone_block": {"meters": 3.0, "rough": 1.0, "metal": 0.0, "mean": [0.440, 0.426, 0.376]},
+	&"roof_clay": {"meters": 2.0, "rough": 1.0, "metal": 0.0, "mean": [0.562, 0.358, 0.265]},
+	&"ceiling_tile": {"meters": 2.4, "rough": 1.0, "metal": 0.0, "mean": [0.942, 0.942, 0.942]},
+	&"plaster_worn": {"meters": 2.5, "rough": 1.0, "metal": 0.0, "mean": [0.843, 0.830, 0.817]},
+	&"wallpaper": {"meters": 2.0, "rough": 1.0, "metal": 0.0, "mean": [0.877, 0.881, 0.861]},
+	&"wallpaper_decrepit": {"meters": 2.0, "rough": 1.0, "metal": 0.0, "mean": [0.466, 0.418, 0.367]},
 }
 
 ## Names a generator already uses for a surface, to the kind that draws it. A map document that
@@ -94,6 +94,17 @@ var path_fn: Callable = Callable()
 ## on the instance it bakes with: a lightmap holds diffuse light only, and a metallic surface has
 ## almost no diffuse, so a baked corrugated roof drew nearly black.
 var metallic_scale: float = 1.0
+
+## [method world_material_for] tints each replacement towards the original texture's average
+## colour; off draws every kind's photo as it is (which read pale beside dark source wood and rock).
+var match_original: bool = true
+
+## What [method world_material_for] draws water faces with (a game's own water shader); null is [method default_water].
+var water_material: Material = null
+
+## The tint range [method original_tint] keeps to: a black original still shows its kind.
+const TINT_MIN := 0.25
+const TINT_MAX := 1.3
 
 ## Triplanar blend sharpness: higher is a harder seam on a bevel, lower a smeared one.
 var sharpness: float = 4.0
@@ -197,21 +208,65 @@ func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 			generated[str(t["key"])] = dir.path_join(str(t["file"]))
 	var cache := {}
 	return func(rec: Dictionary) -> Material:
-		var key := str(rec.get("free", ""))
+		if rec.get("water", false):
+			return water_material if water_material != null else default_water()
+		var free := str(rec.get("free", ""))
+		var tint := Color.WHITE
+		# A blend's average is two textures' (grass and rock), never the one drawn: left untinted.
+		var blend := str(rec.get("material", "")).get_file().to_lower().begins_with("blend")
+		if match_original and not generated.has(free) and not blend:
+			tint = original_tint(StringName(free.get_slice(":", 0)), rec.get("colour", []))
+		var key := "%s|%s" % [free, tint.to_html()]
 		if cache.has(key):
 			return cache[key]
 		var m: Material
-		if generated.has(key):
+		if generated.has(free):
 			var sm := StandardMaterial3D.new()
-			sm.albedo_texture = ImageTexture.create_from_image(Image.load_from_file(generated[key]))
+			sm.albedo_texture = ImageTexture.create_from_image(Image.load_from_file(generated[free]))
 			sm.uv1_triplanar = true
 			sm.uv1_world_triplanar = true
 			sm.uv1_scale = Vector3.ONE * 0.4
 			m = sm
 		else:
-			m = material(StringName(key.get_slice(":", 0)))
+			m = material(StringName(free.get_slice(":", 0)), tint)
 		cache[key] = m
 		return m
+
+
+## The sea a converted map's water faces are drawn with when [member water_material] is not set:
+## a water texture's average is a grey dummy, and drawn opaque it was a pale gravel floor.
+func default_water() -> StandardMaterial3D:
+	if not _cache.has("water"):
+		var m := StandardMaterial3D.new()
+		m.resource_name = "water"
+		m.albedo_color = Color(0.06, 0.24, 0.28, 0.88)
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.roughness = 0.08
+		m.metallic_specular = 0.7
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		_cache["water"] = m
+	return _cache["water"]
+
+
+## The tint that brings [param kind]'s photo to the original texture's average [param colour]
+## (sRGB, the converter's `colour`): its brightness fully, its hue half way, so a blend texture's
+## average does not turn grass grey. White for an unknown kind or no colour.
+func original_tint(kind: StringName, colour: Variant) -> Color:
+	var k := resolve(kind)
+	if k == &"" or not colour is Array or (colour as Array).size() < 3:
+		return Color.WHITE
+	var mean: Array = KINDS[k]["mean"]
+	var want := Color(float(colour[0]), float(colour[1]), float(colour[2]))
+	var have := Color(float(mean[0]), float(mean[1]), float(mean[2]))
+	var lum_w := maxf(want.get_luminance(), 0.01)
+	var lum_h := maxf(have.get_luminance(), 0.01)
+	var gain := clampf(lum_w / lum_h, TINT_MIN, TINT_MAX)
+	var out := Color.WHITE
+	for i in 3:
+		var hue: float = (want[i] / lum_w) / maxf(have[i] / lum_h, 0.01)
+		# Quantised so a map's few hundred surfaces share a few dozen materials.
+		out[i] = snappedf(clampf(gain * lerpf(1.0, hue, 0.5), TINT_MIN, TINT_MAX), 1.0 / 32.0)
+	return out
 
 
 ## Drops every cached material (a texture quality change, or a test).
