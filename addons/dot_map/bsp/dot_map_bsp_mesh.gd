@@ -176,7 +176,14 @@ func surface_arrays(rec: Dictionary) -> Array:
 const GLASS_LOOKS := {
 	&"glass": {"colour": Color(0.72, 0.86, 0.92, 0.22), "roughness": 0.05},
 	&"glass_frosted": {"colour": Color(0.85, 0.9, 0.93, 0.55), "roughness": 0.55},
+	&"fence": {"colour": Color(0.62, 0.64, 0.66), "roughness": 0.5, "pattern": &"diamond", "mode": &"cut"},
+	&"grate": {"colour": Color(0.38, 0.39, 0.4), "roughness": 0.6, "pattern": &"grid", "mode": &"cut"},
+	&"bars": {"colour": Color(0.22, 0.22, 0.24), "roughness": 0.6, "pattern": &"bars", "mode": &"cut"},
+	&"ladder": {"colour": Color(0.5, 0.42, 0.3), "roughness": 0.7, "pattern": &"ladder", "mode": &"cut"},
+	&"foliage_card": {"colour": Color(1, 1, 1), "roughness": 0.9, "pattern": &"leaves", "mode": &"cut"},
+	&"shield": {"colour": Color(0.25, 0.55, 1.0, 0.45), "roughness": 0.2, "mode": &"glow"},
 }
+## `mode` cut is an alpha-scissor card with a drawn pattern, glow an additive sheet; both are drawn only.
 static var _glass_cache: Dictionary = {}
 
 
@@ -197,9 +204,71 @@ static func glass_material(glass_kind: StringName, tint: Array = []) -> Standard
 	m.roughness = float(look["roughness"])
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var mode: StringName = look.get("mode", &"glass")
+	if mode == &"cut":
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+		m.alpha_scissor_threshold = 0.5
+		m.albedo_texture = cutout_texture(StringName(look["pattern"]))
+	elif mode == &"glow":
+		m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.albedo_color = Color(c.r, c.g, c.b, 1.0) * c.a
 	m.resource_name = str(glass_kind)
 	_glass_cache[key] = m
 	return m
+
+
+static var _cutouts: Dictionary = {}
+
+
+## A 128 px tileable alpha-cutout image drawn in code (so it has no licence): wire diamonds, a grid,
+## vertical bars with rails, ladder rungs or leaf blobs. Colour is in the texture only for foliage.
+static func cutout_texture(pattern: StringName) -> ImageTexture:
+	if _cutouts.has(pattern):
+		return _cutouts[pattern]
+	var n := 128
+	var img := Image.create(n, n, true, Image.FORMAT_RGBA8)
+	img.fill(Color(1, 1, 1, 0))
+	var solid := Color.WHITE
+	match pattern:
+		&"diamond":
+			for y in n:
+				for x in n:
+					var d := (x + y) % 16
+					var e := (x - y + n) % 16
+					if d < 2 or e < 2:
+						img.set_pixel(x, y, solid)
+		&"grid":
+			for y in n:
+				for x in n:
+					if x % 16 < 3 or y % 16 < 3:
+						img.set_pixel(x, y, solid)
+		&"bars":
+			for y in n:
+				for x in n:
+					if x % 16 < 4 or y < 6 or (y >= 61 and y < 67) or y >= n - 6:
+						img.set_pixel(x, y, solid)
+		&"ladder":
+			for y in n:
+				for x in n:
+					if x < 10 or x >= n - 10 or y % 24 < 6:
+						img.set_pixel(x, y, solid)
+		&"leaves":
+			var rng := RandomNumberGenerator.new()
+			rng.seed = 7
+			for k in 70:
+				var c := Vector2(rng.randf() * n, rng.randf() * n)
+				var r := rng.randf_range(5.0, 11.0)
+				var shade := rng.randf_range(0.55, 1.0)
+				var col := Color(0.16 * shade, 0.38 * shade, 0.1 * shade, 1.0)
+				for dy in range(-12, 13):
+					for dx in range(-12, 13):
+						if Vector2(dx * 0.7, dy * 1.2).length() <= r:
+							img.set_pixel(posmod(int(c.x) + dx, n), posmod(int(c.y) + dy, n), col)
+	img.generate_mipmaps()
+	var tex := ImageTexture.create_from_image(img)
+	_cutouts[pattern] = tex
+	return tex
 
 
 func _glass_for(rec: Dictionary) -> Material:
@@ -466,6 +535,36 @@ static func _key(keys: Dictionary, name: String, fallback: float) -> float:
 		if k.to_lower() == name:
 			return float(str(keys[k]).split(" ")[0])
 	return fallback
+
+
+## Which free sky panorama (`addons/dot_map/sky/<kind>.jpg`) stands in for the map's sky name, or
+## &"" for a night, space or unnamed sky (those stay the procedural sky and its stars).
+static func sky_kind(sky_name: String) -> StringName:
+	var n := sky_name.to_lower()
+	if n.is_empty():
+		return &""
+	for w in ["night", "dark", "black", "space", "star", "moon"]:
+		if n.contains(w):
+			return &""
+	for w in ["borealis", "ep01", "ep02", "cloudy", "storm", "overcast", "verystill", "grey", "gray"]:
+		if n.contains(w):
+			return &"overcast"
+	if n.contains("day03") or n.contains("sunset") or n.contains("dusk") or n.contains("day01_09") or n.contains("day02_09"):
+		return &"dusk"
+	if n.contains("day01_01") or n.contains("day01_02") or n.contains("day01_03") or n.contains("clear"):
+		return &"clear"
+	return &"cloudy"
+
+
+## The manifest's sky as a panorama texture from [param root] (a folder holding the four kinds), or null.
+func sky_panorama(root: String = "res://addons/dot_map/sky") -> Texture2D:
+	var kind := sky_kind(str(environment_data().get("sky", {}).get("name", "")))
+	if kind == &"":
+		return null
+	var path := root.path_join("%s.jpg" % kind)
+	if not ResourceLoader.exists(path):
+		return null
+	return load(path) as Texture2D
 
 
 ## The map's outdoors as nodes: a [WorldEnvironment] (procedural sky from the sun and ambient

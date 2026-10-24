@@ -52,3 +52,9 @@ The client shell bundles dot-map, so the 12 MB of textures here must not ride in
 ## Not here
 
 No decals, no blood or graffiti, no rubble models: CC0 sources for those were not found (ambientCG's decal category is stains, road markings and manhole covers; Poly Haven has barriers, barrels, tyres and a chain-link fence, but no pallets or rubble).
+
+## See-through kinds in converted maps
+
+A converted map's texture map (`tools/bsp/dotbsp/source_textures.tsv`) can name a see-through generic: `fence` (diamond mesh), `grate`, `bars` and `ladder` are drawn alpha-scissored from a pattern `DotMapBspMesh.cutout_texture` paints in code, `foliage_card` is a leaf cutout, `shield` is an additive glow, and `glass*` are the tinted panes. `invisible` marks decal, fog and light cards, which are skipped. None needs a licence file.
+
+Sky: `DotMapBspMesh.sky_kind(sky_name)` picks `clear`, `cloudy`, `overcast` or `dusk` (night and space names return empty, so a game keeps its procedural night sky), and `sky_panorama(root)` loads the matching panorama from `addons/dot_map/sky/` (Poly Haven, CC0; credits beside the files). A game that vendors the folder passes its own root.
