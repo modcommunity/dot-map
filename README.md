@@ -140,6 +140,10 @@ await host.change_to(&"surf_tidewater")    # announce, wait for peers, swap, tel
 
 On the client, `DotMapSyncClient.handle(payload)` takes whatever arrives. A host may say which map, never what the map is: a map the client does not have must be delivered content. A game whose maps are data read by one scene in its own build lists that scene in `trusted_template_scenes`, and the delivered requirement then applies to the data instead — see [`docs/changing.md`](docs/changing.md#template-scenes) for exactly what that does and does not let a host do.
 
+## Drawing only what can be seen
+
+A converted map keeps its precomputed visibility data (clusters, the potentially visible set, area portals) and gets occluders from its large solid brushes. `DotMapVisibility` shows only the chunks and props the camera's cluster can see, re-deciding only when the camera changes cluster, and closes area portals when their doors shut. `vis_mode` is off, pvs, occluders or both; a map without the data draws everything. Details and measurements in [docs/visibility.md](docs/visibility.md).
+
 ## Documentation
 
 [`docs/`](docs/README.md) has the design reasoning: why the catalogue is not the rotation, the order a map change has to happen in and what breaks when it does not, and why the loader reaches dot-cloud through the registry rather than by name.

@@ -1,10 +1,10 @@
 {
  "bin": {
-  "bytes": 3312,
+  "bytes": 3792,
   "compression": "gzip",
   "file": "fixture.bin",
-  "sha256": "63dbb506329bd98b1ac8e06b0e0122d9652e071aba1587aac661e94d667579e0",
-  "stored_bytes": 501
+  "sha256": "c95542e71d4766690113c0e8fb9b57582896ae418689b5674d281173905bc714",
+  "stored_bytes": 648
  },
  "counts": {
   "hulls": 3,
@@ -304,5 +304,16 @@
   "y0": 0.0
  },
  "version": 1,
+ "vis": {
+  "clusters": 0,
+  "occluder_indices": {
+   "count": 72,
+   "offset": 3504
+  },
+  "occluder_vertices": {
+   "count": 16,
+   "offset": 3312
+  }
+ },
  "volumes": []
 }

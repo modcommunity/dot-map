@@ -215,7 +215,8 @@ func _glass_for(rec: Dictionary) -> Material:
 ## [Material] or null; a glass surface (record key [code]glass[/code]) never asks it and gets
 ## [member glass_material_for] or the built-in glass, in meshes of their own so they can skip shadows.
 ## Records of a chunk that get the same material are one surface: one draw, not one per brush face.
-## Returns [code][{mesh: ArrayMesh, chunk: Array, sky3d: bool, glass: bool}][/code].
+## Returns [code][{mesh: ArrayMesh, chunk: Array, sky3d: bool, glass: bool, clusters: Variant}][/code]:
+## [code]clusters[/code] is every visibility cluster the mesh touches, null when it must always be drawn.
 func build_meshes(model: int, material_for: Callable = Callable()) -> Array[Dictionary]:
 	var groups := {}
 	for rec: Dictionary in surfaces:
@@ -246,13 +247,38 @@ func build_meshes(model: int, material_for: Callable = Callable()) -> Array[Dict
 			if mesh == null or mesh.get_surface_count() >= MAX_SURFACES:
 				mesh = ArrayMesh.new()
 				out.append({"mesh": mesh, "chunk": first.get("chunk", []), "sky3d": bool(first.get("sky3d", false)),
-						"glass": first.has("glass")})
+						"glass": first.has("glass"), "clusters": _clusters_of(groups[key])})
 			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _merged_arrays(entry["recs"]))
 			var s := mesh.get_surface_count() - 1
 			mesh.surface_set_name(s, str(first.get("material", "")))
 			if entry["material"] != null:
 				mesh.surface_set_material(s, entry["material"])
 	return out
+
+
+## The union of the records' clusters, or null when any record has none (drawn from everywhere).
+static func _clusters_of(recs: Array) -> Variant:
+	var seen := {}
+	for rec: Dictionary in recs:
+		var c: Variant = rec.get("clusters")
+		if not c is Array or (c as Array).is_empty():
+			return null
+		for k: Variant in c:
+			seen[int(k)] = true
+	return PackedInt32Array(seen.keys())
+
+
+## Bytes of one block the manifest's [code]vis[/code] record points at ([code]{offset, count}[/code]
+## of [param width]-byte items), empty when it is absent or outside the data.
+func vis_bytes(key: String, width: int = 4) -> PackedByteArray:
+	var rec: Variant = (manifest.get("vis", {}) as Dictionary).get(key)
+	if not rec is Dictionary:
+		return PackedByteArray()
+	var at := int(rec.get("offset", -1))
+	var length := int(rec.get("count", 0)) * width
+	if at < 0 or at + length > _blob.size():
+		return PackedByteArray()
+	return _blob.slice(at, at + length)
 
 
 ## [method surface_arrays] of several records as one, the indices offset onto the joined vertices.
@@ -346,6 +372,8 @@ func build_node(material_for: Callable = Callable()) -> Node3D:
 			mi.position = -parent.position
 			var c: Array = g["chunk"]
 			mi.name = "sky3d" if g["sky3d"] else ("chunk_%d_%d" % [c[0], c[1]] if c.size() == 2 else "mesh")
+			if g["clusters"] != null and model == WORLD:
+				mi.set_meta(&"vis_clusters", g["clusters"])
 			if g["glass"]:
 				mi.name = "glass_" + str(mi.name)
 				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

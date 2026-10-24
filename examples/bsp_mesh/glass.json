@@ -1,10 +1,10 @@
 {
  "bin": {
-  "bytes": 4416,
+  "bytes": 4656,
   "compression": "gzip",
   "file": "glass.bin",
-  "sha256": "c36c7e3f00d52499cc6204855dfc86095ee2a2b07298753d817c1e12010efc8c",
-  "stored_bytes": 576
+  "sha256": "3647b918bedba3ef42fb856fce6a792b7a90825a2b139acdc7354b8649498a12",
+  "stored_bytes": 656
  },
  "breakables": [
   {
@@ -252,5 +252,16 @@
   "y0": 0.0
  },
  "version": 1,
+ "vis": {
+  "clusters": 0,
+  "occluder_indices": {
+   "count": 36,
+   "offset": 4512
+  },
+  "occluder_vertices": {
+   "count": 8,
+   "offset": 4416
+  }
+ },
  "volumes": []
 }
