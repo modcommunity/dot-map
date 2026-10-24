@@ -11,7 +11,7 @@ extends Node3D
 ## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
 ## thick at (256, 256, 16), at 0.01905 m per unit.
 
-const CHECKS := 75
+const CHECKS := 81
 const SECTIONS := 6
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
@@ -163,7 +163,15 @@ func _test_environment(world: DotMapBspMesh) -> void:
 	var pl := snd.get_child(0) as AudioStreamPlayer3D
 	_check(pl.position == Vector3(1, 2, 3) and is_equal_approx(pl.max_distance, 20.0) and pl.stream != null, "placed with its radius and stream")
 	_check(absf(pl.volume_db - linear_to_db(0.5)) < 0.01, "volume carried")
+	var driver := DotMapSoundDriver.new()
+	driver.root = snd
+	_check(driver.handle("sound_fade", {"entity": 1, "name": "", "seconds": 0.0, "from": 0.0, "to": 1.0}) and absf(pl.volume_db) < 0.01, "sound_fade to 1 sets full volume by entity")
+	_check(driver.handle("sound_spin", {"entity": 1, "seconds": 0.0, "from": 100.0, "to": 200.0}) and is_equal_approx(pl.pitch_scale, 2.0), "sound_spin sets the pitch")
+	var _d := driver.handle("sound_spin", {"entity": 1, "seconds": 0.0, "from": 100.0, "to": 1.0e9})
+	_check(is_equal_approx(pl.pitch_scale, 4.0), "an absurd pitch is clamped")
+	_check(not driver.handle("sound_fade", {"entity": 99, "name": "nobody", "seconds": 1.0}) and not driver.handle("beat", {}), "an unknown player or event does nothing")
 	snd.free()
+	driver.free()
 	var hooked := []
 	var snd2 := world.build_sounds(func(_id: String) -> AudioStream: return AudioStreamGenerator.new(),
 			func(rec: Dictionary, _s: AudioStream) -> Node:
@@ -175,6 +183,15 @@ func _test_environment(world: DotMapBspMesh) -> void:
 	_check(props.get_child_count() == 1 and absf((props.get_child(0) as Node3D).rotation_degrees.y - 180.0) < 0.01, "the chair stand-in is placed and turned to face +X at yaw 90")
 	_check((props.get_child(0) as Node3D).position == Vector3(2, 0, -3), "at its place")
 	props.free()
+	world.manifest["props"] = [{"stand_in": "chair", "at": [0, 0, 0], "yaw": 0.0, "scale": 1.0, "solid": 6},
+			{"stand_in": "chair", "at": [3, 0, 0], "yaw": 0.0, "scale": 1.0, "solid": 0}, {"stand_in": "chair", "at": [6, 0, 0], "yaw": 0.0, "scale": 1.0, "solid": 1}]
+	var made: Array = []
+	var solid_props := world.build_props(Callable(), func(b: StaticBody3D) -> void: made.append(b))
+	_check(solid_props.get_child_count() == 3 and made.size() == 1 and (made[0] as StaticBody3D).get_child(0).get("shape") is BoxShape3D, "only solid 2/3/4/6 gets a box body: %d" % made.size())
+	solid_props.free()
+	var plain_props := world.build_props()
+	_check(plain_props.find_children("Solid", "StaticBody3D", true, false).is_empty(), "no body unless the game asks for them")
+	plain_props.free()
 	_check(world.is_free() == false, "a surface with no free key keeps the map from being called free")
 	_done()
 

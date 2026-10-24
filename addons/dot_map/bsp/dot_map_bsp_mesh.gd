@@ -551,6 +551,9 @@ const DEFAULT_PROP_DIRS: PackedStringArray = ["res://addons/dot_map/props"]
 ## The stand-in models face +Z; a Source model faces +X at yaw 0.
 const PROP_FACING_DEGREES := 90.0
 
+## A prop_dynamic `solid` value that collides as a box around its drawn model (2 bbox, 3 and 4 obb, 6 vphysics); 0, 1 and 5 do not.
+const SOLID_BOX := [2, 3, 4, 6]
+
 
 ## The manifest's [code]licence[/code] block (every free replacement with URL, author, licence), or {}.
 func licence() -> Dictionary:
@@ -770,6 +773,8 @@ func _default_player(rec: Dictionary, stream: AudioStream, level: float) -> Node
 		p = a
 	var tn := str(rec.get("targetname", ""))
 	p.name = (tn if not tn.is_empty() else "amb_%d" % int(rec.get("entity", 0))).validate_node_name()
+	p.set_meta(&"dot_map_entity", int(rec.get("entity", -1)))
+	p.set_meta(&"dot_map_gain_scale", level)
 	return p
 
 
@@ -777,7 +782,7 @@ func _default_player(rec: Dictionary, stream: AudioStream, level: float) -> Node
 ## [code]Props[/code]. [param scene_for] takes the stand-in id and returns a [PackedScene]
 ## (default: [constant DEFAULT_PROP_DIRS], [code].glb[/code]). Drawing only, no collision: the
 ## map's own hulls are what players stand on. An id with no scene is skipped.
-func build_props(scene_for: Callable = Callable()) -> Node3D:
+func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callable()) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Props"
 	var cache := {}
@@ -813,6 +818,11 @@ func build_props(scene_for: Callable = Callable()) -> Node3D:
 				(g as GeometryInstance3D).visibility_range_end = end
 				(g as GeometryInstance3D).visibility_range_end_margin = end * 0.1
 		root.add_child(n)
+		if collide_fn.is_valid() and int(rec.get("solid", 0)) in SOLID_BOX:
+			var body := _solid_body(n)
+			if body != null:
+				n.add_child(body)
+				collide_fn.call(body)
 	return root
 
 
@@ -834,6 +844,40 @@ static func _support_block(rec: Dictionary) -> MeshInstance3D:
 	mi.position = Vector3(at[0], at[1], at[2])
 	mi.rotation_degrees.y = float(rec.get("yaw", 0.0))
 	return mi
+
+
+## A static body with one box around the meshes under [param n] (its local space, so it turns and scales with the prop); null for a model with no mesh.
+static func _solid_body(n: Node3D) -> StaticBody3D:
+	var box := _local_aabb(n)
+	if box.size.x <= 0.001 or box.size.y <= 0.001 or box.size.z <= 0.001:
+		return null
+	var body := StaticBody3D.new()
+	body.name = "Solid"
+	var cs := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = box.size
+	cs.shape = shape
+	cs.position = box.get_center()
+	body.add_child(cs)
+	return body
+
+
+static func _local_aabb(n: Node3D) -> AABB:
+	var box := AABB()
+	var first := true
+	for m in n.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		var t := Transform3D.IDENTITY
+		var p: Node = mi
+		while p != null and p != n:
+			t = (p as Node3D).transform * t
+			p = p.get_parent()
+		var b := t * mi.mesh.get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	return box
 
 
 ## The longest side of the meshes under [param n], in the node's own space (its scale ignored).
