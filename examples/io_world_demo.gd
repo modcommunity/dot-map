@@ -10,8 +10,8 @@ extends Node
 ## ([code]examples/bsp_mesh/zm_4way_tunnel.entities.json[/code]); nodes are built here the way
 ## [method DotMapBspMesh.build_node] shapes them (a Node3D per model with a [code]model[/code] meta).
 
-const CHECKS := 183
-const SECTIONS := 15
+const CHECKS := 196
+const SECTIONS := 16
 const TUNNEL := "res://examples/bsp_mesh/zm_4way_tunnel.entities.json"
 
 var _passed := 0
@@ -43,6 +43,7 @@ func _run() -> void:
 	_test_spin_up()
 	_test_physbox_pose()
 	_test_state_transport()
+	await _test_shoot()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -300,7 +301,7 @@ func _test_button_chain() -> void:
 	io2.use(0)
 	io2.advance(40)
 	_check(io2.entity_of(0).state()["motion"][1] == 0.0, "using it again closes it")
-	_check(not io2.use(99).ok and not io2.hurt(0, 5.0), "use of nothing is refused, damage to a door does nothing")
+	_check(not io2.use(99).ok and io2.hurt(0, 5.0) and io2.entity_of(0).state()["motion"][1] == 0.0, "use of nothing is refused, a shot at a door only fires OnDamaged and moves nothing")
 	_done()
 
 
@@ -806,4 +807,77 @@ func _test_state_transport() -> void:
 	var r := t.receive(client, csync, batch)
 	_check(r.ok and (client.entity_of(0) as DotMapEntity).enabled and not (client.entity_of(1) as DotMapEntity).enabled, "a client applies a whole batch in order")
 	_check(not t.receive(client, csync, {"type": "io_batch", "messages": [5]}).ok, "a malformed batch is refused")
+	_done()
+
+
+func _shape_at(n: Node3D, layer: int) -> void:
+	var body := n.get_child(0) as StaticBody3D if n.get_child_count() > 0 else StaticBody3D.new()
+	if body.get_parent() == null:
+		n.add_child(body)
+	body.collision_layer = layer
+	var cs := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(1, 1, 1)
+	cs.shape = box
+	body.add_child(cs)
+
+
+func _test_shoot() -> void:
+	_section("DotMapWorld.shoot hurts the breakable, button or door a ray meets first")
+	var w := DotMapWorld.new()
+	add_child(w)
+	w.io = _io([
+		_rec(0, "func_breakable", "crate", [["health", "30"], ["model", "*5"]]),
+		_rec(1, "func_button", "btn", [["spawnflags", "512"], ["model", "*6"]], [["OnPressed", "c", "Add", "1"]]),
+		_rec(2, "func_door", "door", [["model", "*7"]], [["OnDamaged", "c", "Add", "10"]]),
+		_rec(3, "math_counter", "c", [["max", "100"]]),
+		_rec(4, "func_brush", "wall", [["model", "*8"]]),
+	])
+	w.io.bind_movers([_door_rec(2, "slide"), DotMapMover.from_record({"entity": 1, "model": 6, "kind": "button",
+			"classname": "func_button", "distance": 0.0, "direction": [1, 0, 0], "wait": 1.0, "targetname": "btn"})])
+	w.io.start()
+	# One lane each along -Z at x = 0, 3, 6, 9; the player (layer 2) stands in front of the crate.
+	for lane: Array in [[5, 0.0], [6, 3.0], [7, 6.0], [8, 9.0]]:
+		var n := _model_node(lane[0], Vector3(lane[1], 0, -10))
+		n.get_parent().remove_child(n)
+		w.add_child(n)
+		_shape_at(n, 1)
+	var player := StaticBody3D.new()
+	player.collision_layer = 2
+	var pcs := CollisionShape3D.new()
+	pcs.shape = BoxShape3D.new()
+	player.add_child(pcs)
+	player.position = Vector3(0, 0, -4)
+	w.add_child(player)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var space := w.get_world_3d().direct_space_state
+	var crate := w.io.entity_of(0) as DotMapBreakable
+	var counter := w.io.entity_of(3) as DotMapCounter
+	var o := Vector3.ZERO
+	_check(w.shoot(space, o, Vector3(0, 0, -20), 10.0, null, 1, 3.0) == -1 and crate.health == 30.0,
+			"limit 3 m (the player stands nearer than the crate) stops the shot: nothing hurt")
+	_check(w.shoot(space, o, Vector3(0, 0, -20), 10.0, null, 1, 4.0) == -1 and crate.health == 30.0,
+			"limit 4 m stops a shot at a player in front of the crate (the crate is 9.5 m away)")
+	_check(w.shoot(space, o, Vector3(0, 0, -20), 10.0, null, 1) == 0 and crate.health == 20.0,
+			"without the player in the mask the same ray hurts the crate: entity 0, 30 to 20")
+	_check(w.shoot(space, o, Vector3(0, 0, -20), 10.0, null, 1, 9.6) == 0 and crate.health == 10.0,
+			"a limit past the crate lets the shot land")
+	_check(w.shoot(space, o, Vector3(0, 0, -20), 10.0, null, 3) == -1 and crate.health == 10.0,
+			"the player is the first hit on mask 3 and is not a map entity: nothing hurt")
+	_check(w.shoot(space, o, Vector3(0, 0, -20), 10.0, null, 1) == 0 and crate.broken,
+			"the last 10 breaks the crate")
+	var from_btn := Vector3(3, 0, 0)
+	_check(w.shoot(space, from_btn, Vector3(3, 0, -20), 1.0, null, 1) == 1 and counter.value == 1.0,
+			"a button flagged damage-activates is pressed by a shot (OnPressed ran)")
+	_check(w.shoot(space, Vector3(6, 0, 0), Vector3(6, 0, -20), 1.0, null, 1) == 2 and counter.value == 11.0,
+			"a shot door fires OnDamaged")
+	_check(w.shoot(space, Vector3(9, 0, 0), Vector3(9, 0, -20), 5.0, null, 1) == -1,
+			"a plain brush model is not shootable")
+	_check(w.shoot(space, Vector3(12, 0, 0), Vector3(12, 0, -20), 5.0, null, 1) == -1, "a ray that hits nothing returns -1")
+	_check(w.shoot(space, from_btn, Vector3(3, 0, -20), 0.0, null, 1) == -1, "zero damage hurts nothing")
+	w.io.authoritative = false
+	_check(w.shoot(space, Vector3(6, 0, 0), Vector3(6, 0, -20), 1.0, null, 1) == -1 and counter.value == 11.0,
+			"a client never applies a shot")
+	w.queue_free()
 	_done()
