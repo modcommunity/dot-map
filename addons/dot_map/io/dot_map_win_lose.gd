@@ -9,6 +9,8 @@ extends DotMapEntity
 
 var slowmo_scale := 1.0
 var slowmo_seconds := 2.0
+## The longest slow motion taken, so a stray key cannot leave a game crawling.
+const MAX_SECONDS := 15.0
 
 var _scale := 1.0
 var _seconds := 2.0
@@ -16,7 +18,7 @@ var _seconds := 2.0
 
 func _configure() -> void:
 	_scale = clampf(key_float("slowmo", slowmo_scale), 0.05, 1.0)
-	_seconds = maxf(key_float("slowmoseconds", slowmo_seconds), 0.0)
+	_seconds = clampf(key_float("slowmoseconds", slowmo_seconds), 0.0, MAX_SECONDS)
 
 
 func _input(io: DotMapIO, name: String, _param: String, _activator: Variant, _caller: Variant) -> bool:

@@ -11,7 +11,7 @@ extends Node
 ## from its map-start logic and its timed trigger (Obstacle2): the expected times are read from
 ## the map's own links, then compared with the simulation.
 
-const CHECKS := 178
+const CHECKS := 180
 const SECTIONS := 14
 const OFFICE := "res://examples/io/office_io.doc.json"
 
@@ -450,7 +450,8 @@ func _test_beats_and_winlose() -> void:
 		_rec(2, "logic_winlose", "ending", [["slowmo", "0.25"], ["slowmoseconds", "3"], ["origin", "100 200 300"]],
 				[["OnWin", "nw", "Add", "1"], ["OnLose", "nw", "Add", "10"]]),
 		_rec(3, "logic_winlose", "plain"),
-		_rec(4, "math_counter", "nb", [["max", "999"]]), _rec(5, "math_counter", "nw", [["max", "999"]])], 20)
+		_rec(4, "math_counter", "nb", [["max", "999"]]), _rec(5, "math_counter", "nw", [["max", "999"]]),
+		_rec(6, "logic_beats", "frantic"), _rec(7, "logic_winlose", "endless", [["slowmo", "0.05"], ["slowmoseconds", "9999"]])], 20)
 	var events: Array = []
 	io.event_fn = func(kind: String, data: Dictionary) -> void: events.append([kind, data])
 	var tempo := io.find("tempo")[0] as DotMapBeats
@@ -461,6 +462,10 @@ func _test_beats_and_winlose() -> void:
 	_check(beats[0][1]["downbeat"] == true and beats[1][1]["downbeat"] == false and beats[3][1]["downbeat"] == true and beats[3][1]["bar"] == 1, "a bar of three: the downbeat starts each")
 	_check((io.find("nb")[0] as DotMapCounter).value == 4.0, "OnBeat is an output")
 	_check(tempo.announcer_off() and not (io.find("silent")[0] as DotMapBeats).announcer_off(), "DisableAnnoucner is read as before")
+	var frantic := io.find("frantic")[0] as DotMapBeats
+	io.send("frantic", "SetBPM", "1000000")
+	io.send("frantic", "Stop")
+	_check(frantic.interval() >= 0.1 - 0.0001, "a huge tempo is clamped (interval %f)" % frantic.interval())
 	io.send("silent", "SetBPM", "60")
 	io.send("tempo", "Stop")
 	io.advance(40)
@@ -477,6 +482,9 @@ func _test_beats_and_winlose() -> void:
 	var ends: Array = events.filter(func(e: Array) -> bool: return e[0] == "round_end")
 	_check(ends.size() == 2 and ends[0][1]["time_scale"] == 0.25 and ends[0][1]["seconds"] == 3.0 and ends[0][1]["won"] == true, "decided tells the game the slow motion the keys name")
 	_check(ends[0][1]["camera"] is Vector3 and ends[1][1]["camera"] == null and ends[1][1]["time_scale"] == 1.0, "a camera only when the entity has an origin; no slow motion by default")
+	(io.find("endless")[0] as DotMapWinLose).decided(io, true)
+	var last: Array = events.filter(func(e: Array) -> bool: return e[0] == "round_end").back()
+	_check(last[1]["seconds"] == 15.0, "slowmoseconds is capped (%s)" % last[1]["seconds"])
 	io.advance(1)
 	_check((io.find("nw")[0] as DotMapCounter).value == 1.0, "OnWin fires on the decision")
 	_check(io.unhandled.is_empty(), "no input went unhandled: %s" % [io.unhandled])

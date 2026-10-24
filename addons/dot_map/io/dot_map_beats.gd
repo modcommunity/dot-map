@@ -8,6 +8,8 @@ extends DotMapEntity
 
 ## Used when the map names no tempo; 0 leaves the beat off.
 var default_bpm := 0.0
+## The fastest tempo taken; a faster one would re-queue at the same tick and spin the event queue.
+const MAX_BPM := 600.0
 var beats_per_bar := 4
 
 var _bpm := 0.0
@@ -16,7 +18,7 @@ var _count := 0
 
 
 func _configure() -> void:
-	_bpm = key_float("bpm", default_bpm)
+	_bpm = minf(key_float("bpm", default_bpm), MAX_BPM)
 	beats_per_bar = maxi(int(key_float("beatsperbar", float(beats_per_bar))), 1)
 
 
@@ -45,7 +47,7 @@ func _input(io: DotMapIO, name: String, param: String, activator: Variant, _call
 				io.schedule_self(self, "__beat", str(_gen), interval())
 			return true
 		"setbpm":
-			_bpm = maxf(param.to_float(), 0.0)
+			_bpm = clampf(param.to_float(), 0.0, MAX_BPM)
 			_arm(io)
 			return true
 		"start":
