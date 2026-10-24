@@ -37,7 +37,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | `examples/bsp_mesh_demo.tscn` | the bsp mesh suite (75 checks, headless) on `examples/bsp_mesh/fixture`, which `tools/bsp/tests/mesh_fixture.py` writes, and `terrain_fixture.json` (`tools/bsp/tests/test_terrain.py --write`) |
 | `examples/vis_demo.tscn` | the visibility suite (16 checks on a synthetic map, headless); `-- --maps=<pack prefix>,...` adds the no-holes ray test on real converted packs ([visibility](docs/visibility.md#proof-no-holes)) |
 | `examples/bsp_world_shot.tscn`, `tools/screenshot.sh` | one frame of a converted map dressed with its free textures, environment and stand-in props (under Xvfb) |
-| `examples/io_world_demo.tscn` | toggle brushes, breakables, movers and state replication (headless, 196 checks in 16 sections) |
+| `examples/io_world_demo.tscn` | toggle brushes, breakables, movers and state replication (headless, 205 checks in 17 sections) |
 | `examples/io_demo.tscn` | the I/O suite (headless): delays, cycles, the logic classes, and Office's timed hazards from `examples/io/office_io.doc.json` |
 | `examples/volumes_demo.tscn` | `DotMapVolumes`: hurt, push, teleport, gravity, trigger, ladder and water boxes, effects, sounds, the command allow-list, and Office's lava timing (headless, 128 checks in 13 sections) |
 | `examples/world_demo.tscn` | `DotMapWorld` on the converted Office and Dan's course: one call, the hurt room per its own links, replication, manifest settings into the config (headless, 34 checks) |

@@ -43,7 +43,7 @@ func load_record(rec: Dictionary) -> void:
 		var k := str((p as Array)[0]).to_lower()
 		if not out_names.has(k):
 			keys[k] = str((p as Array)[1])
-	enabled = not flag("startdisabled")
+	enabled = not (flag("startdisabled") or flag("disabled"))
 	_configure()
 
 

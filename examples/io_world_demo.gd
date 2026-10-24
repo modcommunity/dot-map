@@ -10,8 +10,8 @@ extends Node
 ## ([code]examples/bsp_mesh/zm_4way_tunnel.entities.json[/code]); nodes are built here the way
 ## [method DotMapBspMesh.build_node] shapes them (a Node3D per model with a [code]model[/code] meta).
 
-const CHECKS := 196
-const SECTIONS := 16
+const CHECKS := 205
+const SECTIONS := 17
 const TUNNEL := "res://examples/bsp_mesh/zm_4way_tunnel.entities.json"
 
 var _passed := 0
@@ -43,6 +43,7 @@ func _run() -> void:
 	_test_spin_up()
 	_test_physbox_pose()
 	_test_state_transport()
+	_test_keys_read()
 	await _test_shoot()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
@@ -165,6 +166,40 @@ func _test_toggle_brush() -> void:
 	n2.free()
 	n3.free()
 	n4.free()
+	_done()
+
+
+func _test_keys_read() -> void:
+	_section("keys the catalogue lacked: spawnobject, sound fades and spins, disabled spawns")
+	var io := _io([
+		_rec(0, "func_breakable", "drop", [["health", "5"], ["spawnobject", "3"], ["material", "1"]]),
+		_rec(1, "func_breakable", "nodrop", [["health", "5"]]),
+		_rec(2, "ambient_generic", "hum", [["message", "ambient/hum.wav"], ["health", "10"], ["fadeinsecs", "2"], ["fadeoutsecs", "3"], ["spinup", "1.5"], ["pitchstart", "60"], ["pitch", "100"], ["volstart", "2"], ["spawnflags", "16"]]),
+		_rec(3, "info_player_human", "off", [["disabled", "1"]]),
+		_rec(4, "info_player_human", "on"),
+	])
+	var heard: Array = []
+	io.event_fn = func(kind: String, data: Dictionary) -> void: heard.append([kind, data])
+	io.effect_fn = func(_kind: String, _e: DotMapEntity, _on: bool) -> void: pass
+	io.start()
+	_check(io.hurt(0, 10.0) and io.hurt(1, 10.0), "both breakables break")
+	var drops := heard.filter(func(h: Array) -> bool: return h[0] == "spawn_object")
+	_check(drops.size() == 1 and int((drops[0][1] as Dictionary)["object"]) == 3, "only the one with spawnobject drops, object 3: %s" % [drops])
+	var hum := io.entity_of(2) as DotMapSound
+	_check(hum.fade_in == 2.0 and hum.fade_out == 3.0 and hum.spin_up == 1.5, "fade and spin times are read")
+	_check(hum.pitch_start == 60.0 and absf(hum.volume_start - 0.2) < 0.001, "start pitch and volume are read")
+	hum.stand_in = "hum"
+	io.send("hum", "PlaySound")
+	io.advance(1)
+	var fades := heard.filter(func(h: Array) -> bool: return h[0] == "sound_fade")
+	var spins := heard.filter(func(h: Array) -> bool: return h[0] == "sound_spin")
+	_check(fades.size() == 1 and (fades[0][1] as Dictionary)["in"] == true and float((fades[0][1] as Dictionary)["seconds"]) == 2.0, "PlaySound announces the fade-in: %s" % [fades])
+	_check(spins.size() == 1 and float((spins[0][1] as Dictionary)["from"]) == 60.0 and float((spins[0][1] as Dictionary)["to"]) == 100.0, "and the spin-up from 60 to 100: %s" % [spins])
+	io.send("hum", "StopSound")
+	io.advance(1)
+	fades = heard.filter(func(h: Array) -> bool: return h[0] == "sound_fade")
+	_check(fades.size() == 2 and (fades[1][1] as Dictionary)["in"] == false and float((fades[1][1] as Dictionary)["seconds"]) == 3.0, "StopSound announces the 3 s fade-out")
+	_check(not io.entity_of(3).enabled and io.entity_of(4).enabled, "a spawn with disabled=1 starts disabled, the other does not")
 	_done()
 
 

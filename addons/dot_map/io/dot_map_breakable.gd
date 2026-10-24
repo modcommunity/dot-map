@@ -117,6 +117,9 @@ func _break(io: DotMapIO, by: Variant, at: Vector3) -> void:
 	broken = true
 	health = 0.0
 	fire(io, "OnBreak", by)
+	var drop := int(key_float("spawnobject"))
+	if drop > 0:
+		io.event("spawn_object", {"entity": index, "name": targetname, "object": drop, "at": at})
 	io.report_state(self, "broken", true)
 	io.effect("break", self, true)
 	io.kill(self)

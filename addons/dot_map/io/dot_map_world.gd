@@ -151,13 +151,13 @@ func water_boxes() -> Array[AABB]:
 	return volumes.water_boxes()
 
 
-## The map's start points: every [code]info_player_*[/code] as [code]{classname, targetname, origin (metres), yaw (degrees, source axes)}[/code].
+## The map's start points: every [code]info_player_*[/code] as [code]{classname, targetname, origin (metres), yaw (degrees, source axes), enabled (false when the map starts it disabled)}[/code].
 func spawn_points() -> Array:
 	var out: Array = []
 	for e: DotMapEntity in io.entities:
 		if e.classname.begins_with("info_player"):
 			var ang := e.key("angles").split(" ")
-			out.append({"classname": e.classname, "targetname": e.targetname, "origin": e.origin(io),
+			out.append({"classname": e.classname, "targetname": e.targetname, "origin": e.origin(io), "enabled": e.enabled,
 					"yaw": ang[1].to_float() if ang.size() > 1 else 0.0})
 	return out
 
