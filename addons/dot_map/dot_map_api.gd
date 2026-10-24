@@ -41,5 +41,6 @@ extends RefCounted
 # 19: a door's replicated side is clamped to +-1 (0 keeps it), the state sync refuses a side that is not finite or beyond 1,
 #     and an opener with no known position keeps the door's current side.
 # 20: DotMapConfig file names spell `*` as `%` and `?` as `@` (the literal characters still work).
-const LEVEL := 20
+# 21: DotMapWorld.shoot (a ray's first breakable, button or door takes damage through io.hurt).
+const LEVEL := 21
 const OLDEST := 1

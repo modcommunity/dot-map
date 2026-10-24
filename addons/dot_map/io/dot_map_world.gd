@@ -95,6 +95,37 @@ func step(bodies: Array = []) -> void:
 		_push_boxes()
 
 
+## A bullet along [param from] to [param to] against the map's own breakables, buttons and doors: the
+## first body on the ray (on [param mask]) that belongs to one takes [param amount] through [method DotMapIO.hurt].
+## Returns the entity index it hurt, or -1. Pass the nearest hit's distance in [param limit] (negative: none)
+## so a player in front of the panel is not shot through. Host only.
+func shoot(space: PhysicsDirectSpaceState3D, from: Vector3, to: Vector3, amount: float, by: Variant = null,
+		mask: int = 0xFFFFFFFF, limit: float = -1.0) -> int:
+	if not io.authoritative or space == null or amount <= 0.0:
+		return -1
+	var query := PhysicsRayQueryParameters3D.create(from, to, mask)
+	var hit := space.intersect_ray(query)
+	if hit.is_empty() or (limit >= 0.0 and from.distance_to(hit["position"] as Vector3) > limit + 0.01):
+		return -1
+	var node: Node = hit["collider"] as Node
+	var model := -1
+	while node != null and node != self:
+		if node is DotMapGlass:
+			model = (node as DotMapGlass).model
+			break
+		if node.has_meta(&"model"):
+			model = int(node.get_meta(&"model"))
+			break
+		node = node.get_parent()
+	if model <= 0:
+		return -1
+	for e: DotMapEntity in io.entities:
+		if (e is DotMapBreakable or e is DotMapMoverNode) and e.key("model") == "*%d" % model:
+			io.hurt(e.index, amount, hit["position"] as Vector3, by)
+			return e.index
+	return -1
+
+
 ## Lets a joining peer in: it gets the whole state now and every change after (host only).
 func add_peer(peer: Variant) -> void:
 	if sync != null:
