@@ -44,6 +44,10 @@ var hulls: Array = []
 var source_path: String = ""
 ## Takes a glass surface record, returns its [Material]; the built-in [method glass_material] when unset.
 var glass_material_for: Callable = Callable()
+## Metres a stand-in prop is drawn to per metre of its longest side, never under
+## [member prop_view_min]: a can is gone at 30 m, a shelf at 120. 0 draws every prop at any range.
+var prop_view_per_metre: float = 60.0
+var prop_view_min: float = 30.0
 
 var _blob: PackedByteArray = PackedByteArray()
 var _movers: Dictionary = {}
@@ -210,6 +214,7 @@ func _glass_for(rec: Dictionary) -> Material:
 ## mesh under [constant MAX_SURFACES]. [param material_for] takes a surface record, returns a
 ## [Material] or null; a glass surface (record key [code]glass[/code]) never asks it and gets
 ## [member glass_material_for] or the built-in glass, in meshes of their own so they can skip shadows.
+## Records of a chunk that get the same material are one surface: one draw, not one per brush face.
 ## Returns [code][{mesh: ArrayMesh, chunk: Array, sky3d: bool, glass: bool}][/code].
 func build_meshes(model: int, material_for: Callable = Callable()) -> Array[Dictionary]:
 	var groups := {}
@@ -222,22 +227,59 @@ func build_meshes(model: int, material_for: Callable = Callable()) -> Array[Dict
 		(groups[key] as Array).append(rec)
 	var out: Array[Dictionary] = []
 	for key: String in groups:
-		var mesh: ArrayMesh = null
+		# Material instance id -> {material, recs}, in first-seen order so the build is stable.
+		var by_material := {}
 		for rec: Dictionary in groups[key]:
+			var mat: Material = null
+			if rec.has("glass"):
+				mat = _glass_for(rec)
+			elif material_for.is_valid():
+				var m: Variant = material_for.call(rec)
+				mat = m as Material if m is Material else null
+			var id := mat.get_instance_id() if mat != null else 0
+			if not by_material.has(id):
+				by_material[id] = {"material": mat, "recs": []}
+			(by_material[id]["recs"] as Array).append(rec)
+		var mesh: ArrayMesh = null
+		for entry: Dictionary in by_material.values():
+			var first: Dictionary = entry["recs"][0]
 			if mesh == null or mesh.get_surface_count() >= MAX_SURFACES:
 				mesh = ArrayMesh.new()
-				out.append({"mesh": mesh, "chunk": rec.get("chunk", []), "sky3d": bool(rec.get("sky3d", false)),
-						"glass": rec.has("glass")})
-			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays(rec))
+				out.append({"mesh": mesh, "chunk": first.get("chunk", []), "sky3d": bool(first.get("sky3d", false)),
+						"glass": first.has("glass")})
+			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _merged_arrays(entry["recs"]))
 			var s := mesh.get_surface_count() - 1
-			mesh.surface_set_name(s, str(rec.get("material", "")))
-			if rec.has("glass"):
-				mesh.surface_set_material(s, _glass_for(rec))
-			elif material_for.is_valid():
-				var mat: Variant = material_for.call(rec)
-				if mat is Material:
-					mesh.surface_set_material(s, mat)
+			mesh.surface_set_name(s, str(first.get("material", "")))
+			if entry["material"] != null:
+				mesh.surface_set_material(s, entry["material"])
 	return out
+
+
+## [method surface_arrays] of several records as one, the indices offset onto the joined vertices.
+func _merged_arrays(recs: Array) -> Array:
+	if recs.size() == 1:
+		return surface_arrays(recs[0])
+	var verts := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var uvs := PackedVector2Array()
+	var index := PackedInt32Array()
+	for rec: Dictionary in recs:
+		var a := surface_arrays(rec)
+		var base := verts.size()
+		var part: PackedInt32Array = a[Mesh.ARRAY_INDEX]
+		for k in part.size():
+			part[k] += base
+		verts.append_array(a[Mesh.ARRAY_VERTEX])
+		normals.append_array(a[Mesh.ARRAY_NORMAL])
+		uvs.append_array(a[Mesh.ARRAY_TEX_UV])
+		index.append_array(part)
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_INDEX] = index
+	return arrays
 
 
 ## Convex shapes of a model's player-solid brushes, relative to [method model_origin].
@@ -559,6 +601,7 @@ func build_props(scene_for: Callable = Callable()) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Props"
 	var cache := {}
+	var longest_of := {}
 	for rec: Dictionary in manifest.get("props", []):
 		if rec.has("box"):
 			root.add_child(_support_block(rec))
@@ -578,13 +621,22 @@ func build_props(scene_for: Callable = Callable()) -> Node3D:
 		n.rotation_degrees.y = float(rec.get("yaw", 0.0)) + PROP_FACING_DEGREES
 		n.scale = Vector3.ONE * float(rec.get("scale", 1.0))
 		var size := float(rec.get("size", 0.0))
-		if size > 0.0:
+		if not longest_of.has(id):
+			longest_of[id] = _longest_side(n)
+		var longest: float = longest_of[id]
+		if size > 0.0 and longest > 0.001:
 			# A small thing (a can, a phone) on a furniture-sized stand-in: fit its longest side to `size`.
-			var longest := _longest_side(n)
-			if longest > 0.001:
-				n.scale *= size / longest
+			n.scale *= size / longest
+		if prop_view_per_metre > 0.0:
+			var end := maxf(prop_view_min, longest * n.scale.x * prop_view_per_metre)
+			for g in n.find_children("*", "GeometryInstance3D", true, false):
+				(g as GeometryInstance3D).visibility_range_end = end
+				(g as GeometryInstance3D).visibility_range_end_margin = end * 0.1
 		root.add_child(n)
 	return root
+
+
+static var _support_material: StandardMaterial3D = null
 
 
 ## A neutral block of the measured size, for a model something rests on and no stand-in fits.
@@ -592,9 +644,10 @@ static func _support_block(rec: Dictionary) -> MeshInstance3D:
 	var dims: Array = rec["box"]
 	var box := BoxMesh.new()
 	box.size = Vector3(dims[0], dims[1], dims[2])
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.62, 0.6, 0.57)
-	box.material = mat
+	if _support_material == null:
+		_support_material = StandardMaterial3D.new()
+		_support_material.albedo_color = Color(0.62, 0.6, 0.57)
+	box.material = _support_material
 	var mi := MeshInstance3D.new()
 	mi.mesh = box
 	var at: Array = rec.get("at", [0, 0, 0])
