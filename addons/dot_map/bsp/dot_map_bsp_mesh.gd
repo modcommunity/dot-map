@@ -178,6 +178,14 @@ func surface_arrays(rec: Dictionary) -> Array:
 	if rec.has("uv2_offset"):
 		var u2 := int(rec["uv2_offset"])
 		arrays[Mesh.ARRAY_TEX_UV2] = _blob.slice(u2, u2 + 8 * n).to_vector2_array()
+	if rec.has("alpha_offset"):
+		var a0 := int(rec["alpha_offset"])
+		var alpha := _blob.slice(a0, a0 + 4 * n).to_float32_array()
+		var cols := PackedColorArray()
+		cols.resize(n)
+		for k in n:
+			cols[k] = Color(alpha[k], 0.0, 0.0, 1.0)
+		arrays[Mesh.ARRAY_COLOR] = cols
 	var i := int(rec["index_offset"])
 	arrays[Mesh.ARRAY_INDEX] = _blob.slice(i, i + 4 * int(rec["index_count"])).to_int32_array()
 	return arrays
@@ -239,6 +247,34 @@ func ambient_at(point: Vector3, normal: Vector3 = Vector3.UP) -> Color:
 			c += Vector3(_ambient[o], _ambient[o + 1], _ambient[o + 2]) * float(w[face])
 	return Color(c.x, c.y, c.z)
 
+
+## The light no lit surface falls below: the mean sky-facing ambient cube of the map (lump 56), or the sun entity's ambient, never under [constant MIN_FLOOR] so an outdoor frame is never black.
+func light_floor() -> Color:
+	var c := Vector3.ZERO
+	var rec: Variant = (manifest.get("lightmap", {}) as Dictionary).get("ambient")
+	if rec is Dictionary and int(rec["count"]) > 0:
+		var n := int(rec["count"])
+		var at := int(rec["offset"])
+		if at >= 0 and at + 84 * n <= _blob.size():
+			if _ambient.is_empty():
+				_ambient = _blob.slice(at, at + 84 * n).to_float32_array()
+			for i in n:
+				var o := 21 * i + 3 + 3 * 2
+				c += Vector3(_ambient[o], _ambient[o + 1], _ambient[o + 2])
+			c /= float(n)
+	var sun: Dictionary = environment_data().get("sun", {})
+	var a: Variant = sun.get("ambient_hdr", sun.get("ambient"))
+	if a is Array and (a as Array).size() >= 3:
+		c = c.max(Vector3(float(a[0]), float(a[1]), float(a[2])))
+	var lum := (c.x + c.y + c.z) / 3.0
+	if lum < MIN_FLOOR:
+		c = c * (MIN_FLOOR / lum) if lum > 0.0 else Vector3.ONE * MIN_FLOOR
+	return Color(c.x, c.y, c.z)
+
+
+const MIN_FLOOR := 0.3
+## The sun's least energy over a baked world: the bake of a weak outdoor sun is near black and this is what shows the outdoors.
+const SUN_MIN_LIT := 1.0
 
 ## The look of each glass kind: colour with alpha, roughness.
 const GLASS_LOOKS := {
@@ -480,6 +516,7 @@ func _merged_arrays(recs: Array) -> Array:
 	var uvs := PackedVector2Array()
 	var uv2s := PackedVector2Array()
 	var any_uv2 := false
+	var cols := PackedColorArray()
 	var index := PackedInt32Array()
 	for rec: Dictionary in recs:
 		var a := surface_arrays(rec)
@@ -491,6 +528,11 @@ func _merged_arrays(recs: Array) -> Array:
 			part_uv2 = PackedVector2Array()
 			part_uv2.resize((a[Mesh.ARRAY_VERTEX] as PackedVector3Array).size())
 		uv2s.append_array(part_uv2)
+		var part_col: Variant = a[Mesh.ARRAY_COLOR]
+		if part_col == null:
+			part_col = PackedColorArray()
+			part_col.resize((a[Mesh.ARRAY_VERTEX] as PackedVector3Array).size())
+		cols.append_array(part_col)
 		var part: PackedInt32Array = a[Mesh.ARRAY_INDEX]
 		for k in part.size():
 			part[k] += base
@@ -505,6 +547,8 @@ func _merged_arrays(recs: Array) -> Array:
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	if any_uv2:
 		arrays[Mesh.ARRAY_TEX_UV2] = uv2s
+	if recs.any(func(r: Dictionary) -> bool: return r.has("alpha_offset")):
+		arrays[Mesh.ARRAY_COLOR] = cols
 	arrays[Mesh.ARRAY_INDEX] = index
 	return arrays
 
@@ -736,6 +780,8 @@ func build_environment(max_probes: int = 8, sun_shadows: bool = true) -> Node3D:
 	e.sky = sky
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	e.ambient_light_color = amb.lerp(Color(0.4, 0.4, 0.4), 0.25)
+	if has_lightmap():
+		e.ambient_light_color = e.ambient_light_color.lerp(light_floor(), 0.5)
 	e.ambient_light_energy = 0.35 if night else 0.8
 	if env.has("tonemap") or env.has("sun"):
 		e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
@@ -763,7 +809,7 @@ func build_environment(max_probes: int = 8, sun_shadows: bool = true) -> Node3D:
 		var power := 200.0
 		if lc is Array and (lc as Array).size() > 3:
 			power = float(lc[3])
-		light.light_energy = clampf(power / 200.0, 0.2, 2.0)
+		light.light_energy = clampf(power / 200.0, SUN_MIN_LIT if has_lightmap() else 0.2, 2.0)
 		light.shadow_enabled = sun_shadows and not bool(env.get("shadows", {}).get("disabled", false))
 		root.add_child(light)
 	var cubes: Array = env.get("cubemaps", [])

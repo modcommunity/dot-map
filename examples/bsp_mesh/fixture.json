@@ -171,6 +171,7 @@
  },
  "surfaces": [
   {
+   "area": 137.78,
    "chunk": [
     0,
     -1
@@ -197,6 +198,7 @@
    "vertex_count": 24
   },
   {
+   "area": 134.8,
    "chunk": [
     0,
     -1
@@ -223,6 +225,7 @@
    "vertex_count": 20
   },
   {
+   "area": 2.97,
    "chunk": [
     0,
     0
@@ -249,6 +252,7 @@
    "vertex_count": 4
   },
   {
+   "area": 3.11,
    "classname": "func_door",
    "colour": [
     0.7354,
@@ -272,6 +276,7 @@
    "vertex_count": 12
   },
   {
+   "area": 3.11,
    "classname": "func_door",
    "colour": [
     0.7354,

@@ -105,7 +105,10 @@ var water_material: Material = null
 
 ## Draws a map that carries its author's baked lighting with it (the lightmapped shader, unshaded);
 ## off draws every map with [method try_material]'s lit materials.
+var _textures: Dictionary = {}
 var use_lightmap: bool = true
+## Folder of the shared PBR sets (`<id>/<tier>/*.webp`) when the game delivers them apart from the pack; empty reads the folder the manifest names, beside the pack.
+var pbr_library: String = ""
 
 ## Brightness of a light-emitting surface (SURF_LIGHT) in the lightmapped path.
 var emissive_energy: float = 1.5
@@ -212,11 +215,12 @@ func material(kind: StringName, tint: Color = Color.WHITE) -> StandardMaterial3D
 func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 	var generated := {}
 	var library := {}
+	var store := str(world.licence().get("pbr_store", ""))
 	for t: Dictionary in world.licence().get("textures", []):
 		if str(t["kind"]) == "generated":
 			generated[str(t["key"])] = dir.path_join(str(t["file"]))
 		elif str(t["kind"]) == "pbr":
-			library[str(t["key"])] = dir.path_join(str(t["file"]))
+			library[str(t["key"])] = _pbr_dir(dir, store, t)
 	var cache := {}
 	return func(rec: Dictionary) -> Material:
 		if rec.get("water", false):
@@ -228,15 +232,19 @@ func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 		var blend := str(rec.get("material", "")).get_file().to_lower().begins_with("blend")
 		if match_original and not generated.has(free) and not library.has(free) and not blend:
 			tint = original_tint(StringName(free.get_slice(":", 0)), rec.get("colour", []))
-		var key := "%s|%s|%s|%s" % [free, tint.to_html(), rec.get("lightmap_page", -1) if lit else -1, rec.get("emissive", false)]
+		var free2 := str(rec.get("free2", ""))
+		if not library.has(free2):
+			free2 = ""
+		var key := "%s|%s|%s|%s|%s" % [free, free2, tint.to_html(), rec.get("lightmap_page", -1) if lit else -1, rec.get("emissive", false)]
 		if cache.has(key):
 			return cache[key]
 		var m: Material
 		if lit:
 			var file: String = generated.get(free, "")
-			if library.has(free):
-				file = String(library[free]).path_join("albedo.jpg")
-			m = _lightmapped(world, rec, free, tint, file)
+			m = _lightmapped(world, rec, free, tint, file, library.get(free, ""))
+			if not free2.is_empty() and m is ShaderMaterial:
+				m.set_shader_parameter("albedo2_tex", _set_texture(library[free2], "albedo"))
+				m.set_shader_parameter("has_blend", true)
 		elif library.has(free):
 			m = _pbr_material(library[free], free)
 		elif generated.has(free):
@@ -259,16 +267,16 @@ func _pbr_material(dir: String, key: String) -> StandardMaterial3D:
 	sm.uv1_triplanar = true
 	sm.uv1_world_triplanar = true
 	sm.uv1_scale = Vector3.ONE * 0.5
-	sm.albedo_texture = _file_texture(dir.path_join("albedo.jpg"))
-	var n := _file_texture(dir.path_join("normal.jpg"))
+	sm.albedo_texture = _set_texture(dir, "albedo")
+	var n := _set_texture(dir, "normal")
 	if n != null:
 		sm.normal_enabled = true
 		sm.normal_texture = n
-	var r := _file_texture(dir.path_join("roughness.jpg"))
+	var r := _set_texture(dir, "roughness")
 	if r != null:
 		sm.roughness_texture = r
 		sm.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
-	var ao := _file_texture(dir.path_join("ao.jpg"))
+	var ao := _set_texture(dir, "ao")
 	if ao != null:
 		sm.ao_enabled = true
 		sm.ao_texture = ao
@@ -276,19 +284,43 @@ func _pbr_material(dir: String, key: String) -> StandardMaterial3D:
 	return sm
 
 
+## The folder of the PBR set [param t] names: `<library>/<id>/<tier>` for a shared store, the pack's own `pbr/<id>` for an older one.
+func _pbr_dir(dir: String, store: String, t: Dictionary) -> String:
+	var id := str(t["file"]).get_file()
+	if store.is_empty() and pbr_library.is_empty():
+		return dir.path_join(str(t["file"]))
+	var root := pbr_library if not pbr_library.is_empty() else dir.path_join(store).simplify_path()
+	return root.path_join(id).path_join(str(t.get("tier", "1k")))
+
+
+func _set_texture(dir: String, name: String) -> Texture2D:
+	for ext in ["webp", "jpg"]:
+		var p := dir.path_join("%s.%s" % [name, ext])
+		if FileAccess.file_exists(p):
+			return _file_texture(p)
+	return null
+
+
 func _file_texture(path: String) -> Texture2D:
+	if _textures.has(path):
+		return _textures[path]
 	var img := Image.load_from_file(path)
 	if img == null:
 		return null
 	img.generate_mipmaps()
-	return ImageTexture.create_from_image(img)
+	var tex := ImageTexture.create_from_image(img)
+	_textures[path] = tex
+	return tex
 
 
-func _lightmapped(world: DotMapBspMesh, rec: Dictionary, free: String, tint: Color, generated_file: String) -> Material:
+func _lightmapped(world: DotMapBspMesh, rec: Dictionary, free: String, tint: Color, generated_file: String, set_dir: String = "") -> Material:
 	var kind := StringName(free.get_slice(":", 0))
 	var tex: Texture2D = null
 	var metres := 2.5
-	if not generated_file.is_empty():
+	if not set_dir.is_empty():
+		tex = _set_texture(set_dir, "albedo")
+		metres = 2.0
+	elif not generated_file.is_empty():
 		tex = _file_texture(generated_file)
 	else:
 		var k := resolve(kind)
@@ -304,8 +336,16 @@ func _lightmapped(world: DotMapBspMesh, rec: Dictionary, free: String, tint: Col
 	m.set_shader_parameter("lightmap", world.lightmap_page(int(rec["lightmap_page"])))
 	m.set_shader_parameter("tint", Vector3(tint.r, tint.g, tint.b))
 	m.set_shader_parameter("metres", metres)
+	if not set_dir.is_empty():
+		for pair in [["normal", "normal_tex"], ["roughness", "rough_tex"], ["ao", "ao_tex"]]:
+			var pt := _set_texture(set_dir, pair[0])
+			if pt != null:
+				m.set_shader_parameter(pair[1], pt)
+				m.set_shader_parameter("has_" + pair[0], true)
 	m.set_shader_parameter("sharpness", sharpness)
 	m.set_shader_parameter("exposure", world.lightmap_scale())
+	var fl := world.light_floor()
+	m.set_shader_parameter("floor_light", Vector3(fl.r, fl.g, fl.b))
 	if rec.get("emissive", false):
 		m.set_shader_parameter("emissive", emissive_energy)
 	return m

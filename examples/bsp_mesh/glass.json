@@ -88,6 +88,7 @@
  },
  "surfaces": [
   {
+   "area": 199.18,
    "chunk": [
     0,
     -1
@@ -114,6 +115,7 @@
    "vertex_count": 20
   },
   {
+   "area": 73.39,
    "chunk": [
     0,
     -1
@@ -141,6 +143,7 @@
    "vertex_count": 24
   },
   {
+   "area": 18.3,
    "chunk": [
     0,
     -1
@@ -167,6 +170,7 @@
    "vertex_count": 20
   },
   {
+   "area": 2.97,
    "chunk": [
     0,
     0
@@ -193,6 +197,7 @@
    "vertex_count": 4
   },
   {
+   "area": 14.86,
    "chunk": [
     0,
     0
@@ -219,6 +224,7 @@
    "vertex_count": 4
   },
   {
+   "area": 6.22,
    "classname": "func_breakable",
    "colour": [
     0.7354,
