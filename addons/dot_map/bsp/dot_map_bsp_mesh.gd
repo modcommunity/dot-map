@@ -939,10 +939,14 @@ func _place_prop(rec: Dictionary, scene_for: Callable, cache: Dictionary, longes
 	if not cache.has(id):
 		cache[id] = scene_for.call(id) if scene_for.is_valid() \
 				else find_resource(id, DEFAULT_PROP_DIRS, PackedStringArray([".glb", ".tscn"]))
+	if cache[id] == null and id.begins_with("lib/"):
+		cache[id] = _library_model(id)
 	var scene: Variant = cache[id]
-	if not scene is PackedScene:
-		return null
-	var n := (scene as PackedScene).instantiate() as Node3D
+	var n: Node3D = null
+	if scene is PackedScene:
+		n = (scene as PackedScene).instantiate() as Node3D
+	elif scene is Node3D:
+		n = (scene as Node3D).duplicate() as Node3D
 	if n == null:
 		return null
 	var at: Array = rec.get("at", [0, 0, 0])
@@ -957,6 +961,38 @@ func _place_prop(rec: Dictionary, scene_for: Callable, cache: Dictionary, longes
 		# A small thing (a can, a phone) on a furniture-sized stand-in: fit its longest side to `size`.
 		n.scale *= size / longest
 	return n
+
+
+## The folder holding the pack's shared model library (default: the licence block's [code]model_store[/code] beside the mesh).
+var model_library: String = ""
+
+
+## A shipped library model (stand-in id [code]lib/<name>[/code]) loaded from the pack, re-rooted so its bottom centre sits at
+## the origin; null when the pack lacks it. A glTF outside the project has no import, so it is read with [GLTFDocument].
+func _library_model(id: String) -> Node3D:
+	var row := {}
+	for r: Dictionary in licence().get("model_stand_ins", []):
+		if str(r.get("stand_in", "")) == id:
+			row = r
+	if row.is_empty() or not row.has("store_file"):
+		return null
+	var root := model_library if not model_library.is_empty() \
+			else source_path.get_base_dir().path_join(str(licence().get("model_store", "model-library"))).simplify_path()
+	var path := root.path_join(str(row["store_file"]))
+	if not FileAccess.file_exists(path):
+		return null
+	var doc := GLTFDocument.new()
+	var state := GLTFState.new()
+	if doc.append_from_file(path, state) != OK:
+		return null
+	var model := doc.generate_scene(state) as Node3D
+	if model == null:
+		return null
+	var box := _local_aabb(model)
+	model.position -= Vector3(box.get_center().x, box.position.y, box.get_center().z)
+	var holder := Node3D.new()
+	holder.add_child(model)
+	return holder
 
 
 ## One static body with a box per solid prop (see [constant SOLID_BOX]), in world space and with no meshes, for a
