@@ -3,7 +3,7 @@ extends Node3D
 ## Renders one frame of a converted map the way a game builds it, through [DotMapWorld]: free photo and generated
 ## textures, the environment, the stand-in props, glass. Run it under a display (tools/screenshot.sh).
 ##
-##   godot --path . res://examples/bsp_world_shot.tscn -- --world=<prefix> --out=<png> [--view=spawn|overview] [--cam=x,y,z --look=x,y,z] [--nolight]
+##   godot --path . res://examples/bsp_world_shot.tscn -- --world=<prefix> --out=<png> [--view=spawn|overview] [--cam=x,y,z --look=x,y,z] [--nolight] [--nomodels]
 
 var _out := "user://shot.png"
 
@@ -21,6 +21,8 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	var world: DotMapBspMesh = res.value
+	if args.has("nomodels"):
+		world.model_library = "/nonexistent"    # the library models are left out: what a pack without the store shows
 	print(world.describe_lines())
 	print("free: %s, props: %d, ambient sounds: %d" % [world.is_free(), world.manifest.get("props", []).size(),
 			world.sounds_data().get("ambient", []).size()])

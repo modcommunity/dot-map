@@ -296,7 +296,7 @@ func _pbr_dir(dir: String, store: String, t: Dictionary) -> String:
 func _set_texture(dir: String, name: String) -> Texture2D:
 	for ext in ["webp", "jpg"]:
 		var p := dir.path_join("%s.%s" % [name, ext])
-		if FileAccess.file_exists(p):
+		if FileAccess.file_exists(p) or ResourceLoader.exists(p):
 			return _file_texture(p)
 	return null
 
@@ -304,6 +304,11 @@ func _set_texture(dir: String, name: String) -> Texture2D:
 func _file_texture(path: String) -> Texture2D:
 	if _textures.has(path):
 		return _textures[path]
+	# A mounted store slice holds the engine's import (VRAM-compressed, mipmapped), never the source file.
+	if path.begins_with("res://") and ResourceLoader.exists(path):
+		var imported := load(path) as Texture2D
+		_textures[path] = imported
+		return imported
 	var img := Image.load_from_file(path)
 	if img == null:
 		return null

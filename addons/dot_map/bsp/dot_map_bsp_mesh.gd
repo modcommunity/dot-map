@@ -992,13 +992,15 @@ func _library_model(id: String) -> Node3D:
 	var root := model_library if not model_library.is_empty() \
 			else source_path.get_base_dir().path_join(str(licence().get("model_store", "model-library"))).simplify_path()
 	var path := root.path_join(str(row["store_file"]))
-	if not FileAccess.file_exists(path):
-		return null
-	var doc := GLTFDocument.new()
-	var state := GLTFState.new()
-	if doc.append_from_file(path, state) != OK:
-		return null
-	var model := doc.generate_scene(state) as Node3D
+	var model: Node3D = null
+	if path.begins_with("res://") and ResourceLoader.exists(path):
+		var packed := load(path) as PackedScene
+		model = packed.instantiate() as Node3D if packed != null else null
+	elif FileAccess.file_exists(path):
+		var doc := GLTFDocument.new()
+		var state := GLTFState.new()
+		if doc.append_from_file(path, state) == OK:
+			model = doc.generate_scene(state) as Node3D
 	if model == null:
 		return null
 	var box := _local_aabb(model)
