@@ -30,7 +30,8 @@ extends RefCounted
 const CHANNEL := "dot_map.bsp_mesh"
 
 const FORMAT := "dot-bsp-mesh"
-const VERSION := 1
+## Version 2 adds a second UV set per surface and the manifest's [code]lightmap[/code] atlas pages; version 1 maps read as before.
+const VERSION := 2
 
 ## The renderer's limit on surfaces in one mesh; a chunk with more is split over meshes.
 const MAX_SURFACES := 256
@@ -51,6 +52,8 @@ var prop_view_min: float = 30.0
 
 var _blob: PackedByteArray = PackedByteArray()
 var _movers: Dictionary = {}
+var _pages: Dictionary = {}
+var _ambient: PackedFloat32Array = PackedFloat32Array()
 var _entities: DotMapEntities = null
 
 
@@ -101,6 +104,10 @@ static func from_data(doc: Dictionary, stored: PackedByteArray) -> DotResult:
 	m.surfaces = doc.get("surfaces", [])
 	m.hulls = doc.get("hulls", [])
 	m._blob = blob
+	for page: Dictionary in doc.get("lightmap", {}).get("pages", []):
+		var bytes := 4 * int(page.get("width", 0)) * int(page.get("height", 0))
+		if not m._fits(page, bytes, "offset"):
+			return DotResult.fail(DotError.CODE_PARSE, "a lightmap page points outside the mesh data")
 	for rec: Dictionary in doc.get("movers", []):
 		var mi: Variant = rec.get("model")
 		if mi is float or mi is int:        # a mover with no brushes of its own has a null model
@@ -109,6 +116,7 @@ static func from_data(doc: Dictionary, stored: PackedByteArray) -> DotResult:
 		if not m._fits(rec, 3 * 4 * int(rec.get("vertex_count", 0)), "position_offset") \
 				or not m._fits(rec, 3 * 4 * int(rec.get("vertex_count", 0)), "normal_offset") \
 				or not m._fits(rec, 2 * 4 * int(rec.get("vertex_count", 0)), "uv_offset") \
+				or (rec.has("uv2_offset") and not m._fits(rec, 2 * 4 * int(rec.get("vertex_count", 0)), "uv2_offset")) \
 				or not m._fits(rec, 4 * int(rec.get("index_count", 0)), "index_offset"):
 			return DotResult.fail(DotError.CODE_PARSE, "a surface points outside the mesh data", str(rec.get("material")))
 	for rec: Dictionary in m.hulls:
@@ -167,9 +175,69 @@ func surface_arrays(rec: Dictionary) -> Array:
 	arrays[Mesh.ARRAY_NORMAL] = _blob.slice(q, q + 12 * n).to_vector3_array()
 	var u := int(rec["uv_offset"])
 	arrays[Mesh.ARRAY_TEX_UV] = _blob.slice(u, u + 8 * n).to_vector2_array()
+	if rec.has("uv2_offset"):
+		var u2 := int(rec["uv2_offset"])
+		arrays[Mesh.ARRAY_TEX_UV2] = _blob.slice(u2, u2 + 8 * n).to_vector2_array()
 	var i := int(rec["index_offset"])
 	arrays[Mesh.ARRAY_INDEX] = _blob.slice(i, i + 4 * int(rec["index_count"])).to_int32_array()
 	return arrays
+
+
+## Whether the map carries its author's baked lighting (a [code]lightmap[/code] record).
+func has_lightmap() -> bool:
+	return not (manifest.get("lightmap", {}) as Dictionary).get("pages", []).is_empty()
+
+
+## Linear-light exposure of the baked lighting, 1.0 as the author compiled it.
+func lightmap_scale() -> float:
+	return float((manifest.get("lightmap", {}) as Dictionary).get("scale", 1.0))
+
+
+## Atlas page [param index] as an RGB9E5 texture, or null; built once.
+func lightmap_page(index: int) -> Texture2D:
+	if _pages.has(index):
+		return _pages[index]
+	var pages: Array = (manifest.get("lightmap", {}) as Dictionary).get("pages", [])
+	if index < 0 or index >= pages.size():
+		return null
+	var rec: Dictionary = pages[index]
+	var w := int(rec["width"])
+	var h := int(rec["height"])
+	var at := int(rec["offset"])
+	var img := Image.create_from_data(w, h, false, Image.FORMAT_RGBE9995, _blob.slice(at, at + 4 * w * h))
+	_pages[index] = ImageTexture.create_from_image(img)
+	return _pages[index]
+
+
+## The author's per-leaf ambient at [param point] (the nearest sample's cube, weighted by [param normal]), linear;
+## black when the map has none. For a prop or a character the lightmap cannot reach. Scans every sample.
+func ambient_at(point: Vector3, normal: Vector3 = Vector3.UP) -> Color:
+	var rec: Variant = (manifest.get("lightmap", {}) as Dictionary).get("ambient")
+	if not rec is Dictionary:
+		return Color.BLACK
+	var n := int(rec["count"])
+	var at := int(rec["offset"])
+	if n <= 0 or at < 0 or at + 84 * n > _blob.size():
+		return Color.BLACK
+	if _ambient.is_empty():
+		_ambient = _blob.slice(at, at + 84 * n).to_float32_array()
+	var best := 0
+	var best_d := INF
+	for i in n:
+		var d := point.distance_squared_to(Vector3(_ambient[21 * i], _ambient[21 * i + 1], _ambient[21 * i + 2]))
+		if d < best_d:
+			best_d = d
+			best = i
+	var nn := normal.normalized()
+	var w := [nn.x * nn.x, nn.x * nn.x, nn.y * nn.y, nn.y * nn.y, nn.z * nn.z, nn.z * nn.z]
+	var c := Vector3.ZERO
+	for face in 6:
+		# faces are +x, -x, +y, -y, +z, -z; only the side the normal points at counts
+		var sign_ok: bool = (face % 2 == 0) == ([nn.x, nn.x, nn.y, nn.y, nn.z, nn.z][face] >= 0.0)
+		if sign_ok:
+			var o := 21 * best + 3 + 3 * face
+			c += Vector3(_ambient[o], _ambient[o + 1], _ambient[o + 2]) * float(w[face])
+	return Color(c.x, c.y, c.z)
 
 
 ## The look of each glass kind: colour with alpha, roughness.
@@ -410,10 +478,19 @@ func _merged_arrays(recs: Array) -> Array:
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var uvs := PackedVector2Array()
+	var uv2s := PackedVector2Array()
+	var any_uv2 := false
 	var index := PackedInt32Array()
 	for rec: Dictionary in recs:
 		var a := surface_arrays(rec)
 		var base := verts.size()
+		var part_uv2: Variant = a[Mesh.ARRAY_TEX_UV2]
+		if part_uv2 != null:
+			any_uv2 = true
+		else:
+			part_uv2 = PackedVector2Array()
+			part_uv2.resize((a[Mesh.ARRAY_VERTEX] as PackedVector3Array).size())
+		uv2s.append_array(part_uv2)
 		var part: PackedInt32Array = a[Mesh.ARRAY_INDEX]
 		for k in part.size():
 			part[k] += base
@@ -426,6 +503,8 @@ func _merged_arrays(recs: Array) -> Array:
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	if any_uv2:
+		arrays[Mesh.ARRAY_TEX_UV2] = uv2s
 	arrays[Mesh.ARRAY_INDEX] = index
 	return arrays
 

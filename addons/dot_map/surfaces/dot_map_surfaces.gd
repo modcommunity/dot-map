@@ -38,6 +38,7 @@ extends RefCounted
 const CHANNEL := "dot_map.surfaces"
 
 const DEFAULT_ROOT := "res://addons/dot_map/surfaces"
+const LIGHTMAPPED := preload("lightmapped.gdshader")
 
 ## Kind to what draws it. [code]meters[/code] is the width one texture covers in the world.
 ## [code]rough[/code] scales the roughness map (a photo's own roughness is a little glossy for
@@ -101,6 +102,13 @@ var match_original: bool = true
 
 ## What [method world_material_for] draws water faces with (a game's own water shader); null is [method default_water].
 var water_material: Material = null
+
+## Draws a map that carries its author's baked lighting with it (the lightmapped shader, unshaded);
+## off draws every map with [method try_material]'s lit materials.
+var use_lightmap: bool = true
+
+## Brightness of a light-emitting surface (SURF_LIGHT) in the lightmapped path.
+var emissive_energy: float = 1.5
 
 ## The tint range [method original_tint] keeps to: a black original still shows its kind.
 const TINT_MIN := 0.25
@@ -210,17 +218,20 @@ func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 	return func(rec: Dictionary) -> Material:
 		if rec.get("water", false):
 			return water_material if water_material != null else default_water()
+		var lit := use_lightmap and world.has_lightmap() and rec.has("lightmap_page") and not rec.has("glass")
 		var free := str(rec.get("free", ""))
 		var tint := Color.WHITE
 		# A blend's average is two textures' (grass and rock), never the one drawn: left untinted.
 		var blend := str(rec.get("material", "")).get_file().to_lower().begins_with("blend")
 		if match_original and not generated.has(free) and not blend:
 			tint = original_tint(StringName(free.get_slice(":", 0)), rec.get("colour", []))
-		var key := "%s|%s" % [free, tint.to_html()]
+		var key := "%s|%s|%s|%s" % [free, tint.to_html(), rec.get("lightmap_page", -1) if lit else -1, rec.get("emissive", false)]
 		if cache.has(key):
 			return cache[key]
 		var m: Material
-		if generated.has(free):
+		if lit:
+			m = _lightmapped(world, rec, free, tint, generated.get(free, ""))
+		elif generated.has(free):
 			var sm := StandardMaterial3D.new()
 			sm.albedo_texture = ImageTexture.create_from_image(Image.load_from_file(generated[free]))
 			sm.uv1_triplanar = true
@@ -231,6 +242,33 @@ func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 			m = material(StringName(free.get_slice(":", 0)), tint)
 		cache[key] = m
 		return m
+
+
+func _lightmapped(world: DotMapBspMesh, rec: Dictionary, free: String, tint: Color, generated_file: String) -> Material:
+	var kind := StringName(free.get_slice(":", 0))
+	var tex: Texture2D = null
+	var metres := 2.5
+	if not generated_file.is_empty():
+		tex = ImageTexture.create_from_image(Image.load_from_file(generated_file))
+	else:
+		var k := resolve(kind)
+		if k != &"":
+			tex = _load("%s/%s/albedo.jpg" % [root, k])
+			metres = float(KINDS[k]["meters"])
+	if tex == null:
+		return material(kind, tint)
+	var m := ShaderMaterial.new()
+	m.resource_name = free
+	m.shader = LIGHTMAPPED
+	m.set_shader_parameter("albedo_tex", tex)
+	m.set_shader_parameter("lightmap", world.lightmap_page(int(rec["lightmap_page"])))
+	m.set_shader_parameter("tint", Vector3(tint.r, tint.g, tint.b))
+	m.set_shader_parameter("metres", metres)
+	m.set_shader_parameter("sharpness", sharpness)
+	m.set_shader_parameter("exposure", world.lightmap_scale())
+	if rec.get("emissive", false):
+		m.set_shader_parameter("emissive", emissive_energy)
+	return m
 
 
 ## The sea a converted map's water faces are drawn with when [member water_material] is not set:

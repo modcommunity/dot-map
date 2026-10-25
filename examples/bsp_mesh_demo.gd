@@ -11,8 +11,8 @@ extends Node3D
 ## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
 ## thick at (256, 256, 16), at 0.01905 m per unit.
 
-const CHECKS := 85
-const SECTIONS := 6
+const CHECKS := 95
+const SECTIONS := 7
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
 const TERRAIN := "res://examples/bsp_mesh/terrain_fixture.json"
@@ -39,6 +39,7 @@ func _run() -> void:
 		await _test_collide(world)
 		await _test_glass()
 	_test_terrain()
+	_test_lightmap()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -376,4 +377,57 @@ func _test_terrain() -> void:
 	var broken: Dictionary = fx["terrain"].duplicate()
 	broken["bytes"] = 1
 	_check(DotMapTerrain.from_dict(broken).code() == DotError.CODE_PARSE, "a wrong size is refused as a parse error")
+	_done()
+
+
+func _test_lightmap() -> void:
+	_section("lightmap: a v2 surface with a second UV set, an atlas page and an ambient cube")
+	# one triangle, positions then normals then uv then uv2 then indices, then a 2x1 RGB9E5 page, then one ambient sample
+	var blob := PackedByteArray()
+	var pos := PackedVector3Array([Vector3(0, 0, 0), Vector3(1, 0, 0), Vector3(0, 0, -1)])
+	var nor := PackedVector3Array([Vector3.UP, Vector3.UP, Vector3.UP])
+	var uv := PackedVector2Array([Vector2(0, 0), Vector2(1, 0), Vector2(0, 1)])
+	var uv2 := PackedVector2Array([Vector2(0.25, 0.5), Vector2(0.75, 0.5), Vector2(0.25, 0.5)])
+	var offs := []
+	for a: PackedByteArray in [pos.to_byte_array(), nor.to_byte_array(), uv.to_byte_array(), uv2.to_byte_array(),
+			PackedInt32Array([0, 1, 2]).to_byte_array()]:
+		offs.append(blob.size())
+		blob.append_array(a)
+	var page_at := blob.size()
+	# 1.0 white: mantissa 256 at exponent 15 + 1 - 9 + ... = (256 * 2^-8) -> shared exponent field 16 holds 2^(16-15-9)*256 = 1.0
+	var texel := 256 | (256 << 9) | (256 << 18) | (16 << 27)
+	var page := PackedByteArray()
+	page.resize(8)
+	page.encode_u32(0, texel)
+	page.encode_u32(4, texel)
+	blob.append_array(page)
+	var amb_at := blob.size()
+	var cube := PackedFloat32Array([1, 2, 3])
+	for face in 6:
+		cube.append_array(PackedFloat32Array([0.1 * (face + 1), 0.0, 0.0]))
+	blob.append_array(cube.to_byte_array())
+	var doc := {"format": "dot-bsp-mesh", "version": 2, "bin": {"bytes": blob.size()},
+			"lightmap": {"format": "rgbe9995", "scale": 1.0, "pages": [{"offset": page_at, "width": 2, "height": 1}],
+					"ambient": {"offset": amb_at, "count": 1}},
+			"surfaces": [{"model": 0, "material": "m", "vertex_count": 3, "position_offset": offs[0], "normal_offset": offs[1],
+					"uv_offset": offs[2], "uv2_offset": offs[3], "index_offset": offs[4], "index_count": 3,
+					"lightmap_page": 0}], "hulls": []}
+	var r := DotMapBspMesh.from_data(doc, blob)
+	_check(r.ok, "a v2 map loads: %s" % (r.error if not r.ok else ""))
+	var w: DotMapBspMesh = r.value
+	_check(w.has_lightmap() and w.lightmap_page(1) == null, "it has a lightmap, one page")
+	var tex := w.lightmap_page(0)
+	_check(tex != null and tex.get_width() == 2 and tex.get_height() == 1, "the page is a 2x1 texture")
+	_check(tex.get_image().get_format() == Image.FORMAT_RGBE9995, "stored as RGB9E5")
+	_check(tex.get_image().get_pixel(0, 0).is_equal_approx(Color(1, 1, 1)), "the white texel reads as 1.0: %s" % tex.get_image().get_pixel(0, 0))
+	var a := w.surface_arrays(doc["surfaces"][0])
+	_check((a[Mesh.ARRAY_TEX_UV2] as PackedVector2Array)[1].is_equal_approx(Vector2(0.75, 0.5)), "the second UV set is read")
+	var bad := doc.duplicate(true)
+	(bad["surfaces"][0] as Dictionary)["uv2_offset"] = blob.size()
+	_check(not DotMapBspMesh.from_data(bad, blob).ok, "a uv2 block past the data is refused")
+	var built := w.build_meshes(0)
+	var arrays: Array = (built[0]["mesh"] as ArrayMesh).surface_get_arrays(0)
+	_check(built.size() == 1 and arrays[Mesh.ARRAY_TEX_UV2] != null, "the built mesh keeps UV2")
+	_check(w.ambient_at(Vector3(1, 2, 3), Vector3.UP).is_equal_approx(Color(0.3, 0, 0)), "ambient: the +y face for an up normal: %s" % w.ambient_at(Vector3(1, 2, 3), Vector3.UP))
+	_check(w.ambient_at(Vector3(1, 2, 3), Vector3.DOWN).is_equal_approx(Color(0.4, 0, 0)), "ambient: the -y face for a down normal")
 	_done()
