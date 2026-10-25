@@ -2,8 +2,8 @@ extends Node
 ## Proves DotMapCredits and DotMapStore on a hand-written manifest and a stand-in cloud client.
 ## godot --headless --path . res://examples/store_demo.tscn
 
-const CHECKS := 19
-const SECTIONS := 3
+const CHECKS := 38
+const SECTIONS := 5
 
 var _passed := 0
 var _failed := 0
@@ -42,6 +42,17 @@ class FakeCloud:
 		return DotResult.success(null)
 
 
+## A cloud that cannot reach any server: what a bootstrapped checkout without the slices has.
+class OfflineCloud:
+	extends RefCounted
+
+	func dependency_prefix(_id: StringName, _version: String) -> String:
+		return ""
+
+	func ensure(id: StringName, _version: String, _groups: PackedStringArray, _url: String) -> DotResult:
+		return DotResult.fail(DotError.CODE_IO, "Could not get %s's manifest." % id)
+
+
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
 	_run.call_deferred()
@@ -59,6 +70,8 @@ func _run() -> void:
 	_credits()
 	await _store()
 	_surfaces()
+	await _missing_slices()
+	_stand_ins()
 	print("%d checks, %d failed, %d/%d sections" % [_passed + _failed, _failed, _completed, SECTIONS])
 	var bad := _failed > 0 or _passed + _failed != CHECKS or _completed != SECTIONS or _entered != SECTIONS
 	get_tree().quit(1 if bad else 0)
@@ -117,4 +130,83 @@ func _surfaces() -> void:
 	_check("an unmounted shared slice is skipped", DotMapStore.mount_dirs(lic, cloud).size() == 2)
 	s2.pbr_libraries = PackedStringArray(["res://nothing_a/pbr", "res://nothing_b/pbr"])
 	_check("a set in no shared folder falls back to the single library", s2._pbr_dir("res://m", "", {"file": "pbr/x", "tier": "2k"}) == "res://dot_cloud/gamemann/store-x/h1234abcd/pbr/x/2k")
+	_completed += 1
+
+
+func _missing_slices() -> void:
+	_entered += 1
+	var lic: Dictionary = MANIFEST["licence"].duplicate(true)
+	lic["store_pack"]["shared"] = [{"id": "gamemann/store-shared-aa", "version": "h1"}]
+	DotMapStore.reset()
+	var warns: Array[Dictionary] = []
+	var sink := func(rec: Dictionary) -> void:
+		if rec["channel"] == DotMapStore.CHANNEL and rec["level"] == DotLog.Level.WARN:
+			warns.append(rec)
+	DotLog.set_level(DotLog.Level.WARN)
+	DotLog.add_sink(sink)
+	_check("no notice before anything was tried", DotMapStore.notice(lic) == "")
+	var res: DotResult = await DotMapStore.ensure(lic, OfflineCloud.new())
+	_check("an unreachable slice fails ensure", not res.ok)
+	_check("both slices are named missing", DotMapStore.missing(lic, OfflineCloud.new()) == PackedStringArray(["gamemann/store-x@h1234abcd", "gamemann/store-shared-aa@h1"]))
+	_check("the notice says the art is low-detail", DotMapStore.notice(lic).begins_with("Low-detail art: 2"))
+	_check("the credits line carries the notice", DotMapCredits.line({"licence": lic}).contains("Low-detail art"))
+	var w := DotMapBspMesh.new()
+	w.source_path = "res://nowhere/m.json"
+	_check("apply is false without the slices", not DotMapStore.apply(lic, OfflineCloud.new(), DotMapSurfaces.new(), w))
+	DotMapStore.apply(lic, null, DotMapSurfaces.new(), w)
+	_check("one warning however often it is applied", warns.size() == 1)
+	_check("the warning names every slice and how to get them", warns.size() == 1 and str(warns[0]["fields"].get("slices", "")).contains("store-shared-aa@h1")
+			and str(warns[0]["message"]).contains("stage_stores.sh"))
+	DotMapStore.reset()
+	await DotMapStore.ensure(lic, null)
+	_check("no cloud at all is a notice too, and ensure stays ok", DotMapStore.notice(lic) != "")
+	var cloud := FakeCloud.new()
+	await DotMapStore.ensure(lic, cloud)
+	_check("a later fetch clears the notice", DotMapStore.notice(lic) == "")
+	DotLog.remove_sink(sink)
+	DotLog.set_level(DotLog.Level.ERROR)
+	DotMapStore.reset()
+	_completed += 1
+
+
+func _stand_ins() -> void:
+	_entered += 1
+	var dir := "user://store_demo_pack"
+	DirAccess.make_dir_recursive_absolute(dir + "/textures")
+	var img := Image.create(8, 8, false, Image.FORMAT_RGB8)
+	img.fill(Color(0.2, 0.6, 0.3))
+	img.save_webp(dir + "/textures/fb_Moss.webp")
+	var w := DotMapBspMesh.new()
+	w.source_path = dir + "/m.json"
+	w.manifest = {"licence": {"pbr_store": "../.stores/pbr-library", "textures": [
+		{"kind": "pbr", "key": "pbr:pbr_Bricks059", "file": "pbr/Bricks059", "tier": "1k", "colour": [0.5, 0.3, 0.2], "sources": ["walls/red01"]},
+		{"kind": "pbr", "key": "pbr:pbr_Xq7", "file": "pbr/Xq7", "tier": "1k", "colour": [0.25, 0.5, 0.75], "sources": ["models/blank"]},
+		{"kind": "pbr", "key": "pbr:pbr_Moss", "file": "pbr/Moss", "tier": "1k", "fallback_file": "textures/fb_Moss.webp"},
+	]}}
+	var s := DotMapSurfaces.new()
+	s.use_lightmap = false
+	var mat_for := s.world_material_for(w, dir)
+	_check("every missing set is listed", s.missing_sets.size() == 3)
+	var brick: Material = mat_for.call({"free": "pbr:pbr_Bricks059", "colour": [0.4, 0.2, 0.1]})
+	_check("a named set stands in as its kind's photo", brick is StandardMaterial3D and (brick as StandardMaterial3D).albedo_texture != null
+			and (brick as StandardMaterial3D).resource_name == "brick")
+	_check("tinted to the face's own colour, never white", (brick as StandardMaterial3D).albedo_color != Color.WHITE)
+	var flat: Material = mat_for.call({"free": "pbr:pbr_Xq7", "colour": [0.25, 0.5, 0.75]})
+	_check("an unnamed set is the face's colour flat", flat is StandardMaterial3D and (flat as StandardMaterial3D).albedo_color.is_equal_approx(Color(0.25, 0.5, 0.75)))
+	var small: Material = mat_for.call({"free": "pbr:pbr_Moss"})
+	_check("the pack's small albedo wins over a guess", small is StandardMaterial3D and (small as StandardMaterial3D).albedo_texture != null
+			and (small as StandardMaterial3D).albedo_texture.get_width() == 8)
+	_check("nothing is drawn the blank grey", not [brick, flat, small].any(func(m: Material) -> bool:
+			return m is StandardMaterial3D and (m as StandardMaterial3D).albedo_color.is_equal_approx(Color(0.55, 0.55, 0.55))))
+	w.manifest["lightmap"] = {"pages": [{"width": 1, "height": 1, "offset": 0}]}
+	w._blob = PackedByteArray([0, 0, 0, 0])
+	var lit_s := DotMapSurfaces.new()
+	var lit_for := lit_s.world_material_for(w, dir)
+	var lit_flat: Material = lit_for.call({"free": "pbr:pbr_Xq7", "colour": [0.25, 0.5, 0.75], "lightmap_page": 0})
+	_check("a lit map keeps its lightmap on a flat stand-in", lit_flat is ShaderMaterial and (lit_flat as ShaderMaterial).get_shader_parameter("lightmap") != null
+			and (lit_flat as ShaderMaterial).get_shader_parameter("albedo_tex") != null)
+	var lit_brick: Material = lit_for.call({"free": "pbr:pbr_Bricks059", "colour": [0.4, 0.2, 0.1], "lightmap_page": 0})
+	_check("and on a kind stand-in, tinted", lit_brick is ShaderMaterial and (lit_brick as ShaderMaterial).get_shader_parameter("tint") != Vector3.ONE)
+	_check("stand_in_kind reads the converter's words", s.stand_in_kind("Bricks059") == &"brick" and s.stand_in_kind("nature/grass01") == &"grass"
+			and s.stand_in_kind("models/blank") == &"")
 	_completed += 1

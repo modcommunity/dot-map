@@ -26,7 +26,7 @@ static func read(prefix: String, cloud: Object = null) -> DotResult:
 	var world: DotMapBspMesh = got.value
 	var stored: DotResult = await DotMapStore.ensure(world.licence(), cloud)
 	if not stored.ok:
-		DotLog.warn(CHANNEL, "a world's art slice could not be fetched; generic art is drawn", {"at": prefix, "why": stored.error.message})
+		DotLog.debug(CHANNEL, "a world's art slice could not be fetched; DotMapStore.apply warns once", {"at": prefix, "why": stored.error.message})
 	return DotResult.success(world)
 
 

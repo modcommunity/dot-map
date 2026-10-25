@@ -33,7 +33,7 @@ static func works(manifest: Dictionary, only_attribution: bool = false) -> Array
 	return out
 
 
-## The one line a scoreboard or menu shows: the map's author and page, then the authors whose licence asks for a credit.
+## The one line a scoreboard or menu shows: the map's author and page, the authors whose licence asks for a credit, and [method DotMapStore.notice] when its art is not installed.
 static func line(manifest: Dictionary) -> String:
 	var parts := PackedStringArray()
 	var credit: Dictionary = manifest.get("credit", {})
@@ -45,4 +45,7 @@ static func line(manifest: Dictionary) -> String:
 			names[w["author"]] = true
 	if not names.is_empty():
 		parts.append("Art: %s" % ", ".join(PackedStringArray(names.keys())))
+	var missing := DotMapStore.notice(manifest.get("licence", {}))
+	if not missing.is_empty():
+		parts.append(missing)
 	return " | ".join(parts)

@@ -84,6 +84,20 @@ const ALIASES := {
 	&"roof": &"corrugated", &"ceiling": &"concrete_clean", &"stone": &"concrete", &"carpet": &"carpet_grey",
 }
 
+## A word in a texture's name to the kind that stands in for it when its PBR set is not installed; first match wins.
+## The same table as the converter's `nearest.py`, so a stand-in is what the converter would have chosen.
+const NAME_RULES := [
+	["snow", &"snow"], ["carpet|carp|crpt|rug", &"carpet_grey"], ["brick|bricks|brk", &"brick"],
+	["rust|rusty|corrod", &"rust"], ["corrug|container|shutter", &"corrugated"], ["asphalt|road|street|tarmac|highway", &"asphalt"],
+	["checker", &"tile_checker"], ["tile|tiles|tilefloor|bathroom|kitchen", &"tile_white"],
+	["parquet|woodfloor|wood_floor|hardwood", &"wood_floor"], ["plank|wood|door|crate|barrel|log|bark|timber|board", &"wood_planks"],
+	["grass|lawn|moss|leaf|leaves|foliage|ivy|hedge|bush", &"grass"], ["sand", &"sand"],
+	["rock|cliff|stone|cave", &"rock"], ["dirt|mud|gravel|ground|soil|path|terrain", &"ground"],
+	["metal|steel|iron|pipe|grate|vent|duct|rail|girder|catwalk|plate|alum|chrome|panel", &"metal"],
+	["concrete|cement|conc|cinder|pavement|sidewalk|curb", &"concrete"],
+	["plaster|stucco|wallpaper|paint|drywall|wall|ceiling|trim", &"plaster"],
+]
+
 ## Where the textures are. A folder per kind with albedo.jpg, normal.jpg and roughness.jpg.
 var root: String = DEFAULT_ROOT
 
@@ -125,6 +139,9 @@ var sharpness: float = 4.0
 
 var _cache: Dictionary = {}
 var _warned: Dictionary = {}
+var _rules: Array = []
+## Keys of the PBR sets [method world_material_for] found no files for, drawn with [method stand_in_kind] instead.
+var missing_sets: PackedStringArray = PackedStringArray()
 
 
 func _init(p_root: String = DEFAULT_ROOT) -> void:
@@ -224,6 +241,15 @@ func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 			generated[str(t["key"])] = dir.path_join(str(t["file"]))
 		elif str(t["kind"]) == "pbr":
 			library[str(t["key"])] = _pbr_dir(dir, store, t)
+	var stand_in := {}
+	for key: String in library.keys():
+		if not _has_set(library[key]):
+			stand_in[key] = _pack_fallback(dir, key, world.licence())
+			library.erase(key)
+			if not missing_sets.has(key):
+				missing_sets.append(key)
+	if not stand_in.is_empty():
+		DotLog.debug(CHANNEL, "PBR sets not installed; each is drawn as a stand-in kind in its faces' own colour", {"sets": stand_in.size()})
 	var cache := {}
 	return func(rec: Dictionary) -> Material:
 		if rec.get("water", false):
@@ -235,6 +261,8 @@ func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 		var blend := str(rec.get("material", "")).get_file().to_lower().begins_with("blend")
 		if match_original and not generated.has(free) and not library.has(free) and not blend:
 			tint = original_tint(StringName(free.get_slice(":", 0)), rec.get("colour", []))
+		if stand_in.has(free):
+			return _stand_in_material(world, rec, stand_in[free], cache)
 		var free2 := str(rec.get("free2", ""))
 		if not library.has(free2):
 			free2 = ""
@@ -261,6 +289,86 @@ func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 			m = material(StringName(free.get_slice(":", 0)), tint)
 		cache[key] = m
 		return m
+
+
+## The kind that stands in for a texture named [param name] (a PBR set id or a source path) when its files are missing; &"" when no word fits.
+func stand_in_kind(name: String) -> StringName:
+	if _rules.is_empty():
+		for r: Array in NAME_RULES:
+			var re := RegEx.new()
+			re.compile("(?<![a-z])(?:%s)" % r[0])
+			_rules.append([re, r[1]])
+	var parts := name.to_lower().replace("\\", "/").split("/")
+	var text := "/".join(parts.slice(maxi(parts.size() - 2, 0)))
+	for r: Array in _rules:
+		if (r[0] as RegEx).search(text) != null:
+			return r[1]
+	return &""
+
+
+## What a missing set is drawn as: `{file}` for the pack's own low-resolution albedo, else `{kind}` (a photo kind, or &"" for flat colour).
+func _pack_fallback(dir: String, key: String, licence: Dictionary) -> Dictionary:
+	for t: Dictionary in licence.get("textures", []):
+		if str(t.get("key", "")) != key:
+			continue
+		var small := str(t.get("fallback_file", ""))
+		if not small.is_empty() and (FileAccess.file_exists(dir.path_join(small)) or ResourceLoader.exists(dir.path_join(small))):
+			return {"file": dir.path_join(small), "colour": t.get("colour", [])}
+		var kind := stand_in_kind(str(t.get("file", "")).get_file())
+		for src: Variant in t.get("sources", []):
+			if kind == &"":
+				kind = stand_in_kind(str(src))
+		if kind != &"" and _load("%s/%s/albedo.jpg" % [root, resolve(kind)]) == null:
+			kind = &""
+		return {"kind": kind, "colour": t.get("colour", [])}
+	return {"kind": &"", "colour": []}
+
+
+## A face whose PBR set is missing: the pack's small albedo, else the stand-in kind tinted to the face's average colour, else that colour flat; lit by the map's lightmap when it has one.
+func _stand_in_material(world: DotMapBspMesh, rec: Dictionary, fb: Dictionary, cache: Dictionary) -> Material:
+	var colour: Variant = rec.get("colour", fb.get("colour", []))
+	if not colour is Array or (colour as Array).size() < 3:
+		colour = [0.5, 0.5, 0.5]
+	var kind: StringName = fb.get("kind", &"")
+	var tint := Color.WHITE
+	if not fb.has("file"):
+		tint = original_tint(kind, colour) if kind != &"" else Color(float(colour[0]), float(colour[1]), float(colour[2]))
+	var lit := use_lightmap and world.has_lightmap() and rec.has("lightmap_page") and not rec.has("glass")
+	var key := "stand_in|%s|%s|%s|%s" % [fb.get("file", kind), tint.to_html(), rec.get("lightmap_page", -1) if lit else -1, rec.get("emissive", false)]
+	if cache.has(key):
+		return cache[key]
+	var m: Material
+	if lit:
+		if fb.has("file"):
+			m = _lightmapped(world, rec, "stand_in", tint, str(fb["file"]))
+		elif kind != &"":
+			m = _lightmapped(world, rec, String(kind), tint, "")
+		else:
+			m = _lightmapped(world, rec, "flat", tint, "", "", _white())
+	elif fb.has("file"):
+		var sm := StandardMaterial3D.new()
+		sm.albedo_texture = _file_texture(str(fb["file"]))
+		sm.uv1_triplanar = true
+		sm.uv1_world_triplanar = true
+		sm.uv1_scale = Vector3.ONE * 0.5
+		m = sm
+	elif kind != &"":
+		m = material(kind, tint)
+	else:
+		var flat := StandardMaterial3D.new()
+		flat.albedo_color = tint
+		flat.roughness = 0.9
+		m = flat
+	cache[key] = m
+	return m
+
+
+func _white() -> Texture2D:
+	if not _textures.has("white"):
+		var img := Image.create(4, 4, false, Image.FORMAT_RGB8)
+		img.fill(Color.WHITE)
+		_textures["white"] = ImageTexture.create_from_image(img)
+	return _textures["white"]
 
 
 ## A library set shipped in the pack (`pbr/<id>/`): albedo, normal, roughness and AO, world-triplanar.
@@ -336,16 +444,16 @@ func _file_texture(path: String) -> Texture2D:
 	return tex
 
 
-func _lightmapped(world: DotMapBspMesh, rec: Dictionary, free: String, tint: Color, generated_file: String, set_dir: String = "") -> Material:
+func _lightmapped(world: DotMapBspMesh, rec: Dictionary, free: String, tint: Color, generated_file: String, set_dir: String = "", texture: Texture2D = null) -> Material:
 	var kind := StringName(free.get_slice(":", 0))
-	var tex: Texture2D = null
+	var tex: Texture2D = texture
 	var metres := 2.5
-	if not set_dir.is_empty():
+	if tex == null and not set_dir.is_empty():
 		tex = _set_texture(set_dir, "albedo")
 		metres = 2.0
-	elif not generated_file.is_empty():
+	elif tex == null and not generated_file.is_empty():
 		tex = _file_texture(generated_file)
-	else:
+	elif tex == null:
 		var k := resolve(kind)
 		if k != &"":
 			tex = _load("%s/%s/albedo.jpg" % [root, k])
