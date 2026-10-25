@@ -135,6 +135,27 @@ func set_door_open(targetname: String, open: bool) -> void:
 	_dirty = true
 
 
+## Follows every [DotAreaPortal] under [param under] (key or door set): their state is applied now and on each change. Returns how many were bound.
+func bind_area_portals(under: Node) -> int:
+	var n := 0
+	for p in under.find_children("*", "DotAreaPortal", true, false):
+		var portal := p as DotAreaPortal
+		if portal.key < 0 and portal.door.is_empty():
+			continue
+		if not portal.toggled.is_connected(_on_area_portal.bind(portal)):
+			portal.toggled.connect(_on_area_portal.bind(portal))
+		_on_area_portal(portal.open, portal)
+		n += 1
+	return n
+
+
+func _on_area_portal(open: bool, portal: DotAreaPortal) -> void:
+	if portal.key >= 0:
+		set_portal_open(portal.key, open)
+	if not portal.door.is_empty():
+		set_door_open(portal.door, open)
+
+
 ## Door names that have area portals following them, for a game to bind.
 func portal_doors() -> PackedStringArray:
 	return PackedStringArray(_portal_targets.keys())

@@ -35,8 +35,23 @@ func _enter_tree() -> void:
 
 	for entry in _TYPES:
 		add_custom_type(entry[0], entry[1], load(entry[2]), icon)
+	add_tool_menu_item("Bake occluders for the edited scene", _bake_occluders)
+
+
+func _bake_occluders() -> void:
+	var root := EditorInterface.get_edited_scene_root() as Node3D
+	if root == null:
+		push_error("dot-map: open a 3D scene first")
+		return
+	var baker := DotOccluderBaker.new()
+	var res := baker.bake(root)
+	if res.ok:
+		print("dot-map: %d occluder quads from %d meshes; save the scene" % [baker.stats["quads"], baker.stats["meshes"]])
+	else:
+		push_error("dot-map: " + res.error.message)
 
 
 func _exit_tree() -> void:
+	remove_tool_menu_item("Bake occluders for the edited scene")
 	for i in range(_TYPES.size() - 1, -1, -1):
 		remove_custom_type(_TYPES[i][0])
