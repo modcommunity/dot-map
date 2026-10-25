@@ -8,6 +8,8 @@ const BLEND := 0.4
 
 var world: DotMapBspMesh = null
 var environment: Environment = null
+## The node the world is drawn under when it is moved: the camera is sampled in its frame.
+var frame: Node3D = null
 var _clock: float = 0.0
 
 
@@ -16,8 +18,8 @@ static func wanted(world: DotMapBspMesh, enabled: bool = true) -> bool:
 	return enabled and world != null and world.has_lightmap()
 
 
-## Adds the driver under [param parent] for a world drawn lightmapped, freeing every node of [param lamps] (the lights the bake already holds; keep dynamic ones out of the list). Returns null when the world is not lit this way.
-static func attach(parent: Node, world: DotMapBspMesh, environment: Environment, lamps: Array = [], enabled: bool = true) -> DotMapLitWorld:
+## Adds the driver under [param parent] for a world drawn lightmapped, freeing every node of [param lamps] (the lights the bake already holds; keep dynamic ones out of the list). [param p_frame] is the world's node when it is not at the origin. Returns null when the world is not lit this way.
+static func attach(parent: Node, world: DotMapBspMesh, environment: Environment, lamps: Array = [], enabled: bool = true, p_frame: Node3D = null) -> DotMapLitWorld:
 	if not wanted(world, enabled):
 		return null
 	for lamp: Node in lamps:
@@ -27,6 +29,7 @@ static func attach(parent: Node, world: DotMapBspMesh, environment: Environment,
 	node.name = "LitWorld"
 	node.world = world
 	node.environment = environment
+	node.frame = p_frame
 	parent.add_child(node)
 	return node
 
@@ -39,7 +42,10 @@ func _process(delta: float) -> void:
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:
 		return
-	var c := world.ambient_at(cam.global_position, Vector3.UP)
+	var at := cam.global_position
+	if frame != null and frame.is_inside_tree():
+		at = frame.global_transform.affine_inverse() * at
+	var c := world.ambient_at(at, Vector3.UP)
 	if c.get_luminance() <= 0.0:
 		return
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR

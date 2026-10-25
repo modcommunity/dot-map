@@ -11,8 +11,8 @@ extends Node3D
 ## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
 ## thick at (256, 256, 16), at 0.01905 m per unit.
 
-const CHECKS := 95
-const SECTIONS := 7
+const CHECKS := 102
+const SECTIONS := 8
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
 const TERRAIN := "res://examples/bsp_mesh/terrain_fixture.json"
@@ -39,7 +39,9 @@ func _run() -> void:
 		await _test_collide(world)
 		await _test_glass()
 	_test_terrain()
-	_test_lightmap()
+	var lit_world := _test_lightmap()
+	if world != null and lit_world != null:
+		_test_drawn(world, lit_world)
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -380,7 +382,7 @@ func _test_terrain() -> void:
 	_done()
 
 
-func _test_lightmap() -> void:
+func _test_lightmap() -> DotMapBspMesh:
 	_section("lightmap: a v2 surface with a second UV set, an atlas page and an ambient cube")
 	# one triangle, positions then normals then uv then uv2 then indices, then a 2x1 RGB9E5 page, then one ambient sample
 	var blob := PackedByteArray()
@@ -430,4 +432,31 @@ func _test_lightmap() -> void:
 	_check(built.size() == 1 and arrays[Mesh.ARRAY_TEX_UV2] != null, "the built mesh keeps UV2")
 	_check(w.ambient_at(Vector3(1, 2, 3), Vector3.UP).is_equal_approx(Color(0.3, 0, 0)), "ambient: the +y face for an up normal: %s" % w.ambient_at(Vector3(1, 2, 3), Vector3.UP))
 	_check(w.ambient_at(Vector3(1, 2, 3), Vector3.DOWN).is_equal_approx(Color(0.4, 0, 0)), "ambient: the -y face for a down normal")
+	_done()
+	return w
+
+
+func _test_drawn(world: DotMapBspMesh, lit_world: DotMapBspMesh) -> void:
+	_section("drawn world: model 0 only, moved into a game's frame, lit by the bake")
+	var host := Node3D.new()
+	add_child(host)
+	var at := Transform3D(Basis.IDENTITY, Vector3(10, 0, 5))
+	var drawn := DotMapDrawnWorld.attach(host, world, {"transform": at, "probes": 0, "cull": false})
+	_check(drawn.root != null and drawn.root.name == "World" and drawn.root.get_parent() == host, "the node is World under the host")
+	var names := drawn.root.get_children().map(func(c: Node) -> String: return String(c.name))
+	_check(names == ["world"], "only the world model is drawn, no brush entity: %s" % [names])
+	var chunk := drawn.root.get_node("world").get_child(0) as MeshInstance3D
+	var box := chunk.global_transform * chunk.get_aabb()
+	_check(is_equal_approx(box.position.x, chunk.get_aabb().position.x + 10.0), "the meshes are drawn in the game's frame: %s" % box)
+	var all := DotMapDrawnWorld.attach(host, world, {"only_world": false, "probes": 0, "cull": false})
+	_check(all.root.get_child_count() == 2, "only_world off keeps the door")
+	var env := Environment.new()
+	var lamp := OmniLight3D.new()
+	host.add_child(lamp)
+	var lit := DotMapDrawnWorld.attach(host, lit_world, {"transform": at, "environment": env, "lamps": [lamp], "probes": 0, "cull": false})
+	_check(lit.lit != null and lit.lit.frame == lit.root, "a lightmapped world gets the ambient driver, in the drawn node's frame")
+	_check(lamp.is_queued_for_deletion(), "the lamps the bake holds are freed")
+	drawn.detach()
+	_check(drawn.root == null and not is_instance_valid(drawn.lit), "detach lets go of the node")
+	host.queue_free()
 	_done()
