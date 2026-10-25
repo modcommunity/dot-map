@@ -15,7 +15,7 @@ dest_files=["res://.godot/imported/albedo.jpg-3fc4e2f7e07c73a6c9a8b65045085d36.c
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
