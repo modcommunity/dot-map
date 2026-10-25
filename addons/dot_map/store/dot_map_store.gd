@@ -22,7 +22,7 @@ static func mount_dir(licence: Dictionary, cloud: Object) -> String:
 	return prefix.trim_suffix("/")
 
 
-## Downloads and mounts the slice when it is not, once per client (dot-cloud skips what it holds). Ok with "" when
+## Downloads and mounts the slice when it is not, once per client (dot-cloud skips what it holds; an empty [param manifest_url] lets it resolve one). Ok with "" when
 ## the map ships none. A pack acquired with `--depends` has it already, so this is for a map loaded from a folder.
 static func ensure(licence: Dictionary, cloud: Object, manifest_url: String = "") -> DotResult:
 	var p := pack_of(licence)
@@ -31,8 +31,6 @@ static func ensure(licence: Dictionary, cloud: Object, manifest_url: String = ""
 	var dir := mount_dir(licence, cloud)
 	if not dir.is_empty():
 		return DotResult.success(dir)
-	if manifest_url.is_empty():
-		return DotResult.fail(DotError.CODE_STATE, "store slice %s@%s is not mounted and no manifest url was given" % [p["id"], p["version"]])
 	var res: DotResult = await cloud.call("ensure", StringName(str(p["id"])), str(p["version"]), PackedStringArray(), manifest_url)
 	if not res.ok:
 		return res.wrap("store slice %s@%s" % [p["id"], p["version"]])

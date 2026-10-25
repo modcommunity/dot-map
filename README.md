@@ -129,6 +129,18 @@ python3 bsp.py regen --out ../maps/my_map/my_map <game>/<map>      # writes my_m
 python3 bsp.py regen --ratchet --out ../maps/my_map/my_map <game>/<map>   # fails when more is unmapped than the committed coverage says
 ```
 
+A converted map that names a shared art slice (`licence.store_pack`, see [docs/content.md](docs/content.md#shared-stores-as-dot-cloud-slices)) needs two lines in the game's loader, between reading the world and building it, plus the credit line for a scoreboard or map screen (CC-BY asks for it):
+
+```gdscript
+var cloud: Object = DotRegistry.get_service(&"dot_cloud_client")
+var licence: Dictionary = world.manifest.get("licence", {})
+await DotMapStore.ensure(licence, cloud)                 # download and mount the slice once; a pack acquired with --depends has it
+DotMapStore.apply(licence, cloud, surfaces, world)       # point DotMapSurfaces and DotMapBspMesh at it, before world_material_for / build_node
+var credits := DotMapCredits.line(world.manifest)        # "Map by X | Art: A, B"; DotMapCredits.works(manifest) is the full list
+```
+
+Zombie Zone does exactly this in `ZzMap.load_world` / `attach_world` and shows the line on its Tab board.
+
 When a converted map is wrong, fix the converter or its rule tables and regenerate; do not patch the output ([docs/converter-v2.md](docs/converter-v2.md)).
 
 ## Rotation and voting
