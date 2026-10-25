@@ -791,29 +791,11 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 		if rec.has("box"):
 			root.add_child(_support_block(rec))
 			continue
-		var id := str(rec.get("stand_in", ""))
-		if not cache.has(id):
-			cache[id] = scene_for.call(id) if scene_for.is_valid() \
-					else find_resource(id, DEFAULT_PROP_DIRS, PackedStringArray([".glb", ".tscn"]))
-		var scene: Variant = cache[id]
-		if not scene is PackedScene:
-			continue
-		var n := (scene as PackedScene).instantiate() as Node3D
+		var n := _place_prop(rec, scene_for, cache, longest_of)
 		if n == null:
 			continue
-		var at: Array = rec.get("at", [0, 0, 0])
-		n.position = Vector3(at[0], at[1], at[2])
-		n.rotation_degrees.y = float(rec.get("yaw", 0.0)) + PROP_FACING_DEGREES
-		n.scale = Vector3.ONE * float(rec.get("scale", 1.0))
-		var size := float(rec.get("size", 0.0))
-		if not longest_of.has(id):
-			longest_of[id] = _longest_side(n)
-		var longest: float = longest_of[id]
-		if size > 0.0 and longest > 0.001:
-			# A small thing (a can, a phone) on a furniture-sized stand-in: fit its longest side to `size`.
-			n.scale *= size / longest
 		if prop_view_per_metre > 0.0:
-			var end := maxf(prop_view_min, longest * n.scale.x * prop_view_per_metre)
+			var end := maxf(prop_view_min, float(longest_of[str(rec.get("stand_in", ""))]) * n.scale.x * prop_view_per_metre)
 			for g in n.find_children("*", "GeometryInstance3D", true, false):
 				(g as GeometryInstance3D).visibility_range_end = end
 				(g as GeometryInstance3D).visibility_range_end_margin = end * 0.1
@@ -824,6 +806,61 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 				n.add_child(body)
 				collide_fn.call(body)
 	return root
+
+
+## One prop record as an instanced, placed and scaled stand-in (not yet in the tree); null when its stand-in has no scene.
+func _place_prop(rec: Dictionary, scene_for: Callable, cache: Dictionary, longest_of: Dictionary) -> Node3D:
+	var id := str(rec.get("stand_in", ""))
+	if not cache.has(id):
+		cache[id] = scene_for.call(id) if scene_for.is_valid() \
+				else find_resource(id, DEFAULT_PROP_DIRS, PackedStringArray([".glb", ".tscn"]))
+	var scene: Variant = cache[id]
+	if not scene is PackedScene:
+		return null
+	var n := (scene as PackedScene).instantiate() as Node3D
+	if n == null:
+		return null
+	var at: Array = rec.get("at", [0, 0, 0])
+	n.position = Vector3(at[0], at[1], at[2])
+	n.rotation_degrees.y = float(rec.get("yaw", 0.0)) + PROP_FACING_DEGREES
+	n.scale = Vector3.ONE * float(rec.get("scale", 1.0))
+	var size := float(rec.get("size", 0.0))
+	if not longest_of.has(id):
+		longest_of[id] = _longest_side(n)
+	var longest: float = longest_of[id]
+	if size > 0.0 and longest > 0.001:
+		# A small thing (a can, a phone) on a furniture-sized stand-in: fit its longest side to `size`.
+		n.scale *= size / longest
+	return n
+
+
+## One static body with a box per solid prop (see [constant SOLID_BOX]), in world space and with no meshes, for a
+## server that draws nothing and a client that draws [method build_props] without [code]collide_fn[/code].
+## The boxes match [method build_props]'s own solid bodies. Null when no prop is solid.
+func build_prop_collision(scene_for: Callable = Callable()) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.name = "SolidProps"
+	var cache := {}
+	var longest_of := {}
+	for rec: Dictionary in manifest.get("props", []):
+		if rec.has("box") or not int(rec.get("solid", 0)) in SOLID_BOX:
+			continue
+		var n := _place_prop(rec, scene_for, cache, longest_of)
+		if n == null:
+			continue
+		var box := _local_aabb(n)
+		if box.size.x > 0.001 and box.size.y > 0.001 and box.size.z > 0.001:
+			var shape := BoxShape3D.new()
+			shape.size = box.size * n.scale
+			var cs := CollisionShape3D.new()
+			cs.shape = shape
+			cs.transform = Transform3D(n.basis.orthonormalized(), n.position + n.basis * box.get_center())
+			body.add_child(cs)
+		n.free()
+	if body.get_child_count() == 0:
+		body.free()
+		return null
+	return body
 
 
 static var _support_material: StandardMaterial3D = null

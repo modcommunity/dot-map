@@ -11,7 +11,7 @@ extends Node3D
 ## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
 ## thick at (256, 256, 16), at 0.01905 m per unit.
 
-const CHECKS := 84
+const CHECKS := 85
 const SECTIONS := 6
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
@@ -198,6 +198,10 @@ func _test_environment(world: DotMapBspMesh) -> void:
 	var solid_props := world.build_props(Callable(), func(b: StaticBody3D) -> void: made.append(b))
 	_check(solid_props.get_child_count() == 3 and made.size() == 1 and (made[0] as StaticBody3D).get_child(0).get("shape") is BoxShape3D, "only solid 2/3/4/6 gets a box body: %d" % made.size())
 	solid_props.free()
+	var solid_only := world.build_prop_collision()
+	_check(solid_only != null and solid_only.get_child_count() == 1 and (solid_only.get_child(0) as CollisionShape3D).shape is BoxShape3D and absf((solid_only.get_child(0) as CollisionShape3D).position.x) < 1.0,
+			"build_prop_collision: one box for the one solid prop, in world space")
+	solid_only.free()
 	var plain_props := world.build_props()
 	_check(plain_props.find_children("Solid", "StaticBody3D", true, false).is_empty(), "no body unless the game asks for them")
 	plain_props.free()
