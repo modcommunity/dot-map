@@ -978,6 +978,8 @@ func _place_prop(rec: Dictionary, scene_for: Callable, cache: Dictionary, longes
 
 ## The folder holding the pack's shared model library (default: the licence block's [code]model_store[/code] beside the mesh).
 var model_library: String = ""
+## Folders searched for a model before [member model_library], in order: a map's own slice and the shared slices it depends on.
+var model_libraries: PackedStringArray = PackedStringArray()
 
 
 ## A shipped library model (stand-in id [code]lib/<name>[/code]) loaded from the pack, re-rooted so its bottom centre sits at
@@ -992,6 +994,11 @@ func _library_model(id: String) -> Node3D:
 	var root := model_library if not model_library.is_empty() \
 			else source_path.get_base_dir().path_join(str(licence().get("model_store", "model-library"))).simplify_path()
 	var path := root.path_join(str(row["store_file"]))
+	for lib in model_libraries:
+		var cand := lib.path_join(str(row["store_file"]))
+		if ResourceLoader.exists(cand) or FileAccess.file_exists(cand):
+			path = cand
+			break
 	var model: Node3D = null
 	if path.begins_with("res://") and ResourceLoader.exists(path):
 		var packed := load(path) as PackedScene

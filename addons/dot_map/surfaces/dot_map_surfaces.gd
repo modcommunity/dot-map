@@ -109,6 +109,9 @@ var _textures: Dictionary = {}
 var use_lightmap: bool = true
 ## Folder of the shared PBR sets (`<id>/<tier>/*.webp`) when the game delivers them apart from the pack; empty reads the folder the manifest names, beside the pack.
 var pbr_library: String = ""
+## Folders searched for a set before [member pbr_library], in order: a map's own slice and the shared slices it depends on.
+var pbr_libraries: PackedStringArray = PackedStringArray()
+var _set_roots: Dictionary = {}
 
 ## Brightness of a light-emitting surface (SURF_LIGHT) in the lightmapped path.
 var emissive_energy: float = 1.5
@@ -287,10 +290,25 @@ func _pbr_material(dir: String, key: String) -> StandardMaterial3D:
 ## The folder of the PBR set [param t] names: `<library>/<id>/<tier>` for a shared store, the pack's own `pbr/<id>` for an older one.
 func _pbr_dir(dir: String, store: String, t: Dictionary) -> String:
 	var id := str(t["file"]).get_file()
-	if store.is_empty() and pbr_library.is_empty():
+	if store.is_empty() and pbr_library.is_empty() and pbr_libraries.is_empty():
 		return dir.path_join(str(t["file"]))
+	var tier := str(t.get("tier", "1k"))
+	for lib in pbr_libraries:
+		var cand := lib.path_join(id).path_join(tier)
+		if _has_set(cand):
+			return cand
 	var root := pbr_library if not pbr_library.is_empty() else dir.path_join(store).simplify_path()
-	return root.path_join(id).path_join(str(t.get("tier", "1k")))
+	return root.path_join(id).path_join(tier)
+
+
+func _has_set(dir: String) -> bool:
+	if not _set_roots.has(dir):
+		var found := false
+		for ext in ["webp", "jpg"]:
+			var p := dir.path_join("albedo." + ext)
+			found = found or FileAccess.file_exists(p) or ResourceLoader.exists(p)
+		_set_roots[dir] = found
+	return _set_roots[dir]
 
 
 func _set_texture(dir: String, name: String) -> Texture2D:

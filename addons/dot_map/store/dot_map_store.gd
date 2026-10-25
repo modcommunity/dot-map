@@ -1,6 +1,6 @@
 class_name DotMapStore
 extends RefCounted
-## Finds the shared PBR and model stores of a converted map, shipped as a dot-cloud slice (`licence.store_pack`).
+## Finds the shared PBR and model stores of a converted map, shipped as a dot-cloud slice (`licence.store_pack`) plus the shared slices it names.
 
 const CHANNEL := "dot_map.store"
 
@@ -22,6 +22,21 @@ static func mount_dir(licence: Dictionary, cloud: Object) -> String:
 	return prefix.trim_suffix("/")
 
 
+## Every folder a map's art is mounted at: its own slice first, then each shared slice it names (`store_pack.shared`) that is mounted.
+static func mount_dirs(licence: Dictionary, cloud: Object) -> PackedStringArray:
+	var out := PackedStringArray()
+	var own := mount_dir(licence, cloud)
+	if own.is_empty():
+		return out
+	out.append(own)
+	for s: Variant in pack_of(licence).get("shared", []):
+		if s is Dictionary:
+			var prefix: String = cloud.call("dependency_prefix", StringName(str(s.get("id", ""))), str(s.get("version", "")))
+			if not prefix.is_empty():
+				out.append(prefix.trim_suffix("/"))
+	return out
+
+
 ## Downloads and mounts the slice when it is not, once per client (dot-cloud skips what it holds; an empty [param manifest_url] lets it resolve one). Ok with "" when
 ## the map ships none. A pack acquired with `--depends` has it already, so this is for a map loaded from a folder.
 static func ensure(licence: Dictionary, cloud: Object, manifest_url: String = "") -> DotResult:
@@ -39,11 +54,18 @@ static func ensure(licence: Dictionary, cloud: Object, manifest_url: String = ""
 
 ## Points [param surfaces] (DotMapSurfaces) and [param world] (DotMapBspMesh) at a mounted slice. Returns whether it was.
 static func apply(licence: Dictionary, cloud: Object, surfaces: Object, world: Object) -> bool:
-	var dir := mount_dir(licence, cloud)
-	if dir.is_empty():
+	var dirs := mount_dirs(licence, cloud)
+	if dirs.is_empty():
 		return false
+	var pbr := PackedStringArray()
+	var models := PackedStringArray()
+	for d in dirs:
+		pbr.append(d.path_join("pbr"))
+		models.append(d.path_join("models"))
 	if surfaces != null:
-		surfaces.set("pbr_library", dir.path_join("pbr"))
+		surfaces.set("pbr_library", pbr[0])
+		surfaces.set("pbr_libraries", pbr)
 	if world != null:
-		world.set("model_library", dir.path_join("models"))
+		world.set("model_library", models[0])
+		world.set("model_libraries", models)
 	return true

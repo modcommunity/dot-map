@@ -2,7 +2,7 @@ extends Node
 ## Proves DotMapCredits and DotMapStore on a hand-written manifest and a stand-in cloud client.
 ## godot --headless --path . res://examples/store_demo.tscn
 
-const CHECKS := 15
+const CHECKS := 19
 const SECTIONS := 3
 
 var _passed := 0
@@ -88,7 +88,7 @@ func _store() -> void:
 	_check("no slice, no pack", DotMapStore.pack_of({}).is_empty())
 	_check("not mounted gives no dir", DotMapStore.mount_dir(lic, cloud) == "")
 	var res: DotResult = await DotMapStore.ensure(lic, cloud, "")
-	_check("ensure without a manifest url fails", not res.ok)
+	_check("ensure with no manifest url lets the client resolve it", res.ok and cloud.ensured == 1)
 	res = await DotMapStore.ensure(lic, cloud, "https://x/manifest.json")
 	_check("ensure mounts it", res.ok and cloud.ensured == 1 and str(res.value).begins_with("res://dot_cloud/gamemann/store-x"))
 	await DotMapStore.ensure(lic, cloud, "https://x/manifest.json")
@@ -105,4 +105,16 @@ func _surfaces() -> void:
 	_check("apply points both at the slice", DotMapStore.apply(MANIFEST["licence"], cloud, s, w)
 			and s.pbr_library.ends_with("h1234abcd/pbr") and w.model_library.ends_with("h1234abcd/models"))
 	_check("apply is false when unmounted", not DotMapStore.apply(MANIFEST["licence"], FakeCloud.new(), s, w))
+	_check("one mounted dir without shared slices", s.pbr_libraries.size() == 1 and w.model_libraries.size() == 1)
+	var lic: Dictionary = MANIFEST["licence"].duplicate(true)
+	lic["store_pack"]["shared"] = [{"id": "gamemann/store-shared-aa", "version": "h1"}, {"id": "gamemann/store-shared-bb", "version": "h2"}]
+	cloud.mounted["gamemann/store-shared-aa@h1"] = "res://dot_cloud/gamemann/store-shared-aa/h1/"
+	var s2 := DotMapSurfaces.new()
+	var w2 := DotMapBspMesh.new()
+	DotMapStore.apply(lic, cloud, s2, w2)
+	_check("mounted shared slices are searched after the map's own", s2.pbr_libraries.size() == 2 and w2.model_libraries.size() == 2
+			and s2.pbr_libraries[1] == "res://dot_cloud/gamemann/store-shared-aa/h1/pbr" and w2.model_libraries[0].ends_with("h1234abcd/models"))
+	_check("an unmounted shared slice is skipped", DotMapStore.mount_dirs(lic, cloud).size() == 2)
+	s2.pbr_libraries = PackedStringArray(["res://nothing_a/pbr", "res://nothing_b/pbr"])
+	_check("a set in no shared folder falls back to the single library", s2._pbr_dir("res://m", "", {"file": "pbr/x", "tier": "2k"}) == "res://dot_cloud/gamemann/store-x/h1234abcd/pbr/x/2k")
 	_completed += 1

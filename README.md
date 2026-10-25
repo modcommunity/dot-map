@@ -129,7 +129,7 @@ python3 bsp.py regen --out ../maps/my_map/my_map <game>/<map>      # writes my_m
 python3 bsp.py regen --ratchet --out ../maps/my_map/my_map <game>/<map>   # fails when more is unmapped than the committed coverage says
 ```
 
-A converted map that names a shared art slice (`licence.store_pack`, see [docs/content.md](docs/content.md#shared-stores-as-dot-cloud-slices)) needs two lines in the game's loader, between reading the world and building it, plus the credit line for a scoreboard or map screen (CC-BY asks for it):
+A converted map that names a shared art slice (`licence.store_pack`, its own slice plus the shared slices it names; see [docs/content.md](docs/content.md#shared-stores-as-dot-cloud-slices)) needs two lines in the game's loader, between reading the world and building it, plus the credit line for a scoreboard or map screen (CC-BY asks for it):
 
 ```gdscript
 var cloud: Object = DotRegistry.get_service(&"dot_cloud_client")
