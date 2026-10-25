@@ -13,8 +13,10 @@ var unit_scale := 0.0254
 var world_offset := Vector3.ZERO
 ## [code](from, to) -> {position, normal}[/code] or {} when nothing is hit; decals need it, cones use it to stop at a wall.
 var ray_fn := Callable()
-var max_sprites := 160
-var max_cones := 40
+## Sprites and cones are billboards and meshes the engine culls past [member view_range], so their caps only guard a runaway map.
+var max_sprites := 400
+var max_cones := 120
+## Real SpotLight3D nodes lit at once; unlike the rest these cost per pixel, so they stay few.
 var max_lights := 6
 var max_decals := 120
 var max_trails := 24
