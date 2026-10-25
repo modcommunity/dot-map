@@ -616,7 +616,7 @@ func build_node(material_for: Callable = Callable()) -> Node3D:
 			mi.mesh = g["mesh"]
 			mi.position = -parent.position
 			var c: Array = g["chunk"]
-			mi.name = "sky3d" if g["sky3d"] else ("chunk_%d_%d" % [c[0], c[1]] if c.size() == 2 else "mesh")
+			mi.name = "sky3d" if g["sky3d"] else ("chunk_" + "_".join(PackedStringArray(c.map(str))) if c.size() >= 2 else "mesh")
 			if g["clusters"] != null and model == WORLD:
 				mi.set_meta(&"vis_clusters", g["clusters"])
 			if g["glass"]:

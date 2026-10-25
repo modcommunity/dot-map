@@ -1,6 +1,6 @@
 # Visibility: drawing only what the camera can see
 
-A converted map is drawn as 32 m chunks of merged faces plus stand-in props. Without culling every chunk inside the frustum is drawn, including the shop behind three walls. `DotMapVisibility` (`addons/dot_map/bsp/dot_map_visibility.gd`) uses the map's own precomputed visibility data to draw only the chunks the camera's position could see, and adds occluders made from the map's large solid brushes for whatever that data cannot cover.
+A converted map is drawn as 16 m chunks (a 6 m height band each) of merged faces plus stand-in props. Without culling every chunk inside the frustum is drawn, including the shop behind three walls. `DotMapVisibility` (`addons/dot_map/bsp/dot_map_visibility.gd`) uses the map's own precomputed visibility data to draw only the chunks the camera's position could see, and adds occluders made from the map's large solid brushes for whatever that data cannot cover.
 
 ## What the converter keeps
 
@@ -67,6 +67,26 @@ A map converted without the data (ze_jurassicpark: 0 clusters) gets occluders on
 Both together cut draws by 28% and objects by 32%. The frame rate does not move beyond the box's run-to-run spread (two off runs differ by 2 fps): this bench is bound by the game's physics step, which a slow frame pays for several times over, not by drawing. On dev02's CPU renderer, where drawing is the cost, the same pair went from 2183 to 1383 draws and 161 to 117 ms of rendering.
 
 Screenshots from five spots in the mall, off against both, differ only where a price tag drawn through walls (no depth test) was hidden by an occluder: anything drawn through walls on purpose must set `ignore_occlusion_culling`. No geometry was missing.
+
+### Chunk size and the per-position table
+
+Chunks were 32 m columns: the mall had 42 chunks, each touching hundreds of clusters, so pvs hid little (62% of triangles were shown from random points). They are now 16 m columns with a 6 m height band (`DOTBSP_CHUNK`, `DOTBSP_CHUNK_Y` override at conversion): 119 chunks in the mall, 50% of triangles shown. 12 m / 4 m cut a little more (46%) but raised unculled draws by half. Re-run `bsp.py regen` to get the finer chunks; packs made before keep the 32 m ones.
+
+`tools/shot_vis_proof.sh` (`examples/vis_proof.gd`) on the GTX 1660 Ti, 640×360, no zombies, draw calls per mode at spots picked by how much of the map their PVS sees (`--world=<prefix> --spots=6 --diffs=24 --out=<dir>`; `--bisect` names the hidden chunks that change a frame; `--keepshadows`):
+
+| Map, spot | off | pvs | occluders | both |
+| --- | --- | --- | --- | --- |
+| mall, room (5% PVS) | 492 | 307 | 297 | 144 |
+| mall, room (21%) | 418 | 307 | 354 | 213 |
+| mall, corridor | 697 | 568 | 648 | 521 |
+| mall, open | 592 | 543 | 525 | 472 |
+| Death Star, room (2%) | 582 | 248 | 412 | 178 |
+| Death Star, corridor | 1004 | 629 | 804 | 587 |
+| Death Star, open (42%) | 2522 | 1430 | 2323 | 1270 |
+
+The earlier "no reduction" was the coarse chunks plus one run's spread: the 42 mall chunks were nearly all in every row.
+
+Pixel comparison against off at 24 random positions: occluders 0 positions over 0.05% of pixels. pvs and both differ on 3 of 12 mall positions (worst 0.97%) and 1 of 16 on Death Star (0.05%), and the cause is not missing geometry: a ray audit from a differing position (1500 rays, transparent surfaces walked through, `tools` faces skipped) found no first-hit surface outside the PVS. A hidden chunk stops casting shadows, so light leaks where it shaded. With `keep_shadows` every position is 0 differences, at the cost of drawing hidden chunks into the shadow pass (Death Star open spot: 1430 draws becomes 2453). Leave it off unless a map's lights are dominated by shadowing from out-of-sight walls.
 
 ## Re-importing
 
