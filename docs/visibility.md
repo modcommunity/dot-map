@@ -35,7 +35,7 @@ vis.set_door_open("door_store", false)            # the portals that door contro
 - Inside solid or outside the map (no cluster) everything is drawn: a noclip camera never sees a hole.
 - Occluders are one `OccluderInstance3D`, and the viewport's `use_occlusion_culling` is turned on while the mode includes them and put back on `_exit_tree`. They hide props, characters and chunks in the same cluster set but behind a wall.
 - `chunk_view_distance` sets `visibility_range_end` on world chunks that have none: below 0 the fog's far plane (the default), 0 never.
-- `keep_shadows` draws hidden chunks shadow-only rather than hiding them.
+- `shadows` says what a chunk hidden by the PVS still does: `NONE` hides it, `ALL` draws it shadow-only, `REACHING` (default) draws it shadow-only only while a shadow-casting light that touches a drawn chunk reaches it.
 - A headless host does nothing unless `run_headless` is set; a dedicated server never draws.
 - A map with neither clusters nor occluders makes `setup` fail with `CODE_UNSUPPORTED`; the caller drops the node and draws everything.
 
@@ -86,7 +86,7 @@ Chunks were 32 m columns: the mall had 42 chunks, each touching hundreds of clus
 
 The earlier "no reduction" was the coarse chunks plus one run's spread: the 42 mall chunks were nearly all in every row.
 
-Pixel comparison against off at 24 random positions: occluders 0 positions over 0.05% of pixels. pvs and both differ on 3 of 12 mall positions (worst 0.97%) and 1 of 16 on Death Star (0.05%), and the cause is not missing geometry: a ray audit from a differing position (1500 rays, transparent surfaces walked through, `tools` faces skipped) found no first-hit surface outside the PVS. A hidden chunk stops casting shadows, so light leaks where it shaded. With `keep_shadows` every position is 0 differences, at the cost of drawing hidden chunks into the shadow pass (Death Star open spot: 1430 draws becomes 2453). Leave it off unless a map's lights are dominated by shadowing from out-of-sight walls.
+Pixel comparison against off at 24 random positions (1660 Ti, 640x360): a hidden chunk used to stop casting shadows, so light leaked where it shaded (3 of 12 mall positions, worst 0.97%). `shadows = ALL` fixed it but drew every hidden chunk into the shadow pass (Death Star open spot: 1430 draws became 2453). The default is now `REACHING`: a hidden chunk is drawn shadow-only only while a shadow-casting light reaches it from a drawn chunk (a point or spot light by its range; a sun by sweeping the chunk's box along the light direction onto the drawn chunks near the camera). Result: mall 0 positions over 0.05% (worst 0.002%), Death Star 0 over (worst 0.049%); a sun checked by distance from the camera alone had still leaked (0.84%), because a caster far up-sun shades the drawn area. Draw calls over the six spots (off / pvs, shadows REACHING vs NONE vs ALL): mall room 371 / 315 vs 305 vs 337, mall open 643 / 620 vs 602 vs 623, Death Star room 372 / 338 vs 289 vs 347, Death Star corridor 683 / 673 vs 581 vs 680. Shadows cost most of what pvs saves on Death Star (a sun reaches everything), so set `shadows = NONE` for a map where a flicker at the edge of a shadow does not matter.
 
 ## Re-importing
 

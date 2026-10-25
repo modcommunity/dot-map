@@ -47,7 +47,7 @@ func _run() -> void:
 	_vis = DotMapVisibility.new()
 	_vis.chunk_view_distance = 0.0   # the fog's far cut is not what is under test
 	_vis.camera_ref = null
-	_vis.keep_shadows = _args.has("keepshadows")
+	_vis.shadows = DotMapVisibility.Shadows.ALL if _args.has("keepshadows") else (DotMapVisibility.Shadows.NONE if _args.has("noshadows") else DotMapVisibility.Shadows.REACHING)
 	add_child(_vis)
 	var set_up := _vis.setup(_world, _dw.visual)
 	if not set_up.ok:

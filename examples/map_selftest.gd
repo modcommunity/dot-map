@@ -2712,6 +2712,7 @@ func _test_rotation_file_layout() -> void:
 	# Legacy operator path: read, warned once, new path wins whole when both exist.
 	DirAccess.remove_absolute(server_f)
 	DirAccess.remove_absolute(server_game_f)
+	DirAccess.remove_absolute(addon_f)
 	DotCfgLegacy.reset()
 	_put(old_server_f, "defaults:\n  maps: [old]\n")
 	layers = DotMapRotationFile.find_layers(base, "g")

@@ -25,7 +25,10 @@ extends Node
 const CHANNEL := "dot_map.visibility"
 
 enum Mode { OFF, PVS, OCCLUDERS, BOTH }
+enum Shadows { NONE, ALL, REACHING }
 
+## Metres a chunk is assumed to throw a sun shadow.
+const SUN_SWEEP := 2000.0
 const MODE_NAMES := {"off": Mode.OFF, "pvs": Mode.PVS, "occluders": Mode.OCCLUDERS, "both": Mode.BOTH}
 
 signal clusters_changed(camera_clusters: PackedInt32Array)
@@ -38,8 +41,9 @@ signal clusters_changed(camera_clusters: PackedInt32Array)
 @export var margin: float = 1.0
 ## Metres the camera moves before its clusters are looked up again.
 @export var move_step: float = 0.25
-## Hidden chunks still cast shadows (drawn shadow-only) instead of disappearing.
-@export var keep_shadows: bool = false
+## What a chunk hidden by the PVS still does: NONE disappears (light leaks where it shaded), ALL is drawn shadow-only, REACHING is drawn
+## shadow-only only while a shadow-casting light that touches a drawn chunk reaches it.
+@export var shadows: Shadows = Shadows.REACHING
 ## Metres past which a world chunk is not drawn: below 0 the map's own fog far plane, 0 never.
 @export var chunk_view_distance: float = -1.0
 @export var run_headless: bool = false
@@ -167,14 +171,14 @@ func _collect(drawn: Node3D) -> void:
 	while not stack.is_empty():
 		var n: Node = stack.pop_back()
 		if n.has_meta(&"vis_clusters"):
-			_items.append({"node": n, "clusters": n.get_meta(&"vis_clusters"), "shown": true})
+			_items.append({"node": n, "clusters": n.get_meta(&"vis_clusters"), "shown": true, "cast": false, "box": _aabb_under(n as Node3D, drawn) if n is Node3D else AABB()})
 			continue
 		if n.name == &"Props":
 			for p in n.get_children():
 				if p is Node3D:
 					var box := _aabb_under(p as Node3D, drawn)
 					if box.size != Vector3.ZERO:
-						_items.append({"node": p, "clusters": clusters_in_box(box.grow(0.05)), "shown": true})
+						_items.append({"node": p, "clusters": clusters_in_box(box.grow(0.05)), "shown": true, "cast": false, "box": box})
 			continue
 		stack.append_array(n.get_children())
 	for item in _items:
@@ -268,7 +272,8 @@ func update_from(local: Vector3) -> void:
 			if c < 0 or (_visible_bits[c >> 3] & (1 << (c & 7))) != 0:
 				show = true
 				break
-		_set_shown(item, show)
+		item["want"] = show
+	_apply_shown(local)
 	clusters_changed.emit(cams)
 
 
@@ -366,23 +371,91 @@ func clusters_in_box(box: AABB) -> PackedInt32Array:
 	return keys
 
 
-func _set_shown(item: Dictionary, show: bool) -> void:
-	if item["shown"] == show:
+## Applies each item's "want" (drawn or not), then lets hidden ones keep casting shadows per [member shadows].
+func _apply_shown(local: Vector3) -> void:
+	var lights: Array[Dictionary] = []
+	if shadows == Shadows.REACHING:
+		lights = _active_lights(local)
+	for item in _items:
+		var show: bool = item["want"]
+		var cast := false
+		if not show:
+			cast = shadows == Shadows.ALL or (shadows == Shadows.REACHING and _reached(item["box"], lights))
+		_set_shown(item, show, cast)
+
+
+## Shadow-casting lights, in the drawn tree's space, whose reach touches a drawn chunk: only those can put a hidden chunk's shadow on screen.
+func _active_lights(local: Vector3) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if root == null or not root.is_inside_tree():
+		return out
+	var inv := root.global_transform.affine_inverse()
+	for l in root.get_tree().root.find_children("*", "Light3D", true, false):
+		var light := l as Light3D
+		if not light.shadow_enabled or not light.is_visible_in_tree():
+			continue
+		var reach := INF
+		var at := local
+		if light is OmniLight3D:
+			reach = (light as OmniLight3D).omni_range
+			at = inv * light.global_position
+		elif light is SpotLight3D:
+			reach = (light as SpotLight3D).spot_range
+			at = inv * light.global_position
+		elif light is DirectionalLight3D:
+			reach = (light as DirectionalLight3D).directional_shadow_max_distance
+		var receivers: Array[AABB] = []
+		for item in _items:
+			if item["want"] and _box_distance(item["box"], at) <= reach:
+				receivers.append(item["box"])
+		if receivers.is_empty():
+			continue
+		var entry := {"at": at, "reach": reach}
+		if light is DirectionalLight3D:
+			entry["dir"] = (inv.basis * -light.global_basis.z).normalized()
+			entry["receivers"] = receivers
+		out.append(entry)
+	return out
+
+
+static func _box_distance(box: AABB, p: Vector3) -> float:
+	var q := p.clamp(box.position, box.end)
+	return p.distance_to(q)
+
+
+func _reached(box: AABB, lights: Array[Dictionary]) -> bool:
+	for l in lights:
+		if l.has("dir"):
+			# A sun's shadow falls along its direction from anywhere up-sun, however far: sweep the box and ask what it can land on.
+			var swept := box.merge(AABB(box.position + (l["dir"] as Vector3) * SUN_SWEEP, box.size))
+			for r: AABB in l["receivers"]:
+				if swept.intersects(r):
+					return true
+		elif _box_distance(box, l["at"]) <= float(l["reach"]):
+			return true
+	return false
+
+
+func _set_shown(item: Dictionary, show: bool, cast: bool = false) -> void:
+	if item["shown"] == show and item["cast"] == cast:
 		return
 	item["shown"] = show
+	item["cast"] = cast
 	var n: Node = item["node"]
 	if not is_instance_valid(n):
 		return
-	if keep_shadows:
+	if cast:
+		(n as Node3D).visible = true
 		for g in ([n] if n is GeometryInstance3D else n.find_children("*", "GeometryInstance3D", true, false)):
-			if show:
-				(g as GeometryInstance3D).cast_shadow = g.get_meta(&"vis_cast", GeometryInstance3D.SHADOW_CASTING_SETTING_ON)
-			else:
-				if not g.has_meta(&"vis_cast"):
-					g.set_meta(&"vis_cast", (g as GeometryInstance3D).cast_shadow)
-				(g as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
-	else:
-		(n as Node3D).visible = show
+			if not g.has_meta(&"vis_cast"):
+				g.set_meta(&"vis_cast", (g as GeometryInstance3D).cast_shadow)
+			(g as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+		return
+	for g in ([n] if n is GeometryInstance3D else n.find_children("*", "GeometryInstance3D", true, false)):
+		if g.has_meta(&"vis_cast"):
+			(g as GeometryInstance3D).cast_shadow = g.get_meta(&"vis_cast")
+			g.remove_meta(&"vis_cast")
+	(n as Node3D).visible = show
 
 
 func _show_all() -> void:
