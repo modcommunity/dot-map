@@ -3,7 +3,9 @@ extends Node3D
 ## Renders one frame of a converted map the way a game builds it, through [DotMapWorld]: free photo and generated
 ## textures, the environment, the stand-in props, glass. Run it under a display (tools/screenshot.sh).
 ##
-##   godot --path . res://examples/bsp_world_shot.tscn -- --world=<prefix> --out=<png> [--view=spawn|overview] [--cam=x,y,z --look=x,y,z] [--nolight] [--nomodels]
+##   godot --path . res://examples/bsp_world_shot.tscn -- --world=<prefix> --out=<png> [--view=spawn|overview] [--cam=x,y,z --look=x,y,z] [--nolight] [--nomodels] [--list=<file>]
+##
+## `--list` is a file of lines `<png> <x,y,z cam> <x,y,z look>`: one load, a frame for each line (a map's props take minutes to parse).
 
 var _out := "user://shot.png"
 
@@ -77,8 +79,24 @@ func _ready() -> void:
 	cam.make_current()
 	for i in 12:
 		await get_tree().process_frame
+	var err := OK
+	if args.has("list"):
+		for line in FileAccess.get_file_as_string(str(args["list"])).split("\n", false):
+			var f := line.split(" ", false)
+			if f.size() < 3:
+				continue
+			var c := f[1].split_floats(",")
+			var l := f[2].split_floats(",")
+			cam.position = Vector3(c[0], c[1], c[2])
+			cam.look_at(Vector3(l[0], l[1], l[2]))
+			for i in 4:
+				await get_tree().process_frame
+			err = get_viewport().get_texture().get_image().save_png(f[0])
+			print("saved %s (%s)" % [f[0], error_string(err)])
+		get_tree().quit(0 if err == OK else 1)
+		return
 	var img := get_viewport().get_texture().get_image()
-	var err := img.save_png(_out)
+	err = img.save_png(_out)
 	print("saved %s (%s) from %s to %s" % [_out, error_string(err), from, look])
 	get_tree().quit(0 if err == OK else 1)
 
