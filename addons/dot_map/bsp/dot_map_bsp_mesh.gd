@@ -677,6 +677,11 @@ const PROP_FACING_DEGREES := 90.0
 ## A prop_dynamic `solid` value that collides as a box around its drawn model (2 bbox, 3 and 4 obb, 6 vphysics); 0, 1 and 5 do not.
 const SOLID_BOX := [2, 3, 4, 6]
 
+## A solid prop whose box would be wider than this (metres) is a room, a roof or a hull the map's own brushes already cover; a box would seal it.
+const SOLID_MAX_SIDE := 6.0
+## ...and one smaller than this on its longest side is a pebble that only snags a body.
+const SOLID_MIN_SIDE := 0.25
+
 
 ## The manifest's [code]licence[/code] block (every free replacement with URL, author, licence), or {}.
 func licence() -> Dictionary:
@@ -914,7 +919,14 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 	var longest_of := {}
 	for rec: Dictionary in manifest.get("props", []):
 		if rec.has("box"):
-			root.add_child(_support_block(rec))
+			var block := _support_block(rec)
+			root.add_child(block)
+			if collide_fn.is_valid() and int(rec.get("solid", 0)) in SOLID_BOX:
+				var cb := _solid_shape(rec, null)
+				if not cb.is_empty():
+					var bb := _body_for(cb)
+					root.add_child(bb)
+					collide_fn.call(bb)
 			continue
 		var n := _place_prop(rec, scene_for, cache, longest_of)
 		if n == null:
@@ -926,9 +938,10 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 				(g as GeometryInstance3D).visibility_range_end_margin = end * 0.1
 		root.add_child(n)
 		if collide_fn.is_valid() and int(rec.get("solid", 0)) in SOLID_BOX:
-			var body := _solid_body(n)
-			if body != null:
-				n.add_child(body)
+			var box := _solid_shape(rec, n)
+			if not box.is_empty():
+				var body := _body_for(box)
+				root.add_child(body)
 				collide_fn.call(body)
 	return root
 
@@ -1004,23 +1017,62 @@ func build_prop_collision(scene_for: Callable = Callable()) -> StaticBody3D:
 	var cache := {}
 	var longest_of := {}
 	for rec: Dictionary in manifest.get("props", []):
-		if rec.has("box") or not int(rec.get("solid", 0)) in SOLID_BOX:
+		if not int(rec.get("solid", 0)) in SOLID_BOX:
 			continue
-		var n := _place_prop(rec, scene_for, cache, longest_of)
-		if n == null:
+		var n: Node3D = null
+		if not rec.has("box") and not rec.has("collide"):
+			n = _place_prop(rec, scene_for, cache, longest_of)
+			if n == null:
+				continue
+		var box := _solid_shape(rec, n)
+		if n != null:
+			n.free()
+		if box.is_empty():
 			continue
-		var box := _local_aabb(n)
-		if box.size.x > 0.001 and box.size.y > 0.001 and box.size.z > 0.001:
-			var shape := BoxShape3D.new()
-			shape.size = box.size * n.scale
-			var cs := CollisionShape3D.new()
-			cs.shape = shape
-			cs.transform = Transform3D(n.basis.orthonormalized(), n.position + n.basis * box.get_center())
-			body.add_child(cs)
-		n.free()
+		var shape := BoxShape3D.new()
+		shape.size = box["size"]
+		var cs := CollisionShape3D.new()
+		cs.shape = shape
+		cs.transform = box["transform"]
+		body.add_child(cs)
 	if body.get_child_count() == 0:
 		body.free()
 		return null
+	return body
+
+
+## {size, transform} (world space) of the box a solid prop record collides as, or {} for none. A `box` record (a
+## support block) and a record with `collide` (the original model's measured bounds, written by the converter) use their
+## own numbers, so the body is the size of what the map had; otherwise the drawn stand-in [param n] is boxed.
+func _solid_shape(rec: Dictionary, n: Node3D) -> Dictionary:
+	var size := Vector3.ZERO
+	var xf := Transform3D.IDENTITY
+	var src: Variant = rec.get("collide", rec) if rec.has("collide") or rec.has("box") else null
+	if src != null:
+		var d: Array = src["box"]
+		var at: Array = src.get("at", rec.get("at", [0, 0, 0]))
+		size = Vector3(d[0], d[1], d[2])
+		xf = Transform3D(Basis(Vector3.UP, deg_to_rad(float(src.get("yaw", rec.get("yaw", 0.0))))), Vector3(at[0], at[1], at[2]))
+	elif n != null:
+		var box := _local_aabb(n)
+		size = box.size * n.scale
+		xf = Transform3D(n.basis.orthonormalized(), n.position + n.basis * box.get_center())
+	if size.x <= 0.001 or size.y <= 0.001 or size.z <= 0.001:
+		return {}
+	if maxf(size.x, maxf(size.y, size.z)) < SOLID_MIN_SIDE or maxf(size.x, size.z) > SOLID_MAX_SIDE:
+		return {}
+	return {"size": size, "transform": xf}
+
+
+static func _body_for(box: Dictionary) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.name = "Solid"
+	var cs := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = box["size"]
+	cs.shape = shape
+	body.add_child(cs)
+	body.transform = box["transform"]
 	return body
 
 
@@ -1042,22 +1094,6 @@ static func _support_block(rec: Dictionary) -> MeshInstance3D:
 	mi.position = Vector3(at[0], at[1], at[2])
 	mi.rotation_degrees.y = float(rec.get("yaw", 0.0))
 	return mi
-
-
-## A static body with one box around the meshes under [param n] (its local space, so it turns and scales with the prop); null for a model with no mesh.
-static func _solid_body(n: Node3D) -> StaticBody3D:
-	var box := _local_aabb(n)
-	if box.size.x <= 0.001 or box.size.y <= 0.001 or box.size.z <= 0.001:
-		return null
-	var body := StaticBody3D.new()
-	body.name = "Solid"
-	var cs := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
-	shape.size = box.size
-	cs.shape = shape
-	cs.position = box.get_center()
-	body.add_child(cs)
-	return body
 
 
 static func _local_aabb(n: Node3D) -> AABB:

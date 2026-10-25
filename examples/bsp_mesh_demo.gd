@@ -197,7 +197,7 @@ func _test_environment(world: DotMapBspMesh) -> void:
 			{"stand_in": "chair", "at": [3, 0, 0], "yaw": 0.0, "scale": 1.0, "solid": 0}, {"stand_in": "chair", "at": [6, 0, 0], "yaw": 0.0, "scale": 1.0, "solid": 1}]
 	var made: Array = []
 	var solid_props := world.build_props(Callable(), func(b: StaticBody3D) -> void: made.append(b))
-	_check(solid_props.get_child_count() == 3 and made.size() == 1 and (made[0] as StaticBody3D).get_child(0).get("shape") is BoxShape3D, "only solid 2/3/4/6 gets a box body: %d" % made.size())
+	_check(solid_props.get_child_count() == 4 and made.size() == 1 and (made[0] as StaticBody3D).get_child(0).get("shape") is BoxShape3D, "only solid 2/3/4/6 gets a box body: %d" % made.size())
 	solid_props.free()
 	var solid_only := world.build_prop_collision()
 	_check(solid_only != null and solid_only.get_child_count() == 1 and (solid_only.get_child(0) as CollisionShape3D).shape is BoxShape3D and absf((solid_only.get_child(0) as CollisionShape3D).position.x) < 1.0,
