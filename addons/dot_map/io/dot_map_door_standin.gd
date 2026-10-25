@@ -34,6 +34,7 @@ static func build(mover: DotMapMover, yaw_degrees: float, size: Vector3 = SIZE, 
 	root.add_child(panel)
 	if mover.solid:
 		var body := AnimatableBody3D.new()
+		body.sync_to_physics = false
 		body.name = "col_solid"
 		body.collision_layer = layer
 		body.collision_mask = 0

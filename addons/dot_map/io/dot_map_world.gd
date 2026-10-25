@@ -357,6 +357,9 @@ func _build_collision(ents: DotMapEntities, layers: Dictionary) -> void:
 					continue
 			elif moving:
 				body = AnimatableBody3D.new()
+				# The io moves the parent. A synced body copies each physics step's pose back onto itself, which offsets
+				# it from the parent by however far the parent moved since: a collider that drifts with frame timing.
+				(body as AnimatableBody3D).sync_to_physics = false
 			else:
 				body = StaticBody3D.new()
 			body.name = "col_" + kind
