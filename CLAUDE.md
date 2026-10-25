@@ -36,6 +36,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | `examples/brushes_demo.tscn` | the brushes suite (62 checks, headless) and, under `xvfb-run` with `-- --shot=<prefix>`, three frames |
 | `examples/bsp_entities_demo.tscn` | the brush-entity suite (42 checks, headless) on a real map's movers, volumes and links, `examples/bsp_mesh/zm_4way_tunnel.entities.json` ([brush-entities](docs/brush-entities.md)) |
 | `examples/bsp_mesh_demo.tscn` | the bsp mesh suite (95 checks, headless) on `examples/bsp_mesh/fixture`, which `tools/bsp/tests/mesh_fixture.py` writes, and `terrain_fixture.json` (`tools/bsp/tests/test_terrain.py --write`) |
+| `addons/dot_map/culling/`, `tools/bake_occluders.gd`, `tools/shot_culling.sh`, `examples/culling_demo.tscn` | culling for a hand-built level: `DotOccluderBaker` (large flat faces to occluder quads), `DotAreaPortal` (a doorway box that occludes while closed; `DotMapVisibility.bind_area_portals`); 28 checks. [culling](docs/culling.md) |
 | `examples/vis_demo.tscn` | the visibility suite (16 checks on a synthetic map, headless); `-- --maps=<pack prefix>,...` adds the no-holes ray test on real converted packs ([visibility](docs/visibility.md#proof-no-holes)) |
 | `examples/bsp_world_shot.tscn`, `tools/screenshot.sh` | one frame of a converted map dressed with its free textures, environment and stand-in props (under Xvfb) |
 | `examples/io_world_demo.tscn` | toggle brushes, breakables, movers and state replication (headless, 205 checks in 17 sections) |

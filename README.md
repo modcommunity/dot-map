@@ -197,6 +197,8 @@ On the client, `DotMapSyncClient.handle(payload)` takes whatever arrives. A host
 
 A converted map keeps its precomputed visibility data (clusters, the potentially visible set, area portals) and gets occluders from its large solid brushes. `DotMapVisibility` shows only the chunks and props the camera's cluster can see, re-deciding only when the camera changes cluster, and closes area portals when their doors shut. `vis_mode` is off, pvs, occluders or both; a map without the data draws everything. Details and measurements in [docs/visibility.md](docs/visibility.md).
 
+A level you built by hand gets the same from `DotOccluderBaker` (large walls and floors become occluder quads, headless or from the editor's Tools menu) and `DotAreaPortal` (a doorway that hides the room behind it while the door is shut): [add culling in 5 minutes](docs/culling.md). Both are opt-in.
+
 ## Documentation
 
 [`docs/`](docs/README.md) has the design reasoning: why the catalogue is not the rotation, the order a map change has to happen in and what breaks when it does not, and why the loader reaches dot-cloud through the registry rather than by name.

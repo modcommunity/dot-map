@@ -282,7 +282,8 @@ func _shoot(dir: String) -> void:
 		occ.occluder = baked if step[1] else null
 		for portal in _portals:
 			portal.set_open(step[2])
-		for i in 8:
+		await get_tree().create_timer(2.0).timeout   # the occlusion scene is rebuilt off the main thread
+		for i in 4:
 			await get_tree().process_frame
 		var draws := RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
 		var objs := RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME)
