@@ -90,6 +90,47 @@ for key in server.games.current_maps():
     catalogue.add_delivered(key, "map.tscn")
 ```
 
+## A converted map, from files to a drawn world
+
+A converted map is a prefix: `<prefix>.json` (the manifest), `<prefix>.bin` (geometry, lightmaps, visibility), usually `<prefix>.doc.json` (the source document, which gives entities and links) and `<prefix>.coverage.json`. `examples/bsp_mesh/fixture.json` and `fixture.bin` are a tiny one to start from, and the converter's `bsp.py regen` writes the real ones (below).
+
+```gdscript
+# `world` is a DotMapBspMesh, read from the prefix (the path without ".json").
+var loaded := DotMapBspMesh.load_prefix("res://examples/bsp_mesh/fixture")
+if not loaded.ok:
+    push_error(str(loaded.error))
+    return
+var world: DotMapBspMesh = loaded.value
+
+# 1. The whole playable world (geometry, props, doors, triggers, collision, the map's own environment).
+var surfaces := DotMapSurfaces.new()
+var material_for := surfaces.world_material_for(world, "res://examples/bsp_mesh")   # the folder the textures sit in
+var built := DotMapWorld.build(world, {"material_for": material_for})
+if not built.ok:
+    return
+var dw: DotMapWorld = built.value
+add_child(dw)
+
+# 2. Draw only what the camera can see. Fails quietly (the map is drawn whole) when the map has no visibility data.
+var vis := DotMapVisibility.new()
+add_child(vis)
+vis.setup(world, dw.visual)
+
+# 3. Lightmapped maps only: let the baked light drive the sky and ambient, and free the bake's own lamps. Returns null for a map without a lightmap.
+DotMapLitWorld.attach(dw, world, environment, lamps)
+```
+
+`examples/bsp_world_shot.gd` is this flow in about eighty lines with a camera (`tools/screenshot.sh dot-map out.png --scene res://examples/bsp_world_shot.tscn`, with `--world=<prefix>`), and `world.build_node()` alone gives just the mesh tree when you want to place everything yourself. `world` in the snippets above is that `DotMapBspMesh`, never a node.
+
+To make a converted map from an original, with the author's file in the converter's store (`bsp.py store`), from `tools/bsp`:
+
+```bash
+python3 bsp.py regen --out ../maps/my_map/my_map <game>/<map>      # writes my_map.json, .bin, .coverage.json, .doc.json
+python3 bsp.py regen --ratchet --out ../maps/my_map/my_map <game>/<map>   # fails when more is unmapped than the committed coverage says
+```
+
+When a converted map is wrong, fix the converter or its rule tables and regenerate; do not patch the output ([docs/converter-v2.md](docs/converter-v2.md)).
+
 ## Rotation and voting
 
 ```gdscript
