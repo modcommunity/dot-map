@@ -58,6 +58,7 @@ for k in "${KINDS[@]}"; do
             if [ ! -f "$to" ]; then echo "missing: $DEST/$k/$f"; bad=1
             elif ! cmp -s "$from" "$to"; then echo "differs: $DEST/$k/$f"; bad=1; fi
             [ -f "$to.import" ] || { echo "no import file: $DEST/$k/$f.import (open the project once)"; bad=1; }
+            ! grep -q '^mipmaps/generate=false' "$to.import" 2>/dev/null || { echo "no mipmaps: $DEST/$k/$f.import (run the sync; surfaces shimmer at a distance without them)"; bad=1; }
         else
             mkdir -p "$OUT/$k"
             cmp -s "$from" "$to" 2>/dev/null || cp "$from" "$to"
@@ -67,6 +68,8 @@ for k in "${KINDS[@]}"; do
                 # Godot writes a fresh uid and dest hash on its first import.
                 sed -e "s#res://addons/dot_map/surfaces/#res://$DEST/#g" -e '/^uid=/d' -e '/^path=/d' -e '/^dest_files=/d' "$from.import" > "$to.import"
             fi
+            # Mipmaps are not optional for a surface: a copy imported without them (as a game's own import settings may) is set right.
+            sed -i 's#^mipmaps/generate=false#mipmaps/generate=true#' "$to.import"
         fi
     done
 done
