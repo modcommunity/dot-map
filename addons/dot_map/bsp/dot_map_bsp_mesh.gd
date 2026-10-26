@@ -908,15 +908,25 @@ func _default_player(rec: Dictionary, stream: AudioStream, level: float) -> Node
 	return p
 
 
+## Library models ([code]lib/[/code]) [method build_props] could not load last time; [member missing_proxied] of them were drawn as boxes.
+var missing_models: int = 0
+## How many of [member missing_models] were drawn as low-detail boxes of the original's measured bounds.
+var missing_proxied: int = 0
+## Source paths already warned about missing library models: one WARN per map per process.
+static var _models_warned: Dictionary = {}
+
+
 ## The free stand-in models the converter placed for the map's own, as nodes under
 ## [code]Props[/code]. [param scene_for] takes the stand-in id and returns a [PackedScene]
-## (default: [constant DEFAULT_PROP_DIRS], [code].glb[/code]). Drawing only, no collision: the
-## map's own hulls are what players stand on. An id with no scene is skipped.
+## (default: [constant DEFAULT_PROP_DIRS], [code].glb[/code]). An id with no scene is skipped, except a
+## library model with measured bounds (`collide` or `bounds`), which is drawn as a box of them so nothing collides unseen.
 func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callable()) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Props"
 	var cache := {}
 	var longest_of := {}
+	missing_models = 0
+	missing_proxied = 0
 	for rec: Dictionary in manifest.get("props", []):
 		if rec.has("box"):
 			var block := _support_block(rec)
@@ -929,6 +939,19 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 					collide_fn.call(bb)
 			continue
 		var n := _place_prop(rec, scene_for, cache, longest_of)
+		if n == null and str(rec.get("stand_in", "")).begins_with("lib/"):
+			missing_models += 1
+			n = _proxy_for(rec)
+			if n != null:
+				missing_proxied += 1
+				root.add_child(n)
+				if collide_fn.is_valid() and int(rec.get("solid", 0)) in SOLID_BOX:
+					var pb := _solid_shape(rec, null)
+					if not pb.is_empty():
+						var body := _body_for(pb)
+						root.add_child(body)
+						collide_fn.call(body)
+			continue
 		if n == null:
 			continue
 		if prop_view_per_metre > 0.0:
@@ -943,7 +966,40 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 				var body := _body_for(box)
 				root.add_child(body)
 				collide_fn.call(body)
+	_warn_missing_models()
 	return root
+
+
+## A low-detail box of a missing library model's measured bounds (`collide`, else `bounds`), or null without them.
+func _proxy_for(rec: Dictionary) -> Node3D:
+	var src: Variant = rec.get("collide", rec.get("bounds", null))
+	if not src is Dictionary or not (src as Dictionary).has("box"):
+		return null
+	var d: Array = src["box"]
+	if float(d[0]) <= 0.001 or float(d[1]) <= 0.001 or float(d[2]) <= 0.001:
+		return null
+	var at: Array = src.get("at", rec.get("at", [0, 0, 0]))
+	var yaw: Variant = src.get("yaw", rec.get("yaw", 0.0))
+	var block: MeshInstance3D
+	if is_tree(rec):
+		var trunk: Dictionary = _solid_shape({"stand_in": rec["stand_in"], "collide": src}, null)
+		var w: float = (trunk["size"] as Vector3).x if not trunk.is_empty() else clampf(minf(d[0], d[2]) * TRUNK_SHARE, TRUNK_MIN, TRUNK_MAX)
+		block = _support_block({"box": [w, d[1], w], "at": at, "yaw": yaw}, Color(0.36, 0.27, 0.18))
+		var crown := _support_block({"box": [d[0], d[1] * 0.65, d[2]], "at": [0, d[1] * 0.175, 0], "yaw": 0.0}, Color(0.2, 0.32, 0.18))
+		block.add_child(crown)
+	else:
+		block = _support_block({"box": d, "at": at, "yaw": yaw})
+	block.name = "Proxy"
+	block.set_meta(&"dot_map_proxy", str(rec.get("stand_in", "")))
+	return block
+
+
+func _warn_missing_models() -> void:
+	if missing_models == 0 or _models_warned.has(source_path):
+		return
+	_models_warned[source_path] = true
+	DotLog.warn(CHANNEL, "a map's library models are not installed; %d drawn as low-detail boxes, %d left out. To get them: %s" % [missing_proxied, missing_models - missing_proxied, DotMapStore.HOW_TO_GET],
+			{"map": source_path.get_file(), "store_pack": str(DotMapStore.pack_of(licence()).get("id", "none"))})
 
 
 ## One prop record as an instanced, placed and scaled stand-in (not yet in the tree); null when its stand-in has no scene.
@@ -1070,7 +1126,25 @@ func _solid_shape(rec: Dictionary, n: Node3D) -> Dictionary:
 		return {}
 	if maxf(size.x, maxf(size.y, size.z)) < SOLID_MIN_SIDE or maxf(size.x, size.z) > SOLID_MAX_SIDE:
 		return {}
+	if is_tree(rec):
+		var w := clampf(minf(size.x, size.z) * TRUNK_SHARE, TRUNK_MIN, TRUNK_MAX)
+		size = Vector3(w, size.y, w)
 	return {"size": size, "transform": xf}
+
+
+## A tree collides as its trunk: a source tree's physics model is the trunk, and a box of the crown is an unseen wall round it.
+const TRUNK_SHARE := 0.15
+const TRUNK_MIN := 0.3
+const TRUNK_MAX := 0.8
+const TREE_WORDS: PackedStringArray = ["tree", "pine", "palm", "conifer", "spruce", "birch", "oak"]
+
+
+## Whether a prop record's stand-in is a tree (a word of its id, so a street lamp is not).
+static func is_tree(rec: Dictionary) -> bool:
+	for w in str(rec.get("stand_in", "")).to_lower().replace("/", "_").replace("-", "_").split("_", false):
+		if w in TREE_WORDS:
+			return true
+	return false
 
 
 static func _body_for(box: Dictionary) -> StaticBody3D:
@@ -1086,17 +1160,25 @@ static func _body_for(box: Dictionary) -> StaticBody3D:
 
 
 static var _support_material: StandardMaterial3D = null
+static var _tinted: Dictionary = {}
 
 
-## A neutral block of the measured size, for a model something rests on and no stand-in fits.
-static func _support_block(rec: Dictionary) -> MeshInstance3D:
+## A neutral block of the measured size, for a model something rests on and no stand-in fits; [param tint] colours a proxy's part.
+static func _support_block(rec: Dictionary, tint: Color = Color(0.62, 0.6, 0.57)) -> MeshInstance3D:
 	var dims: Array = rec["box"]
 	var box := BoxMesh.new()
 	box.size = Vector3(dims[0], dims[1], dims[2])
 	if _support_material == null:
 		_support_material = StandardMaterial3D.new()
 		_support_material.albedo_color = Color(0.62, 0.6, 0.57)
-	box.material = _support_material
+	if tint.is_equal_approx(_support_material.albedo_color):
+		box.material = _support_material
+	else:
+		if not _tinted.has(tint):
+			var m := StandardMaterial3D.new()
+			m.albedo_color = tint
+			_tinted[tint] = m
+		box.material = _tinted[tint]
 	var mi := MeshInstance3D.new()
 	mi.mesh = box
 	var at: Array = rec.get("at", [0, 0, 0])
