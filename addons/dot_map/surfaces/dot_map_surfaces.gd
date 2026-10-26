@@ -487,10 +487,23 @@ func _file_texture(path: String) -> Texture2D:
 	var img := Image.load_from_file(path)
 	if img == null:
 		return null
+	slim_image(img, path)
 	img.generate_mipmaps()
 	var tex := ImageTexture.create_from_image(img)
 	_textures[path] = tex
 	return tex
+
+
+## Drops the channels a set's [param path] part never samples: roughness and AO keep red, a normal map red and green
+## (both shaders rebuild z). A raw 1k set decodes to 4 MB per map, and a big map draws hundreds of sets.
+static func slim_image(img: Image, path: String) -> void:
+	if img.is_compressed():
+		return
+	var part := path.get_file().get_basename()
+	if part in ["roughness", "ao"] and img.get_format() != Image.FORMAT_R8:
+		img.convert(Image.FORMAT_R8)
+	elif part == "normal" and img.get_format() != Image.FORMAT_RG8:
+		img.convert(Image.FORMAT_RG8)
 
 
 func _lightmapped(world: DotMapBspMesh, rec: Dictionary, free: String, tint: Color, generated_file: String, set_dir: String = "", texture: Texture2D = null) -> Material:

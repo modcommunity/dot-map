@@ -45,7 +45,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | `examples/world_demo.tscn` | `DotMapWorld` on the converted Office and Dan's course: one call, the hurt room per its own links, replication, manifest settings into the config (headless, 34 checks) |
 | `addons/dot_map/io/` (`dot_map_door_standin`, `dot_map_physbox`, `dot_map_soundscape`) | the drawn `prop_door_rotating`, `func_physbox` bodies and `env_soundscape` classes ([io](docs/io.md)) |
 | `examples/door_shot.tscn`, `tools/door_shot.sh` | frames of one `prop_door_rotating` of a converted map (`--entity=<index>`): closed, then half open from each side, from above and from the opener's eye, the hinge marked by a green post |
-| `examples/map_threads_selftest.tscn` | the threaded load stages equal the inline ones (26 checks, headless) |
+| `examples/map_threads_selftest.tscn` | the threaded load stages equal the inline ones, and a raw PBR set keeps only the channels it samples (27 checks, headless) |
 | `examples/map_selftest.tscn` | the suite; includes a real signed pack fetched by a peer |
 | `tools/bsp/` | the family's one converter for community VBSP maps: reader, brush-to-box cutting, the intermediate JSON every game's adapter reads, `list` for a conversion queue, and the pieces every adapter repeated: `Flood` (reachable space), the entity and brush classifiers, prop matching, lights, `.gma` through fastgmad, the open-wall room plan, teleport destinations, the 0.0254 scale. Python, outside the addon so it never ships. [tools/bsp/README.md](tools/bsp/README.md) |
 

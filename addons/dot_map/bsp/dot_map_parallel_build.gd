@@ -54,6 +54,7 @@ static func textures(paths: PackedStringArray, workers: int) -> Dictionary:
 		var images := DotParallel.run(func(i: int) -> Variant:
 			var img := Image.load_from_file(paths[from + i])
 			if img != null:
+				DotMapSurfaces.slim_image(img, paths[from + i])
 				img.generate_mipmaps()
 			return img, n, &"map.textures", workers)
 		for i in n:

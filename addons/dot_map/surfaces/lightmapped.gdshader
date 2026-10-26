@@ -31,11 +31,17 @@ void vertex() {
 	blend_w = COLOR.r;
 }
 
+// A tangent normal from red and green alone: an imported normal map is two-channel (RGTC), and so is a raw one once slimmed.
+vec3 unpack_normal(vec2 rg) {
+	vec2 xy = rg * 2.0 - 1.0;
+	return vec3(xy, sqrt(max(0.0, 1.0 - dot(xy, xy))));
+}
+
 // Triplanar normal map by whiteout blending, in world space.
 vec3 world_normal(vec3 wn, vec3 w) {
-	vec3 tx = texture(normal_tex, wpos.zy / metres).xyz * 2.0 - 1.0;
-	vec3 ty = texture(normal_tex, wpos.xz / metres).xyz * 2.0 - 1.0;
-	vec3 tz = texture(normal_tex, wpos.xy / metres).xyz * 2.0 - 1.0;
+	vec3 tx = unpack_normal(texture(normal_tex, wpos.zy / metres).xy);
+	vec3 ty = unpack_normal(texture(normal_tex, wpos.xz / metres).xy);
+	vec3 tz = unpack_normal(texture(normal_tex, wpos.xy / metres).xy);
 	vec3 sg = sign(wn);
 	tx = vec3(tx.xy * sg.x + wn.zy, abs(tx.z) * wn.x);
 	ty = vec3(ty.xy * sg.y + wn.xz, abs(ty.z) * wn.y);

@@ -6,7 +6,7 @@ extends Node
 ## godot --headless --path . res://examples/map_threads_selftest.tscn
 ## [/codeblock]
 
-const CHECKS := 26
+const CHECKS := 27
 const SECTIONS := 4
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const COPIES := 40
@@ -153,4 +153,18 @@ func _test_textures() -> void:
 	_check(same, "decoded and mip-mapped pixels equal inline with 2 and 4 workers")
 	for p in paths:
 		DirAccess.remove_absolute(p)
+	var parts := PackedStringArray()
+	for part in ["albedo", "normal", "roughness", "ao"]:
+		DirAccess.make_dir_recursive_absolute("user://map_threads_set")
+		var path := "user://map_threads_set/%s.png" % part
+		var img := Image.create(32, 32, false, Image.FORMAT_RGB8)
+		img.fill(Color(0.6, 0.3, 0.9))
+		img.save_png(path)
+		parts.append(path)
+	var slim := DotMapParallelBuild.textures(parts, 2)
+	var formats := []
+	for p in parts:
+		formats.append((slim[p] as Texture2D).get_image().get_format())
+		DirAccess.remove_absolute(p)
+	_check(formats == [Image.FORMAT_RGB8, Image.FORMAT_RG8, Image.FORMAT_R8, Image.FORMAT_R8], "a set keeps only the channels it samples: albedo RGB, normal RG, roughness and AO R (%s)" % str(formats))
 	_completed += 1
