@@ -969,6 +969,7 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 				var body := _body_for(box)
 				root.add_child(body)
 				collide_fn.call(body)
+	_free_templates(cache)
 	_warn_missing_models()
 	return root
 
@@ -1050,6 +1051,17 @@ func _warn_missing_models() -> void:
 			{"map": source_path.get_file(), "store_pack": str(DotMapStore.pack_of(licence()).get("id", "none"))})
 
 
+## Key in a prop cache for the library templates [method _place_prop] made, which only the caller's end can free.
+const OWNED_KEY := &"__owned"
+
+
+## Frees the library templates a prop pass loaded; they are orphan nodes, so dropping the cache leaks their meshes and textures.
+func _free_templates(cache: Dictionary) -> void:
+	for n: Node in cache.get(OWNED_KEY, []):
+		n.free()
+	cache.erase(OWNED_KEY)
+
+
 ## One prop record as an instanced, placed and scaled stand-in (not yet in the tree); null when its stand-in has no scene.
 func _place_prop(rec: Dictionary, scene_for: Callable, cache: Dictionary, longest_of: Dictionary) -> Node3D:
 	var id := str(rec.get("stand_in", ""))
@@ -1058,6 +1070,8 @@ func _place_prop(rec: Dictionary, scene_for: Callable, cache: Dictionary, longes
 				else find_resource(id, DEFAULT_PROP_DIRS, PackedStringArray([".glb", ".tscn"]))
 	if cache[id] == null and id.begins_with("lib/"):
 		cache[id] = _library_model(id)
+		if cache[id] != null:
+			cache.get_or_add(OWNED_KEY, []).append(cache[id])
 	var scene: Variant = cache[id]
 	var n: Node3D = null
 	if scene is PackedScene:
@@ -1086,6 +1100,31 @@ var model_library: String = ""
 var model_libraries: PackedStringArray = PackedStringArray()
 
 
+## Library models this mesh found damaged ([method gltf_defect]); each is drawn as its measured box.
+var defective_models := PackedStringArray()
+
+
+## Why the glTF at [param path] cannot load ("" when it can): a .bin longer than its declared byteLength, which the engine
+## refuses with an error per read and no name. Checked up front so the model is named once instead.
+static func gltf_defect(path: String) -> String:
+	if path.get_extension() != "gltf":
+		return ""
+	var json: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not json is Dictionary:
+		return "not readable as JSON"
+	for buf: Variant in (json as Dictionary).get("buffers", []):
+		var uri := str((buf as Dictionary).get("uri", ""))
+		if uri == "" or uri.begins_with("data:"):
+			continue
+		var bin := path.get_base_dir().path_join(uri.uri_decode())
+		if not FileAccess.file_exists(bin):
+			return "%s is missing" % uri
+		var file := FileAccess.open(bin, FileAccess.READ)
+		if file != null and file.get_length() > int((buf as Dictionary).get("byteLength", 0)):
+			return "%s is %d bytes but the glTF declares %d" % [uri, file.get_length(), int((buf as Dictionary).get("byteLength", 0))]
+	return ""
+
+
 ## A shipped library model (stand-in id [code]lib/<name>[/code]) loaded from the pack, re-rooted so its bottom centre sits at
 ## the origin; null when the pack lacks it. A glTF outside the project has no import, so it is read with [GLTFDocument].
 func _library_model(id: String) -> Node3D:
@@ -1108,6 +1147,12 @@ func _library_model(id: String) -> Node3D:
 		var packed := load(path) as PackedScene
 		model = packed.instantiate() as Node3D if packed != null else null
 	elif FileAccess.file_exists(path):
+		var defect := gltf_defect(path)
+		if defect != "":
+			if not defective_models.has(path):
+				defective_models.append(path)
+				DotLog.warn(CHANNEL, "a library model is damaged and drawn as a box instead: " + defect, {"model": path})
+			return null
 		var doc := GLTFDocument.new()
 		var state := GLTFState.new()
 		if doc.append_from_file(path, state) == OK:
@@ -1148,6 +1193,7 @@ func build_prop_collision(scene_for: Callable = Callable()) -> StaticBody3D:
 		cs.shape = shape
 		cs.transform = box["transform"]
 		body.add_child(cs)
+	_free_templates(cache)
 	if body.get_child_count() == 0:
 		body.free()
 		return null
