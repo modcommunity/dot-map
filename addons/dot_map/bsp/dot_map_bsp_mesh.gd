@@ -927,6 +927,7 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 	var longest_of := {}
 	missing_models = 0
 	missing_proxied = 0
+	_unseen.clear()
 	for rec: Dictionary in manifest.get("props", []):
 		if rec.has("box"):
 			var block := _support_block(rec)
@@ -942,7 +943,9 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 		if n == null and str(rec.get("stand_in", "")).begins_with("lib/"):
 			missing_models += 1
 			n = _proxy_for(rec)
-			if n != null:
+			if n == null:
+				_unseen.append(rec)
+			else:
 				missing_proxied += 1
 				root.add_child(n)
 				if collide_fn.is_valid() and int(rec.get("solid", 0)) in SOLID_BOX:
@@ -992,6 +995,51 @@ func _proxy_for(rec: Dictionary) -> Node3D:
 	block.name = "Proxy"
 	block.set_meta(&"dot_map_proxy", str(rec.get("stand_in", "")))
 	return block
+
+
+## Library prop records [method build_props] could neither load nor measure, for [method draw_unseen_boxes].
+var _unseen: Array[Dictionary] = []
+
+
+## Blocks for a game's own world-space collision boxes ([code][x, y, z, sx, sy, sz, yaw][/code]) that stand where
+## [method build_props] drew nothing (a missing, unmeasured library model), so no box collides unseen; null when none.
+func draw_unseen_boxes(boxes: Array) -> Node3D:
+	if _unseen.is_empty():
+		return null
+	var at_xz := {}
+	for rec in _unseen:
+		var at: Array = rec.get("at", [0, 0, 0])
+		var key := Vector2i(floori(float(at[0])), floori(float(at[2])))
+		if not at_xz.has(key):
+			at_xz[key] = []
+		at_xz[key].append(rec)
+	var root := Node3D.new()
+	root.name = "UnseenProps"
+	for b: Variant in boxes:
+		if not b is Array or (b as Array).size() < 7:
+			continue
+		var rec: Variant = null
+		# A library model sits bottom-centre on its origin, so its box is centred over `at` and starts at its height.
+		var cells := {}
+		for dx in [-0.05, 0.05]:
+			for dz in [-0.05, 0.05]:
+				cells[Vector2i(floori(float(b[0]) + dx), floori(float(b[2]) + dz))] = true
+		for cell: Vector2i in cells:
+			for r: Dictionary in at_xz.get(cell, []):
+				if absf(float(r["at"][0]) - float(b[0])) < 0.05 and absf(float(r["at"][2]) - float(b[2])) < 0.05 \
+						and absf(float(b[1]) - float(b[4]) * 0.5 - float(r["at"][1])) <= 0.25:
+					rec = r
+		if rec == null:
+			continue
+		var tint := Color(0.36, 0.27, 0.18) if is_tree(rec) else Color(0.62, 0.6, 0.57)
+		var block := _support_block({"box": [b[3], b[4], b[5]], "at": [b[0], b[1], b[2]], "yaw": b[6]}, tint)
+		block.name = "Proxy"
+		block.set_meta(&"dot_map_proxy", str(rec.get("stand_in", "")))
+		root.add_child(block)
+	if root.get_child_count() == 0:
+		root.free()
+		return null
+	return root
 
 
 func _warn_missing_models() -> void:

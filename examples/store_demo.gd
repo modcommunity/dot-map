@@ -2,7 +2,7 @@ extends Node
 ## Proves DotMapCredits and DotMapStore on a hand-written manifest and a stand-in cloud client.
 ## godot --headless --path . res://examples/store_demo.tscn
 
-const CHECKS := 51
+const CHECKS := 52
 const SECTIONS := 6
 
 var _passed := 0
@@ -258,6 +258,11 @@ func _missing_models() -> void:
 	_check("no invisible solid: every collision box has a drawn box around it", server.get_child_count() == 3 and unseen == 0)
 	_check("nothing collides where nothing is drawn (the unmeasured truck)", not bodies.any(func(b: StaticBody3D) -> bool: return b.position.distance_to(Vector3(9, 0, 9)) < 3.0))
 	w.build_props().free()
+	var unseen_root := w.draw_unseen_boxes([[9.02, 1.5, 9.0, 2.0, 3.0, 5.0, 0.0], [9.0, 10.0, 9.0, 2.0, 3.0, 5.0, 0.0], [-40.0, 1.0, -40.0, 1.0, 2.0, 1.0, 0.0]])
+	_check("a game's own box at the unmeasured truck is drawn, and only that one", unseen_root != null and unseen_root.get_child_count() == 1
+			and (unseen_root.get_child(0) as Node3D).position.is_equal_approx(Vector3(9.02, 1.5, 9.0)))
+	if unseen_root != null:
+		unseen_root.free()
 	_check("one warning per map, however often it is built", warns.size() == 1)
 	_check("the warning counts the boxes and says how to get the models", warns.size() == 1 and str(warns[0]["message"]).contains("4 drawn as low-detail boxes, 1 left out")
 			and str(warns[0]["message"]).contains("stage_stores.sh"))
