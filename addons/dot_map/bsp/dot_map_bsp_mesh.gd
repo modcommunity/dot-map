@@ -300,6 +300,22 @@ func light_floor() -> Color:
 	var lum := (c.x + c.y + c.z) / 3.0
 	if visibility_floor > 0.0 and lum < visibility_floor:
 		c = c * (visibility_floor / lum) if lum > 0.0 else Vector3.ONE * visibility_floor
+	return _limit_tint(c)
+
+
+## The strongest ratio of brightest to dimmest channel a floor keeps: a sky-lit map's blue floor (0.1, 0.1, 0.5) tinted every pale surface of it.
+const MAX_TINT_RATIO := 2.5
+
+
+## Pulls [param c] toward its own grey until its channels are within [constant MAX_TINT_RATIO]; the author's warm or cool cast stays, a saturated one does not.
+static func _limit_tint(c: Vector3) -> Color:
+	var g := (c.x + c.y + c.z) / 3.0
+	var hi := maxf(c.x, maxf(c.y, c.z))
+	var lo := minf(c.x, minf(c.y, c.z))
+	var denom := hi + (MAX_TINT_RATIO - 1.0) * g - MAX_TINT_RATIO * lo
+	if g > 0.0 and denom > 0.0:
+		var k := minf(1.0, (MAX_TINT_RATIO - 1.0) * g / denom)
+		c = Vector3(g, g, g) + (c - Vector3(g, g, g)) * k
 	return Color(c.x, c.y, c.z)
 
 
