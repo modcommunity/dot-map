@@ -58,13 +58,42 @@ var _pages: Dictionary = {}
 var _ambient: PackedFloat32Array = PackedFloat32Array()
 var _floor_mean: Dictionary = {}
 var _entities: DotMapEntities = null
+## Built shapes by model (and kinds), shared by every body made from this mesh: a shape is a read-only resource.
+var _hull_cache: Dictionary = {}
+var _concave_cache: Dictionary = {}
 
 
-## Reads [code]<prefix>.json[/code] and [code]<prefix>.bin[/code].
+## Loaded meshes kept per prefix so a round-start rebuild of the same stage skips the read, hash and
+## decompress; keyed on both files' modification times so a regenerated map is read again.
+static var cache_meshes := true
+static var cache_limit := 6
+static var _cache: Dictionary = {}
+
+
+## Forgets every cached mesh (and the shapes each holds).
+static func clear_cache() -> void:
+	_cache.clear()
+
+
+## Reads [code]<prefix>.json[/code] and [code]<prefix>.bin[/code]; the result is shared with every
+## other caller of the same prefix while [member cache_meshes] is on, so treat it as read-only.
 static func load_prefix(prefix: String) -> DotResult:
 	var json_path := prefix + ".json"
 	if not FileAccess.file_exists(json_path):
 		return DotResult.fail(DotError.CODE_IO, "no mesh manifest", json_path)
+	var stamp := str(FileAccess.get_modified_time(json_path)) + ":" + str(FileAccess.get_modified_time(prefix + ".bin"))
+	var hit: Dictionary = _cache.get(prefix, {})
+	if cache_meshes and hit.get("stamp") == stamp:
+		return DotResult.success(hit["mesh"])
+	var res := _read_prefix(prefix, json_path)
+	if res.ok and cache_meshes:
+		if _cache.size() >= cache_limit and not _cache.has(prefix):
+			_cache.erase(_cache.keys()[0])
+		_cache[prefix] = {"stamp": stamp, "mesh": res.value}
+	return res
+
+
+static func _read_prefix(prefix: String, json_path: String) -> DotResult:
 	var text := FileAccess.get_file_as_string(json_path)
 	var parsed: Variant = JSON.parse_string(text)
 	if not parsed is Dictionary:
@@ -596,6 +625,13 @@ func _merged_arrays(recs: Array) -> Array:
 ## Convex shapes of a model's player-solid brushes, relative to [method model_origin].
 ## [param kinds] filters (empty is every kind). Returns [code][{shape, kind, brush}][/code].
 func hull_shapes(model: int, kinds: PackedStringArray = PackedStringArray()) -> Array[Dictionary]:
+	var key := "%d:%s" % [model, ",".join(kinds)]
+	if not _hull_cache.has(key):
+		_hull_cache[key] = _build_hull_shapes(model, kinds)
+	return _hull_cache[key].duplicate()
+
+
+func _build_hull_shapes(model: int, kinds: PackedStringArray) -> Array[Dictionary]:
 	var recs: Array = hulls.filter(func(r: Dictionary) -> bool:
 		return int(r["model"]) == model and (kinds.is_empty() or str(r["kind"]) in kinds))
 	var points := DotMapParallelBuild.hull_points(self, recs, model_origin(model), load_threads)
@@ -610,6 +646,12 @@ func hull_shapes(model: int, kinds: PackedStringArray = PackedStringArray()) -> 
 ## Triangle shapes for the surfaces that collide as drawn (displacements: terrain has no
 ## brushes), relative to [method model_origin].
 func concave_shapes(model: int) -> Array[ConcavePolygonShape3D]:
+	if not _concave_cache.has(model):
+		_concave_cache[model] = _build_concave_shapes(model)
+	return _concave_cache[model].duplicate()
+
+
+func _build_concave_shapes(model: int) -> Array[ConcavePolygonShape3D]:
 	var recs: Array = surfaces.filter(func(r: Dictionary) -> bool: return int(r["model"]) == model and r.get("collide", false))
 	var faces := DotMapParallelBuild.concave_faces(self, recs, model_origin(model), load_threads)
 	var out: Array[ConcavePolygonShape3D] = []
@@ -624,7 +666,7 @@ func concave_shapes(model: int) -> Array[ConcavePolygonShape3D]:
 ## one, else [code]model_<n>[/code]), meta [code]model[/code] and [code]mover[/code] set.
 ## Drawing only: collision is [method hull_shapes] and [method concave_shapes], because which
 ## body and layer each goes on is the game's.
-func build_node(material_for: Callable = Callable()) -> Node3D:
+func build_node(material_for: Callable = Callable(), draw: bool = true) -> Node3D:
 	var root := Node3D.new()
 	root.name = "BspMesh"
 	for model in models():
@@ -638,6 +680,8 @@ func build_node(material_for: Callable = Callable()) -> Node3D:
 			parent.position = model_origin(model)
 			parent.set_meta(&"mover", mover(model))
 		root.add_child(parent)
+		if not draw:
+			continue
 		for g: Dictionary in build_meshes(model, material_for):
 			var mi := MeshInstance3D.new()
 			mi.mesh = g["mesh"]

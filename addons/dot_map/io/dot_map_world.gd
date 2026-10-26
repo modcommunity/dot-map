@@ -57,7 +57,7 @@ var _boxes_dirty := false
 ## player_fn, send_fn, ladder_fn, swim_fn, material_for[/code] (callables). [param options]: [code]doc[/code]
 ## (the source document), [code]doc_path[/code], [code]store[/code] (store root), [code]authoritative[/code]
 ## (true), [code]rate[/code] (60), [code]seed[/code], [code]command_allow[/code], [code]map_id[/code],
-## [code]environment, props, sounds, collision[/code] (true), [code]surfaces[/code] (a [DotMapSurfaces]; with no
+## [code]environment, props, sounds, collision[/code] (true), [code]draw[/code] (false builds the model nodes with no meshes; default off on the headless display, where nothing renders), [code]surfaces[/code] (a [DotMapSurfaces]; with no
 ## [code]material_for[/code] hook the world is drawn through it, lightmapped, else through a default one), [code]lightmap[/code] (true), [code]layers[/code] ({solid, clip, glass} to
 ## a collision layer, default 1), [code]config[/code] ({game, config_dir, allow, defaults, get_fn, set_fn};
 ## the weakest layer is the manifest's [code]settings[/code], the cvars the map's own entities set, then
@@ -231,12 +231,13 @@ func _assemble(doc: Dictionary, hooks: Dictionary, options: Dictionary) -> DotRe
 	if not loaded.ok:
 		return loaded
 	var ents := DotMapEntities.from_manifest(mesh.manifest)
+	var draw := bool(options.get("draw", DisplayServer.get_name() != "headless"))
 	var mat_for: Callable = hooks.get("material_for", Callable()) if hooks.get("material_for") is Callable else Callable()
-	if not mat_for.is_valid():
+	if draw and not mat_for.is_valid():
 		var surfaces: DotMapSurfaces = options.get("surfaces") if options.get("surfaces") is DotMapSurfaces else DotMapSurfaces.new()
 		surfaces.use_lightmap = bool(options.get("lightmap", true))
 		mat_for = surfaces.world_material_for(mesh, mesh.source_path.get_base_dir())
-	visual = mesh.build_node(mat_for)
+	visual = mesh.build_node(mat_for, draw)
 	add_child(visual)
 	var layers: Dictionary = options.get("layers", {})
 	if bool(options.get("environment", true)):

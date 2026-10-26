@@ -11,8 +11,8 @@ extends Node3D
 ## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
 ## thick at (256, 256, 16), at 0.01905 m per unit.
 
-const CHECKS := 109
-const SECTIONS := 9
+const CHECKS := 119
+const SECTIONS := 10
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
 const TERRAIN := "res://examples/bsp_mesh/terrain_fixture.json"
@@ -43,6 +43,7 @@ func _run() -> void:
 	var lit_world := _test_lightmap()
 	if world != null and lit_world != null:
 		_test_drawn(world, lit_world)
+	_test_rebuild()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -210,6 +211,55 @@ func _test_environment(world: DotMapBspMesh) -> void:
 	_check(plain_props.find_children("Solid", "StaticBody3D", true, false).is_empty(), "no body unless the game asks for them")
 	plain_props.free()
 	_check(world.is_free() == false, "a surface with no free key keeps the map from being called free")
+	_done()
+
+
+## Every body's shapes under a world, as "kind:shape-class:points" strings in tree order.
+func _collision_signature(root: Node) -> PackedStringArray:
+	var out := PackedStringArray()
+	for cs: Node in root.find_children("*", "CollisionShape3D", true, false):
+		var shape: Shape3D = (cs as CollisionShape3D).shape
+		var pts := PackedVector3Array()
+		if shape is ConvexPolygonShape3D:
+			pts = (shape as ConvexPolygonShape3D).points
+		elif shape is ConcavePolygonShape3D:
+			pts = (shape as ConcavePolygonShape3D).get_faces()
+		out.append("%s:%s:%d:%s" % [cs.get_parent().get_meta(&"hull_kind", ""), shape.get_class(), pts.size(), str(pts.slice(0, 6))])
+	return out
+
+
+const SOURCE := {"format": "dot-bsp-source", "version": 1, "entities": []}
+
+
+func _test_rebuild() -> void:
+	_section("a rebuilt world has identical collision, from cached meshes and shapes")
+	DotMapBspMesh.clear_cache()
+	var first := DotMapWorld.build(FIXTURE, {}, {"doc": SOURCE, "environment": false, "draw": true})
+	_check(first.ok, "the first build: %s" % (first.error.message if not first.ok else ""))
+	if not first.ok:
+		_done()
+		return
+	var a: DotMapWorld = first.value
+	var second := DotMapWorld.build(FIXTURE, {}, {"doc": SOURCE, "environment": false})
+	_check(second.ok, "the rebuild")
+	var b: DotMapWorld = second.value
+	_check(a.mesh == b.mesh, "the rebuild reuses the loaded mesh")
+	var sig := _collision_signature(a)
+	_check(not sig.is_empty(), "the world has collision shapes")
+	_check(sig == _collision_signature(b), "the rebuilt collision is identical")
+	_check(a.mesh.hull_shapes(0)[0]["shape"] == b.mesh.hull_shapes(0)[0]["shape"], "the shapes are shared")
+	_check(not a.visual.find_children("*", "MeshInstance3D", true, false).is_empty(), "draw true builds the meshes")
+	var bare := DotMapWorld.build(FIXTURE, {}, {"doc": SOURCE, "environment": false, "draw": false})
+	_check(bare.ok and (bare.value as DotMapWorld).visual.find_children("*", "MeshInstance3D", true, false).is_empty(),
+			"draw false builds no meshes")
+	_check(bare.ok and _collision_signature(bare.value) == sig, "draw false keeps the same collision")
+	DotMapBspMesh.cache_meshes = false
+	var fresh := DotMapBspMesh.load_prefix(FIXTURE)
+	DotMapBspMesh.cache_meshes = true
+	_check(fresh.ok and fresh.value != a.mesh, "the cache can be switched off")
+	for w: Variant in [a, b, bare.value if bare.ok else null]:
+		if w != null:
+			(w as Node).free()
 	_done()
 
 
