@@ -251,7 +251,7 @@ func ambient_at(point: Vector3, normal: Vector3 = Vector3.UP) -> Color:
 	return Color(c.x, c.y, c.z)
 
 
-## The light no lit surface falls below: the mean sky-facing ambient cube of the map (lump 56), or the sun entity's ambient, never under [constant MIN_FLOOR] so an outdoor frame is never black.
+## The light no lit surface falls below: the mean sky-facing ambient cube of the map (lump 56), or the sun entity's ambient, never under [member visibility_floor] so an outdoor frame is never black.
 func light_floor() -> Color:
 	var c := Vector3.ZERO
 	var rec: Variant = (manifest.get("lightmap", {}) as Dictionary).get("ambient")
@@ -269,12 +269,21 @@ func light_floor() -> Color:
 	if a is Array and (a as Array).size() >= 3:
 		c = c.max(Vector3(float(a[0]), float(a[1]), float(a[2])))
 	var lum := (c.x + c.y + c.z) / 3.0
-	if lum < MIN_FLOOR:
-		c = c * (MIN_FLOOR / lum) if lum > 0.0 else Vector3.ONE * MIN_FLOOR
+	if visibility_floor > 0.0 and lum < visibility_floor:
+		c = c * (visibility_floor / lum) if lum > 0.0 else Vector3.ONE * visibility_floor
 	return Color(c.x, c.y, c.z)
 
 
+## The default [member visibility_floor].
 const MIN_FLOOR := 0.3
+
+## Mean luminance a lit surface (and an actor's ambient, [DotMapLitWorld]) never falls below, tinted by the author's ambient, so a map the author lit darkly stays playable. 0 turns the floor off; a game wires its cvar to this before the world's materials are built.
+static var visibility_floor: float = MIN_FLOOR
+
+
+## Sets [member visibility_floor] for a caller that reaches this script by path.
+static func set_visibility_floor(value: float) -> void:
+	visibility_floor = maxf(value, 0.0)
 ## The sun's least energy over a baked world: the bake of a weak outdoor sun is near black and this is what shows the outdoors.
 const SUN_MIN_LIT := 1.0
 
