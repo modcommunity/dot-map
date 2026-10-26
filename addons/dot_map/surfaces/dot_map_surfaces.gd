@@ -39,6 +39,13 @@ const CHANNEL := "dot_map.surfaces"
 
 const DEFAULT_ROOT := "res://addons/dot_map/surfaces"
 const LIGHTMAPPED := preload("lightmapped.gdshader")
+const LIQUID := preload("liquid.gdshader")
+## Liquid kind to its shader colours: tint, deep tint, sky tint, alpha looking down, glow.
+const LIQUIDS := {
+	&"water": [Color(0.10, 0.34, 0.42), Color(0.03, 0.12, 0.20), Color(0.62, 0.78, 0.92), 0.5, 0.0],
+	&"slime": [Color(0.30, 0.48, 0.08), Color(0.08, 0.18, 0.02), Color(0.70, 0.85, 0.45), 0.8, 0.15],
+	&"lava": [Color(1.0, 0.42, 0.05), Color(0.45, 0.04, 0.0), Color(1.0, 0.75, 0.35), 1.0, 2.5],
+}
 
 ## Kind to what draws it. [code]meters[/code] is the width one texture covers in the world.
 ## [code]rough[/code] scales the roughness map (a photo's own roughness is a little glossy for
@@ -114,7 +121,7 @@ var metallic_scale: float = 1.0
 ## colour; off draws every kind's photo as it is (which read pale beside dark source wood and rock).
 var match_original: bool = true
 
-## What [method world_material_for] draws water faces with (a game's own water shader); null is [method default_water].
+## What [method world_material_for] draws water faces with (a game's own water shader); null is [method liquid_material] by the face's name.
 var water_material: Material = null
 
 ## Draws a map that carries its author's baked lighting with it (the lightmapped shader, unshaded);
@@ -253,7 +260,7 @@ func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 	var cache := {}
 	return func(rec: Dictionary) -> Material:
 		if rec.get("water", false):
-			return water_material if water_material != null else default_water()
+			return water_material if water_material != null else liquid_material(liquid_kind(str(rec.get("material", ""))))
 		var lit := use_lightmap and world.has_lightmap() and rec.has("lightmap_page") and not rec.has("glass")
 		var free := str(rec.get("free", ""))
 		var tint := Color.WHITE
@@ -482,19 +489,42 @@ func _lightmapped(world: DotMapBspMesh, rec: Dictionary, free: String, tint: Col
 	return m
 
 
-## The sea a converted map's water faces are drawn with when [member water_material] is not set:
-## a water texture's average is a grey dummy, and drawn opaque it was a pale gravel floor.
-func default_water() -> StandardMaterial3D:
-	if not _cache.has("water"):
-		var m := StandardMaterial3D.new()
-		m.resource_name = "water"
-		m.albedo_color = Color(0.06, 0.24, 0.28, 0.88)
-		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		m.roughness = 0.08
-		m.metallic_specular = 0.7
-		m.cull_mode = BaseMaterial3D.CULL_DISABLED
-		_cache["water"] = m
-	return _cache["water"]
+## The liquid a surface named [param name] is: &"lava", &"slime" or &"water".
+static func liquid_kind(name: String) -> StringName:
+	var n := name.to_lower()
+	if n.contains("lava") and not n.contains("lavator"):
+		return &"lava"
+	if n.contains("slime") or n.contains("sludge") or n.contains("toxic") or n.contains("acid"):
+		return &"slime"
+	return &"water"
+
+
+## The moving, translucent surface (liquid.gdshader) a converted map's [param kind] faces are drawn with,
+## one per kind. A flat tinted sheet read as a blue floor, not water. [param lip] is the foam width at a volume's edge.
+func liquid_material(kind: StringName = &"water", lip: float = 0.0) -> ShaderMaterial:
+	var key := "liquid|%s|%s" % [kind, lip]
+	if not _cache.has(key):
+		var look: Array = LIQUIDS.get(kind, LIQUIDS[&"water"])
+		var m := ShaderMaterial.new()
+		m.resource_name = String(kind)
+		m.shader = LIQUID
+		m.set_shader_parameter("tint", look[0])
+		m.set_shader_parameter("deep_tint", look[1])
+		m.set_shader_parameter("sky_tint", look[2])
+		m.set_shader_parameter("alpha_down", look[3])
+		m.set_shader_parameter("alpha_grazing", maxf(look[3], 0.9))
+		m.set_shader_parameter("glow", look[4])
+		m.set_shader_parameter("lip_width", lip)
+		if kind == &"lava":
+			m.set_shader_parameter("flow_speed", 0.25)
+			m.set_shader_parameter("roughness_base", 0.6)
+		_cache[key] = m
+	return _cache[key]
+
+
+## [method liquid_material] for water, kept for callers of the old name.
+func default_water() -> ShaderMaterial:
+	return liquid_material(&"water")
 
 
 ## The tint that brings [param kind]'s photo to the original texture's average [param colour]

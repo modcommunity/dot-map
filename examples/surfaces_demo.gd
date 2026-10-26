@@ -15,8 +15,8 @@ extends Node3D
 ## map that is inside out, or a texture twice the size it should be, so the frames have to be
 ## looked at.
 
-const CHECKS := 105
-const SECTIONS := 4
+const CHECKS := 115
+const SECTIONS := 5
 
 const COLUMNS := 5
 const CUBE := 3.0
@@ -41,6 +41,7 @@ func _run() -> void:
 	_test_material_flags()
 	_test_aliases_and_fallback()
 	_test_paths()
+	_test_liquids()
 	_build_gallery()
 
 	var prefix := ""
@@ -151,6 +152,24 @@ func _test_paths() -> void:
 
 
 # --- The gallery -------------------------------------------------------------------
+
+func _test_liquids() -> void:
+	_section("a world's water, slime and lava faces are the liquid shader")
+	_check(DotMapSurfaces.liquid_kind("de_nuke/nukwater_movingplane") == &"water", "nukwater is water")
+	_check(DotMapSurfaces.liquid_kind("maps/lava01") == &"lava", "lava01 is lava")
+	_check(DotMapSurfaces.liquid_kind("tile/lavatory_floor") == &"water", "a lavatory is not lava")
+	_check(DotMapSurfaces.liquid_kind("nature/toxicslime002a") == &"slime", "toxic slime is slime")
+	var draw := _surfaces.world_material_for(DotMapBspMesh.new(), "")
+	var water: Material = draw.call({"water": true, "material": "dev/dev_water2", "free": "pbr:pbr_SheetMetal001"})
+	_check(water is ShaderMaterial and (water as ShaderMaterial).shader == DotMapSurfaces.LIQUID, "a water face is the liquid shader, not its free texture")
+	_check(is_zero_approx(float((water as ShaderMaterial).get_shader_parameter("lip_width"))), "a world's face draws no lip")
+	var lava: ShaderMaterial = draw.call({"water": true, "material": "maps/lava01"})
+	_check(float(lava.get_shader_parameter("glow")) > 0.0, "lava glows")
+	_check(lava != water, "lava is its own material")
+	_check(draw.call({"water": true, "material": "dev/dev_water2"}) == water, "one water material for every water face")
+	_check(_surfaces.default_water() is ShaderMaterial, "the default water is the liquid shader")
+	_done()
+
 
 func _build_gallery() -> void:
 	var kinds := _surfaces.kinds()
