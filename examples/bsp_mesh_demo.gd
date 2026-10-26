@@ -260,7 +260,7 @@ func _test_glass() -> void:
 		return
 	var world: DotMapBspMesh = res.value
 	var glass_recs := world.surfaces.filter(func(r: Dictionary) -> bool: return r.has("glass"))
-	_check(glass_recs.size() == 2, "two glass surfaces (the pane wall and the breakable): %d" % glass_recs.size())
+	_check(glass_recs.size() == 4, "four glass surfaces (the pane wall, the breakable and the fence in two cells): %d" % glass_recs.size())
 	_check(world.surfaces.any(func(r: Dictionary) -> bool: return not r.has("glass")), "the floor is not glass")
 	var seen: Array = []
 	var plain := func(rec: Dictionary) -> Material:
@@ -274,7 +274,7 @@ func _test_glass() -> void:
 	for model in root.get_children():
 		for mi: MeshInstance3D in model.get_children():
 			(glass_nodes if str(mi.name).begins_with("glass_") else other_nodes).append(mi)
-	_check(glass_nodes.size() == 2 and not other_nodes.is_empty(), "glass sits in its own mesh instances: %d" % glass_nodes.size())
+	_check(glass_nodes.size() == 3 and not other_nodes.is_empty(), "glass sits in its own mesh instances: %d" % glass_nodes.size())
 	var gi: MeshInstance3D = glass_nodes[0]
 	_check(gi.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "glass casts no shadow")
 	var proxies := other_nodes.filter(func(m: MeshInstance3D) -> bool: return str(m.name).begins_with("shadow_"))

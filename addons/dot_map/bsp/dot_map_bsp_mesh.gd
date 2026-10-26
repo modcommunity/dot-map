@@ -297,6 +297,7 @@ const GLASS_LOOKS := {
 	&"ladder": {"colour": Color(0.5, 0.42, 0.3), "roughness": 0.7, "pattern": &"ladder", "mode": &"cut"},
 	&"foliage_card": {"colour": Color(1, 1, 1), "roughness": 0.9, "pattern": &"leaves", "mode": &"cut"},
 	&"shield": {"colour": Color(0.25, 0.55, 1.0, 0.45), "roughness": 0.2, "mode": &"glow"},
+	&"glow": {"colour": Color(1, 1, 1, 0.5), "roughness": 0.2, "mode": &"glow"},
 }
 ## `mode` cut is an alpha-scissor card with a drawn pattern, glow an additive sheet; both are drawn only.
 static var _glass_cache: Dictionary = {}
@@ -439,6 +440,21 @@ static func keep_coverage(img: Image) -> Image:
 	return Image.create_from_data(img.get_width(), img.get_height(), true, img.get_format(), data)
 
 
+## One shared back-face-visible copy of [param mat] for a surface the source drew from both sides (rope, leaves); a
+## shader material keeps its own culling, which is a render mode and cannot be switched per instance.
+func _two_sided(mat: Material) -> Material:
+	if not (mat is BaseMaterial3D) or (mat as BaseMaterial3D).cull_mode == BaseMaterial3D.CULL_DISABLED:
+		return mat
+	if not _two_sided_cache.has(mat):
+		var copy := mat.duplicate() as BaseMaterial3D
+		copy.cull_mode = BaseMaterial3D.CULL_DISABLED
+		_two_sided_cache[mat] = copy
+	return _two_sided_cache[mat]
+
+
+var _two_sided_cache: Dictionary = {}
+
+
 func _glass_for(rec: Dictionary) -> Material:
 	if glass_material_for.is_valid():
 		var m: Variant = glass_material_for.call(rec)
@@ -474,6 +490,8 @@ func build_meshes(model: int, material_for: Callable = Callable()) -> Array[Dict
 			elif material_for.is_valid():
 				var m: Variant = material_for.call(rec)
 				mat = m as Material if m is Material else null
+				if mat != null and rec.get("two_sided", false):
+					mat = _two_sided(mat)
 			var id := mat.get_instance_id() if mat != null else 0
 			if not by_material.has(id):
 				by_material[id] = {"material": mat, "recs": []}
@@ -1225,6 +1243,8 @@ func _library_model(id: String) -> Node3D:
 		var state := GLTFState.new()
 		if doc.append_from_file(path, state) == OK:
 			model = doc.generate_scene(state) as Node3D
+			if model != null:
+				add_mesh_lods(model, model_lod_min_tris)
 	if model == null:
 		return null
 	var box := _local_aabb(model)
@@ -1232,6 +1252,57 @@ func _library_model(id: String) -> Node3D:
 	var holder := Node3D.new()
 	holder.add_child(model)
 	return holder
+
+
+## Triangles a library model's mesh must have before [method add_mesh_lods] simplifies it (the engine then picks a coarser level by
+## screen size); 0 leaves every mesh whole. A scanned tree is over a million triangles, and a street of them was the frame.
+static var model_lod_min_tris: int = 20000
+
+
+## Sets [member model_lod_min_tris] for a caller that reaches this script by path.
+static func set_model_lod(min_tris: int) -> void:
+	model_lod_min_tris = maxi(min_tris, 0)
+
+
+## Gives every unskinned [MeshInstance3D] mesh under [param root] with at least [param min_tris] triangles its LOD levels
+## (meshoptimizer, as the editor's import does); a glTF read at run time has none. About a second for a million triangles,
+## once per model. Returns how many meshes changed.
+static func add_mesh_lods(root: Node, min_tris: int) -> int:
+	if min_tris <= 0:
+		return 0
+	var done := {}
+	var changed := 0
+	for found in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := found as MeshInstance3D
+		var mesh := mi.mesh as ArrayMesh
+		if mesh == null or mi.skin != null or mesh.get_blend_shape_count() > 0:
+			continue
+		if not done.has(mesh):
+			done[mesh] = _with_lods(mesh, min_tris)
+		if done[mesh] != mesh:
+			mi.mesh = done[mesh]
+			changed += 1
+	return changed
+
+
+static func _with_lods(mesh: ArrayMesh, min_tris: int) -> Mesh:
+	var tris := 0
+	var all: Array = []
+	for i in mesh.get_surface_count():
+		if mesh.surface_get_primitive_type(i) != Mesh.PRIMITIVE_TRIANGLES:
+			return mesh
+		var arrays := mesh.surface_get_arrays(i)
+		var index: Variant = arrays[Mesh.ARRAY_INDEX]
+		tris += (index as PackedInt32Array).size() / 3 if index != null else (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() / 3
+		all.append(arrays)
+	if tris < min_tris:
+		return mesh
+	var importer := ImporterMesh.new()
+	for i in all.size():
+		importer.add_surface(Mesh.PRIMITIVE_TRIANGLES, all[i], [], {}, mesh.surface_get_material(i), mesh.surface_get_name(i))
+	importer.generate_lods(25.0, 60.0, [])
+	var out := importer.get_mesh()
+	return out if out != null else mesh
 
 
 ## One static body with a box per solid prop (see [constant SOLID_BOX]), in world space and with no meshes, for a

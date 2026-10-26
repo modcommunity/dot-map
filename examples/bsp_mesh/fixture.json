@@ -174,7 +174,8 @@
    "area": 137.78,
    "chunk": [
     0,
-    -1
+    -1,
+    0
    ],
    "classname": "worldspawn",
    "colour": [
@@ -201,7 +202,8 @@
    "area": 134.8,
    "chunk": [
     0,
-    -1
+    -1,
+    0
    ],
    "classname": "worldspawn",
    "colour": [
@@ -227,6 +229,7 @@
   {
    "area": 2.97,
    "chunk": [
+    0,
     0,
     0
    ],

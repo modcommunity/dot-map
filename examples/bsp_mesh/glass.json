@@ -75,8 +75,7 @@
  "movers": [],
  "name": "glass",
  "notes": [
-  "2 glass surfaces (kinds glass)",
-  "translucent faces whose texture maps to no glass kind or water, drawn opaque (add a row to source_textures.tsv): PROPS/FENCEXYZ 6"
+  "4 glass surfaces (kinds fence, glass)"
  ],
  "skipped": {},
  "sky3d": null,
@@ -91,7 +90,8 @@
    "area": 199.18,
    "chunk": [
     0,
-    -1
+    -1,
+    0
    ],
    "classname": "worldspawn",
    "colour": [
@@ -118,7 +118,8 @@
    "area": 73.39,
    "chunk": [
     0,
-    -1
+    -1,
+    0
    ],
    "classname": "worldspawn",
    "colour": [
@@ -146,7 +147,8 @@
    "area": 18.3,
    "chunk": [
     0,
-    -1
+    -1,
+    0
    ],
    "classname": "worldspawn",
    "colour": [
@@ -156,9 +158,13 @@
    ],
    "entity": null,
    "generic": "metal",
+   "glass": "fence",
    "index_count": 30,
    "index_offset": 2312,
    "material": "props/fencexyz",
+   "material_flags": [
+    "translucent"
+   ],
    "model": 0,
    "normal_offset": 1912,
    "position_offset": 1672,
@@ -172,6 +178,7 @@
   {
    "area": 2.97,
    "chunk": [
+    0,
     0,
     0
    ],
@@ -200,6 +207,7 @@
    "area": 14.86,
    "chunk": [
     0,
+    0,
     0
    ],
    "classname": "worldspawn",
@@ -210,9 +218,13 @@
    ],
    "entity": null,
    "generic": "metal",
+   "glass": "fence",
    "index_count": 6,
    "index_offset": 2712,
    "material": "props/fencexyz",
+   "material_flags": [
+    "translucent"
+   ],
    "model": 0,
    "normal_offset": 2632,
    "position_offset": 2584,
