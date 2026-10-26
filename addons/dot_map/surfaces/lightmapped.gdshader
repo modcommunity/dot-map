@@ -56,12 +56,12 @@ void fragment() {
 		s = mix(s, s2, smoothstep(0.25, 0.75, blend_w));
 	}
 	vec3 light = emissive > 0.0 ? vec3(emissive) : max(texture(lightmap, UV2).rgb * exposure, floor_light);
-	// A low sun bakes far above 1 (red 3.7 on the Atix street) and the filmic curve clips that to flat yellow:
-	// the overshoot rolls off to 1 and bleaches toward grey, as film does, so the surface keeps its texture.
+	// A low sun bakes far above 1 (red 3.7 on the Atix street) and the filmic curve clips that to flat yellow: the overshoot
+	// rolls off toward 1.5 and bleaches toward grey, as film does. At or below 1 nothing changes, so ordinary bakes are untouched.
 	float peak = max(light.r, max(light.g, light.b));
-	if (peak > 0.8) {
+	if (peak > 1.0) {
 		float bleach = clamp((peak - 1.0) / 3.0, 0.0, 0.6);
-		light *= (0.8 + 0.2 * (1.0 - exp(-(peak - 0.8) / 0.2))) / peak;
+		light *= (1.0 + 0.5 * (1.0 - exp(-(peak - 1.0) / 0.5))) / peak;
 		light = mix(light, vec3(dot(light, vec3(0.3333))), bleach);
 	}
 	float ao = 1.0;

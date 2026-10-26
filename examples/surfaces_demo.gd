@@ -15,8 +15,8 @@ extends Node3D
 ## map that is inside out, or a texture twice the size it should be, so the frames have to be
 ## looked at.
 
-const CHECKS := 115
-const SECTIONS := 5
+const CHECKS := 122
+const SECTIONS := 6
 
 const COLUMNS := 5
 const CUBE := 3.0
@@ -42,6 +42,7 @@ func _run() -> void:
 	_test_aliases_and_fallback()
 	_test_paths()
 	_test_liquids()
+	_test_light_rolloff()
 	_build_gallery()
 
 	var prefix := ""
@@ -168,6 +169,29 @@ func _test_liquids() -> void:
 	_check(lava != water, "lava is its own material")
 	_check(draw.call({"water": true, "material": "dev/dev_water2"}) == water, "one water material for every water face")
 	_check(_surfaces.default_water() is ShaderMaterial, "the default water is the liquid shader")
+	_done()
+
+
+func _test_light_rolloff() -> void:
+	_section("the lightmap roll-off leaves a normal bake alone and tames an overshoot")
+	var same := true
+	for v: Vector3 in [Vector3.ZERO, Vector3(0.1, 0.5, 0.3), Vector3(0.8, 0.9, 0.95), Vector3(1.0, 0.2, 1.0), Vector3(0.99, 1.0, 0.0)]:
+		same = same and DotMapSurfaces.light_rolloff(v) == v
+	_check(same, "values at or below 1 pass through exactly")
+	var hot := DotMapSurfaces.light_rolloff(Vector3(3.7, 2.0, 0.5))
+	_check(maxf(hot.x, maxf(hot.y, hot.z)) < 1.5, "a red of 3.7 stays under the 1.5 asymptote")
+	_check(hot.x > hot.y and hot.y > hot.z, "the hue order survives the roll-off")
+	var prev := 1.0
+	var rising := true
+	for i in 40:
+		var o := DotMapSurfaces.light_rolloff(Vector3.ONE * (1.0 + i * 0.25))
+		rising = rising and o.x >= prev - 0.0001
+		prev = o.x
+	_check(rising, "a brighter bake is never darker")
+	_check(DotMapSurfaces.light_rolloff(Vector3.ONE * 1.001).x < 1.01, "the knee is continuous")
+	var code := DotMapSurfaces.LIGHTMAPPED.code
+	_check(code.contains("if (peak > 1.0)") and code.contains("1.0 + 0.5 * (1.0 - exp(-(peak - 1.0) / 0.5))"), "the shader holds the same constants")
+	_check(code.contains("clamp((peak - 1.0) / 3.0, 0.0, 0.6)"), "the shader bleaches by the same rule")
 	_done()
 
 

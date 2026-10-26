@@ -489,6 +489,17 @@ func _lightmapped(world: DotMapBspMesh, rec: Dictionary, free: String, tint: Col
 	return m
 
 
+## CPU twin of the roll-off in lightmapped.gdshader (a baked value above 1 eases toward 1.5 and bleaches); the demo pins both.
+static func light_rolloff(light: Vector3) -> Vector3:
+	var peak := maxf(light.x, maxf(light.y, light.z))
+	if peak <= 1.0:
+		return light
+	var bleach := clampf((peak - 1.0) / 3.0, 0.0, 0.6)
+	var out := light * ((1.0 + 0.5 * (1.0 - exp(-(peak - 1.0) / 0.5))) / peak)
+	var grey := (out.x + out.y + out.z) * 0.3333
+	return out.lerp(Vector3(grey, grey, grey), bleach)
+
+
 ## The liquid a surface named [param name] is: &"lava", &"slime" or &"water".
 static func liquid_kind(name: String) -> StringName:
 	var n := name.to_lower()
