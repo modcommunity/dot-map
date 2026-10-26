@@ -49,11 +49,14 @@ var glass_material_for: Callable = Callable()
 ## [member prop_view_min]: a can is gone at 30 m, a shelf at 120. 0 draws every prop at any range.
 var prop_view_per_metre: float = 60.0
 var prop_view_min: float = 30.0
+## Workers for the pure-CPU build stages ([code]map_load_threads[/code]): 0 inline, -1 automatic, never on the web. The output is identical.
+var load_threads: int = DotMapParallelBuild.default_workers
 
 var _blob: PackedByteArray = PackedByteArray()
 var _movers: Dictionary = {}
 var _pages: Dictionary = {}
 var _ambient: PackedFloat32Array = PackedFloat32Array()
+var _floor_mean: Dictionary = {}
 var _entities: DotMapEntities = null
 
 
@@ -258,10 +261,9 @@ func light_floor() -> Color:
 		if at >= 0 and at + 84 * n <= _blob.size():
 			if _ambient.is_empty():
 				_ambient = _blob.slice(at, at + 84 * n).to_float32_array()
-			for i in n:
-				var o := 21 * i + 3 + 3 * 2
-				c += Vector3(_ambient[o], _ambient[o + 1], _ambient[o + 2])
-			c /= float(n)
+			if not _floor_mean.has(n):    # every material of the map asks, and the scan is 1 ms
+				_floor_mean[n] = DotMapParallelBuild.sky_mean(_ambient, n)
+			c = _floor_mean[n]
 	var sun: Dictionary = environment_data().get("sun", {})
 	var a: Variant = sun.get("ambient_hdr", sun.get("ambient"))
 	if a is Array and (a as Array).size() >= 3:
@@ -452,7 +454,7 @@ func build_meshes(model: int, material_for: Callable = Callable()) -> Array[Dict
 		if not groups.has(key):
 			groups[key] = []
 		(groups[key] as Array).append(rec)
-	var out: Array[Dictionary] = []
+	var plan: Array = []    # [group key, entry]
 	for key: String in groups:
 		# Material instance id -> {material, recs}, in first-seen order so the build is stable.
 		var by_material := {}
@@ -467,14 +469,25 @@ func build_meshes(model: int, material_for: Callable = Callable()) -> Array[Dict
 			if not by_material.has(id):
 				by_material[id] = {"material": mat, "recs": []}
 			(by_material[id]["recs"] as Array).append(rec)
-		var mesh: ArrayMesh = null
 		for entry: Dictionary in by_material.values():
+			plan.append([key, entry])
+	var out: Array[Dictionary] = []
+	var mesh: ArrayMesh = null
+	var mesh_key := ""
+	var step := DotMapParallelBuild.batch_size(load_threads)
+	for from in range(0, plan.size(), step):
+		var chunk := plan.slice(from, from + step)
+		var arrays := DotMapParallelBuild.merged(self, chunk.map(func(p: Array) -> Array: return p[1]["recs"]), load_threads)
+		for i in chunk.size():
+			var key: String = chunk[i][0]
+			var entry: Dictionary = chunk[i][1]
 			var first: Dictionary = entry["recs"][0]
-			if mesh == null or mesh.get_surface_count() >= MAX_SURFACES:
+			if key != mesh_key or mesh.get_surface_count() >= MAX_SURFACES:
+				mesh_key = key
 				mesh = ArrayMesh.new()
 				out.append({"mesh": mesh, "chunk": first.get("chunk", []), "sky3d": bool(first.get("sky3d", false)),
 						"glass": first.has("glass"), "clusters": _clusters_of(groups[key])})
-			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _merged_arrays(entry["recs"]))
+			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays[i])
 			var s := mesh.get_surface_count() - 1
 			mesh.surface_set_name(s, str(first.get("material", "")))
 			if entry["material"] != null:
@@ -556,39 +569,26 @@ func _merged_arrays(recs: Array) -> Array:
 ## Convex shapes of a model's player-solid brushes, relative to [method model_origin].
 ## [param kinds] filters (empty is every kind). Returns [code][{shape, kind, brush}][/code].
 func hull_shapes(model: int, kinds: PackedStringArray = PackedStringArray()) -> Array[Dictionary]:
-	var origin := model_origin(model)
+	var recs: Array = hulls.filter(func(r: Dictionary) -> bool:
+		return int(r["model"]) == model and (kinds.is_empty() or str(r["kind"]) in kinds))
+	var points := DotMapParallelBuild.hull_points(self, recs, model_origin(model), load_threads)
 	var out: Array[Dictionary] = []
-	for rec: Dictionary in hulls:
-		if int(rec["model"]) != model or (not kinds.is_empty() and not str(rec["kind"]) in kinds):
-			continue
-		var p := int(rec["point_offset"])
-		var pts := _blob.slice(p, p + 12 * int(rec["point_count"])).to_vector3_array()
-		for k in pts.size():
-			pts[k] -= origin
+	for i in recs.size():
 		var shape := ConvexPolygonShape3D.new()
-		shape.points = pts
-		out.append({"shape": shape, "kind": str(rec["kind"]), "brush": int(rec["brush"])})
+		shape.points = points[i]
+		out.append({"shape": shape, "kind": str(recs[i]["kind"]), "brush": int(recs[i]["brush"])})
 	return out
 
 
 ## Triangle shapes for the surfaces that collide as drawn (displacements: terrain has no
 ## brushes), relative to [method model_origin].
 func concave_shapes(model: int) -> Array[ConcavePolygonShape3D]:
-	var origin := model_origin(model)
+	var recs: Array = surfaces.filter(func(r: Dictionary) -> bool: return int(r["model"]) == model and r.get("collide", false))
+	var faces := DotMapParallelBuild.concave_faces(self, recs, model_origin(model), load_threads)
 	var out: Array[ConcavePolygonShape3D] = []
-	for rec: Dictionary in surfaces:
-		if int(rec["model"]) != model or not rec.get("collide", false):
-			continue
-		var a := surface_arrays(rec)
-		var verts: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
-		var index: PackedInt32Array = a[Mesh.ARRAY_INDEX]
-		var faces := PackedVector3Array()
-		faces.resize(index.size())
-		for k in index.size():
-			faces[k] = verts[index[k]] - origin
-		var shape := ConcavePolygonShape3D.new()
-		shape.set_faces(faces)
-		out.append(shape)
+	for f: PackedVector3Array in faces:
+		out.append(ConcavePolygonShape3D.new())
+		out[-1].set_faces(f)
 	return out
 
 

@@ -127,6 +127,8 @@ var water_material: Material = null
 ## Draws a map that carries its author's baked lighting with it (the lightmapped shader, unshaded);
 ## off draws every map with [method try_material]'s lit materials.
 var _textures: Dictionary = {}
+## Workers that decode the world's texture files ahead of the material pass ([code]map_load_threads[/code]): 0 inline, -1 automatic.
+var load_threads: int = DotMapParallelBuild.default_workers
 var use_lightmap: bool = true
 ## Folder of the shared PBR sets (`<id>/<tier>/*.webp`) when the game delivers them apart from the pack; empty reads the folder the manifest names, beside the pack.
 var pbr_library: String = ""
@@ -257,6 +259,7 @@ func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 				missing_sets.append(key)
 	if not stand_in.is_empty():
 		DotLog.debug(CHANNEL, "PBR sets not installed; each is drawn as a stand-in kind in its faces' own colour", {"sets": stand_in.size()})
+	_prefetch(world, generated, library)
 	var cache := {}
 	return func(rec: Dictionary) -> Material:
 		if rec.get("water", false):
@@ -296,6 +299,48 @@ func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 			m = material(StringName(free.get_slice(":", 0)), tint)
 		cache[key] = m
 		return m
+
+
+## Reads the texture files the world's surfaces use before the serial material pass: disk files decoded on workers, imported ones through [ResourceLoader]'s own threads. Nothing happens inline.
+func _prefetch(world: DotMapBspMesh, generated: Dictionary, library: Dictionary) -> void:
+	if DotParallel.resolve_workers(load_threads) == 0:
+		return
+	var used := {}
+	for rec: Dictionary in world.surfaces:
+		used[str(rec.get("free", ""))] = true
+		used[str(rec.get("free2", ""))] = true
+	var files := PackedStringArray()
+	for key: String in generated:
+		if used.has(key) and use_lightmap and world.has_lightmap():    # the unlit branch decodes its own, unmipped
+			files.append(generated[key])
+	for key: String in library:
+		if used.has(key):
+			for part in ["albedo", "normal", "roughness", "ao"]:
+				var found := _set_file(library[key], part)
+				if not found.is_empty():
+					files.append(found)
+	var disk := PackedStringArray()
+	var imported := PackedStringArray()
+	for p in files:
+		if _textures.has(p):
+			continue
+		if p.begins_with("res://") and ResourceLoader.exists(p):
+			imported.append(p)
+			ResourceLoader.load_threaded_request(p)
+		else:
+			disk.append(p)
+	_textures.merge(DotMapParallelBuild.textures(disk, load_threads))
+	for p in imported:
+		_textures[p] = ResourceLoader.load_threaded_get(p) as Texture2D
+
+
+## The first existing file of the set's [param part] (webp, then jpg), or "".
+func _set_file(dir: String, part: String) -> String:
+	for ext in ["webp", "jpg"]:
+		var p := dir.path_join("%s.%s" % [part, ext])
+		if FileAccess.file_exists(p) or ResourceLoader.exists(p):
+			return p
+	return ""
 
 
 ## The kind that stands in for a texture named [param name] (a PBR set id or a source path) when its files are missing; &"" when no word fits.
@@ -427,11 +472,8 @@ func _has_set(dir: String) -> bool:
 
 
 func _set_texture(dir: String, name: String) -> Texture2D:
-	for ext in ["webp", "jpg"]:
-		var p := dir.path_join("%s.%s" % [name, ext])
-		if FileAccess.file_exists(p) or ResourceLoader.exists(p):
-			return _file_texture(p)
-	return null
+	var p := _set_file(dir, name)
+	return _file_texture(p) if not p.is_empty() else null
 
 
 func _file_texture(path: String) -> Texture2D:
