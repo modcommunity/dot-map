@@ -50,6 +50,14 @@ var swim_fn := Callable()
 var effect_fn := Callable()
 
 var _boxes_dirty := false
+## When true, [method step] opens every touch door (a mover with `touch`) a body in [param bodies] overlaps, as a
+## body walking in would; for stand-ins, since a person's own movement is not helped. Rate: seconds between touches.
+var touch_doors := false
+var touch_interval_steps := 64
+var _door_boxes: Array[Dictionary] = []
+var _door_boxes_read := false
+var _steps := 0
+var _touched: Dictionary = {}
 
 
 ## Builds the world of the mesh at [param prefix] (the [code].json]/[code].bin[/code] pair) or from an already
@@ -90,6 +98,9 @@ static func build(source: Variant, hooks: Dictionary = {}, options: Dictionary =
 ## Advances the logic one tick, then steps the volumes with [param bodies] (host only: a client's
 ## clock is set by [method apply_state] and it runs no volumes).
 func step(bodies: Array = []) -> void:
+	_steps += 1
+	if touch_doors and io.authoritative:
+		_touch_doors(bodies)
 	io.advance(1)
 	if io.authoritative:
 		volumes.step(bodies)
@@ -439,3 +450,30 @@ func _effect(kind: String, e: DotMapEntity, on: bool) -> void:
 			node.call("play" if on else "stop")
 	if effect_fn.is_valid():
 		effect_fn.call(kind, e, on)
+
+
+## Each body ({id, position (feet), radius, height, body}) overlapping a touch door's box touches it, once per
+## [member touch_interval_steps] steps.
+func _touch_doors(bodies: Array) -> void:
+	if not _door_boxes_read:
+		_door_boxes_read = true
+		for ent: DotMapEntity in io.entities:
+			var e := ent as DotMapMoverNode
+			if e == null or e.mover == null or not e.mover.touch or e.hit_half == Vector3.ZERO:
+				continue
+			var box := AABB(e.hit_frame.origin, Vector3.ZERO)
+			for corner in 8:
+				box = box.expand(e.hit_frame * Vector3(e.hit_half.x if corner & 1 else -e.hit_half.x,
+					e.hit_half.y if corner & 2 else -e.hit_half.y, e.hit_half.z if corner & 4 else -e.hit_half.z))
+			_door_boxes.append({"index": e.index, "box": box.grow(0.1)})
+	for info: Dictionary in bodies:
+		var radius := float(info.get("radius", 0.35))
+		var feet: Vector3 = info["position"]
+		var reach := AABB(feet - Vector3(radius, 0.0, radius), Vector3(radius * 2.0, float(info.get("height", 1.8)), radius * 2.0))
+		for door in _door_boxes:
+			if not (door["box"] as AABB).intersects(reach):
+				continue
+			var key := "%d:%s" % [door["index"], info["id"]]
+			if _steps - int(_touched.get(key, -touch_interval_steps)) >= touch_interval_steps:
+				_touched[key] = _steps
+				var _result := io.touch(int(door["index"]), info.get("body"))
