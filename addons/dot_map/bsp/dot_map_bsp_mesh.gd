@@ -644,20 +644,29 @@ static var shadow_proxy: bool = true
 static var shadow_range: float = 0.0
 
 
+## Whether translucent surfaces (foliage, glass cards) are copied into the shadow proxy; off by default as a card's alpha is costly in the shadow pass.
+static var shadow_translucent: bool = false
+
+
 ## Sets [member shadow_proxy] and [member shadow_range] for a caller that reaches this script by path.
 static func set_shadow_cost(proxy: bool, range_m: float) -> void:
 	shadow_proxy = proxy
 	shadow_range = maxf(range_m, 0.0)
 
 
-## Moves [param visual]'s shadow onto a shadows-only sibling holding its opaque surfaces as one; translucent surfaces (foliage, glass) cast none, as a card's alpha cannot be cheap in the shadow pass.
+## Sets [member shadow_translucent] for a caller that reaches this script by path.
+static func set_shadow_translucent(on: bool) -> void:
+	shadow_translucent = on
+
+
+## Moves [param visual]'s shadow onto a shadows-only sibling holding its opaque surfaces as one; translucent surfaces (foliage, glass) cast none unless [member shadow_translucent].
 func _add_shadow_proxy(parent: Node3D, visual: MeshInstance3D) -> void:
 	var mesh := visual.mesh
 	var verts := PackedVector3Array()
 	var index := PackedInt32Array()
 	for s in mesh.get_surface_count():
 		var m := mesh.surface_get_material(s) as BaseMaterial3D
-		if m != null and m.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+		if not shadow_translucent and m != null and m.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
 			continue
 		var a := mesh.surface_get_arrays(s)
 		var v: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
