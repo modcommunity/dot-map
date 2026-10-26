@@ -10,6 +10,10 @@ var world: DotMapBspMesh = null
 var environment: Environment = null
 ## The node the world is drawn under when it is moved: the camera is sampled in its frame.
 var frame: Node3D = null
+## The scene's sun, raised to [member min_sun_energy] so shadowed interiors of a dim map still read; null leaves it alone.
+var sun: DirectionalLight3D = null
+## Least energy [member sun] keeps (0: no floor).
+var min_sun_energy: float = 0.0
 var _clock: float = 0.0
 
 
@@ -35,6 +39,8 @@ static func attach(parent: Node, world: DotMapBspMesh, environment: Environment,
 
 
 func _process(delta: float) -> void:
+	if sun != null and is_instance_valid(sun) and sun.light_energy < min_sun_energy:
+		sun.light_energy = min_sun_energy
 	_clock -= delta
 	if _clock > 0.0 or world == null or environment == null:
 		return
@@ -46,6 +52,10 @@ func _process(delta: float) -> void:
 	if frame != null and frame.is_inside_tree():
 		at = frame.global_transform.affine_inverse() * at
 	var c := world.ambient_at(at, Vector3.UP)
+	var floor_lum := DotMapBspMesh.visibility_floor
+	if floor_lum > 0.0 and c.get_luminance() < floor_lum:
+		var lum := c.get_luminance()
+		c = c * (floor_lum / lum) if lum > 0.0 else Color(floor_lum, floor_lum, floor_lum)
 	if c.get_luminance() <= 0.0:
 		return
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR

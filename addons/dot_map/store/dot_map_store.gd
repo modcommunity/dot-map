@@ -8,6 +8,11 @@ const HOW_TO_GET := "run the maps repository's tools/stage_stores.sh, or point t
 
 ## Root slice id to `{ids, why}` for every map whose slices could not be had, so [method notice] can say so.
 static var _unfetched: Dictionary = {}
+## Whether [method ensure] works out the download size first and puts it on the load gate (a few KB of signed manifests, one request per slice).
+static var announce_download: bool = true
+## The gate meta [method ensure] sets to the bytes still to download, for a client that draws progress against the whole.
+const META_DOWNLOAD_BYTES := &"download_bytes"
+
 ## Root slice ids already warned about: one WARN per map per process.
 static var _warned: Dictionary = {}
 
@@ -97,6 +102,10 @@ static func ensure(licence: Dictionary, cloud: Object, manifest_url: String = ""
 	if not dir.is_empty():
 		_unfetched.erase(str(p["id"]))
 		return DotResult.success(dir)
+	if announce_download:
+		var planned: DotResult = await plan(licence, cloud, manifest_url)
+		if planned.ok and int(planned.value["bytes"]) > 0:
+			_announce(planned.value)
 	var res: DotResult = await cloud.call("ensure", StringName(str(p["id"])), str(p["version"]), PackedStringArray(), manifest_url)
 	if not res.ok:
 		_unfetched[str(p["id"])] = {"ids": missing(licence, cloud), "why": res.error.message}
@@ -104,6 +113,48 @@ static func ensure(licence: Dictionary, cloud: Object, manifest_url: String = ""
 		return res.wrap("store slice %s@%s" % [p["id"], p["version"]])
 	_unfetched.erase(str(p["id"]))
 	return DotResult.success(mount_dir(licence, cloud))
+
+
+## What fetching [param licence]'s slices would cost, without downloading: `{bytes, slices, ids}` summed over the root and every dependency not mounted or cached ([method DotCloudClient.plan_for]). Fails when a manifest cannot be had.
+static func plan(licence: Dictionary, cloud: Object, manifest_url: String = "") -> DotResult:
+	var p := pack_of(licence)
+	var total := {"bytes": 0, "slices": 0, "ids": PackedStringArray()}
+	if p.is_empty() or cloud == null or not cloud.has_method("resolve_manifest") or not cloud.has_method("plan_for") or not cloud.has_method("is_mounted"):
+		return DotResult.success(total)
+	var walked := await _plan_slice(cloud, str(p["id"]), str(p["version"]), manifest_url, {}, total, 0)
+	if not walked.ok:
+		return walked
+	return DotResult.success(total)
+
+
+static func _plan_slice(cloud: Object, id: String, version: String, url: String, seen: Dictionary, total: Dictionary, depth: int) -> DotResult:
+	var key := "%s@%s" % [id, version]
+	if seen.has(key) or depth > 5 or bool(cloud.call("is_mounted", StringName(id), version)):
+		return DotResult.success(true)
+	seen[key] = true
+	var got: DotResult = await cloud.call("resolve_manifest", StringName(id), version, url)
+	if not got.ok:
+		return got.wrap("manifest of %s" % key)
+	var manifest: Object = got.value
+	var cost: Dictionary = cloud.call("plan_for", manifest)
+	if int(cost.get("missing_bytes", 0)) > 0:
+		total["bytes"] = int(total["bytes"]) + int(cost["missing_bytes"])
+		total["slices"] = int(total["slices"]) + 1
+		(total["ids"] as PackedStringArray).append(key)
+	for dep: Variant in manifest.get("dependencies"):
+		var below := await _plan_slice(cloud, str(dep["id"]), str(dep["version"]), "", seen, total, depth + 1)
+		if not below.ok:
+			return below
+	return DotResult.success(true)
+
+
+## Says what is about to be downloaded: on the load gate (its text and [constant META_DOWNLOAD_BYTES]) and in the log.
+static func _announce(cost: Dictionary) -> void:
+	DotLog.info(CHANNEL, "map art to download", {"bytes": DotPaths.format_bytes(int(cost["bytes"])), "slices": cost["slices"]})
+	var gate := DotRegistry.get_service(DotLoadGate.SERVICE) as DotLoadGate
+	if gate != null and not gate.is_open():
+		gate.set_meta(META_DOWNLOAD_BYTES, int(cost["bytes"]))
+		gate.set_progress(gate.progress(), "Downloading map art: %s" % DotPaths.format_bytes(int(cost["bytes"])))
 
 
 ## Puts [method notice] on the load screen of the game in progress, if it has a [DotLoadGate].

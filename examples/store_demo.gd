@@ -2,8 +2,8 @@ extends Node
 ## Proves DotMapCredits and DotMapStore on a hand-written manifest and a stand-in cloud client.
 ## godot --headless --path . res://examples/store_demo.tscn
 
-const CHECKS := 52
-const SECTIONS := 6
+const CHECKS := 57
+const SECTIONS := 7
 
 var _passed := 0
 var _failed := 0
@@ -42,6 +42,34 @@ class FakeCloud:
 		return DotResult.success(null)
 
 
+## A cloud that knows manifests: the root names two slices (one cached, one 3 MB) under it, and a shared one it shares with a mounted map.
+class PlanCloud:
+	extends FakeCloud
+	var resolved := PackedStringArray()
+	const DEPS := {"r@1": ["a@1", "b@1"], "a@1": ["s@1"], "b@1": ["s@1"], "s@1": []}
+	const MISSING := {"r@1": 1 << 20, "a@1": 0, "b@1": 2 << 20, "s@1": 5 << 20}
+
+	func is_mounted(id: StringName, version: String) -> bool:
+		return mounted.has("%s@%s" % [id, version])
+
+	func resolve_manifest(id: StringName, version: String, _url: String = "") -> DotResult:
+		resolved.append("%s@%s" % [id, version])
+		var m := PlanManifest.new()
+		m.key = "%s@%s" % [id, version]
+		for d: String in DEPS[m.key]:
+			m.dependencies.append({"id": d.get_slice("@", 0), "version": d.get_slice("@", 1)})
+		return DotResult.success(m)
+
+	func plan_for(m: Object, _groups: PackedStringArray = PackedStringArray()) -> Dictionary:
+		return {"missing_bytes": MISSING[m.key]}
+
+
+class PlanManifest:
+	extends RefCounted
+	var key := ""
+	var dependencies: Array = []
+
+
 ## A cloud that cannot reach any server: what a bootstrapped checkout without the slices has.
 class OfflineCloud:
 	extends RefCounted
@@ -69,6 +97,7 @@ func _check(label: String, ok: bool) -> void:
 func _run() -> void:
 	_credits()
 	await _store()
+	await _plan()
 	_surfaces()
 	await _missing_slices()
 	_stand_ins()
@@ -107,6 +136,23 @@ func _store() -> void:
 	_check("ensure mounts it", res.ok and cloud.ensured == 1 and str(res.value).begins_with("res://dot_cloud/gamemann/store-x"))
 	await DotMapStore.ensure(lic, cloud, "https://x/manifest.json")
 	_check("a second ensure downloads nothing", cloud.ensured == 1)
+	_completed += 1
+
+
+func _plan() -> void:
+	_entered += 1
+	var lic := {"store_pack": {"id": "r", "version": "1"}}
+	var cloud := PlanCloud.new()
+	var res: DotResult = await DotMapStore.plan(lic, cloud)
+	_check("plan adds the root and every dependency", res.ok and int(res.value["bytes"]) == 8 << 20)
+	_check("a slice two others share is counted once", cloud.resolved.count("s@1") == 1 and res.value["slices"] == 3)
+	cloud.mounted["s@1"] = "res://x/"
+	res = await DotMapStore.plan(lic, cloud)
+	_check("a mounted slice costs nothing", int(res.value["bytes"]) == 3 << 20)
+	res = await DotMapStore.plan({}, cloud)
+	_check("a map with no slices costs nothing", res.ok and int(res.value["bytes"]) == 0)
+	res = await DotMapStore.plan(lic, FakeCloud.new())
+	_check("a client that cannot plan is not an error", res.ok and int(res.value["bytes"]) == 0)
 	_completed += 1
 
 
