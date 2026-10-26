@@ -11,8 +11,8 @@ extends Node3D
 ## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
 ## thick at (256, 256, 16), at 0.01905 m per unit.
 
-const CHECKS := 104
-const SECTIONS := 8
+const CHECKS := 109
+const SECTIONS := 9
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
 const TERRAIN := "res://examples/bsp_mesh/terrain_fixture.json"
@@ -39,6 +39,7 @@ func _run() -> void:
 		await _test_collide(world)
 		await _test_glass()
 	_test_terrain()
+	_test_mesh_lods()
 	var lit_world := _test_lightmap()
 	if world != null and lit_world != null:
 		_test_drawn(world, lit_world)
@@ -336,6 +337,36 @@ func _test_glass() -> void:
 	add_child(twin)
 	twin.apply_broken(Vector3.ONE, &"host")
 	_check(twin.is_broken(), "the host's word breaks it on a client")
+	_done()
+
+
+func _test_mesh_lods() -> void:
+	_section("a heavy library mesh gets LOD levels and a triangle cap")
+	var sphere := SphereMesh.new()
+	sphere.radial_segments = 128
+	sphere.rings = 64
+	var arrays := sphere.get_mesh_arrays()
+	var whole := (arrays[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+	var plain := ArrayMesh.new()
+	plain.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var root := Node3D.new()
+	var mi := MeshInstance3D.new()
+	mi.mesh = plain
+	root.add_child(mi)
+	_check(DotMapBspMesh.add_mesh_lods(root, 0) == 0 and mi.mesh == plain, "a minimum of 0 leaves the mesh alone")
+	_check(DotMapBspMesh.add_mesh_lods(root, whole + 1) == 0 and mi.mesh == plain, "a mesh under the minimum is left alone")
+	_check(DotMapBspMesh.add_mesh_lods(root, 1000) == 1 and mi.mesh != plain, "a mesh over it is replaced")
+	var lod_mesh := mi.mesh as ArrayMesh
+	var capped_root := Node3D.new()
+	var capped := MeshInstance3D.new()
+	capped.mesh = plain
+	capped_root.add_child(capped)
+	var _n := DotMapBspMesh.add_mesh_lods(capped_root, 1000, whole / 4)
+	var kept := ((capped.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+	_check(lod_mesh != null and ((lod_mesh.surface_get_arrays(0)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3) == whole, "without a cap the first level keeps every triangle (%d)" % whole)
+	_check(kept <= whole / 4 and kept > 0, "a cap of a quarter starts from a level of at most that many: %d of %d" % [kept, whole])
+	root.free()
+	capped_root.free()
 	_done()
 
 

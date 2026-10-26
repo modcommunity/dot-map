@@ -1244,7 +1244,7 @@ func _library_model(id: String) -> Node3D:
 		if doc.append_from_file(path, state) == OK:
 			model = doc.generate_scene(state) as Node3D
 			if model != null:
-				add_mesh_lods(model, model_lod_min_tris)
+				add_mesh_lods(model, model_lod_min_tris, model_max_tris)
 	if model == null:
 		return null
 	var box := _local_aabb(model)
@@ -1258,16 +1258,20 @@ func _library_model(id: String) -> Node3D:
 ## screen size); 0 leaves every mesh whole. A scanned tree is over a million triangles, and a street of them was the frame.
 static var model_lod_min_tris: int = 20000
 
+## Most triangles a library model's mesh keeps at full detail: a mesh over it starts from the coarsest simplification that fits, so a 1.6 million triangle tree is drawn at about this size when near. 0 keeps the model's own.
+static var model_max_tris: int = 150000
 
-## Sets [member model_lod_min_tris] for a caller that reaches this script by path.
-static func set_model_lod(min_tris: int) -> void:
+
+## Sets [member model_lod_min_tris] and [member model_max_tris] for a caller that reaches this script by path.
+static func set_model_lod(min_tris: int, max_tris: int = 0) -> void:
 	model_lod_min_tris = maxi(min_tris, 0)
+	model_max_tris = maxi(max_tris, 0)
 
 
 ## Gives every unskinned [MeshInstance3D] mesh under [param root] with at least [param min_tris] triangles its LOD levels
-## (meshoptimizer, as the editor's import does); a glTF read at run time has none. About a second for a million triangles,
-## once per model. Returns how many meshes changed.
-static func add_mesh_lods(root: Node, min_tris: int) -> int:
+## (meshoptimizer, as the editor's import does; a glTF read at run time has none), after cutting it to [param max_tris]
+## (0: not cut). About a second for a million triangles, once per model. Returns how many meshes changed.
+static func add_mesh_lods(root: Node, min_tris: int, max_tris: int = 0) -> int:
 	if min_tris <= 0:
 		return 0
 	var done := {}
@@ -1278,14 +1282,14 @@ static func add_mesh_lods(root: Node, min_tris: int) -> int:
 		if mesh == null or mi.skin != null or mesh.get_blend_shape_count() > 0:
 			continue
 		if not done.has(mesh):
-			done[mesh] = _with_lods(mesh, min_tris)
+			done[mesh] = _with_lods(mesh, min_tris, max_tris)
 		if done[mesh] != mesh:
 			mi.mesh = done[mesh]
 			changed += 1
 	return changed
 
 
-static func _with_lods(mesh: ArrayMesh, min_tris: int) -> Mesh:
+static func _with_lods(mesh: ArrayMesh, min_tris: int, max_tris: int) -> Mesh:
 	var tris := 0
 	var all: Array = []
 	for i in mesh.get_surface_count():
@@ -1297,12 +1301,30 @@ static func _with_lods(mesh: ArrayMesh, min_tris: int) -> Mesh:
 		all.append(arrays)
 	if tris < min_tris:
 		return mesh
+	var importer := _importer_of(mesh, all)
+	importer.generate_lods(25.0, 60.0, [])
+	if max_tris > 0 and tris > max_tris:
+		# Each surface restarts from the first level small enough for its share, then gets its own levels again.
+		var share := float(max_tris) / float(tris)
+		for i in all.size():
+			var arrays: Array = all[i]
+			var base := (arrays[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3 if arrays[Mesh.ARRAY_INDEX] != null else 0
+			for l in importer.get_surface_lod_count(i):
+				var indices := importer.get_surface_lod_indices(i, l)
+				if indices.size() / 3 <= int(base * share) or l == importer.get_surface_lod_count(i) - 1:
+					arrays[Mesh.ARRAY_INDEX] = indices
+					break
+		importer = _importer_of(mesh, all)
+		importer.generate_lods(25.0, 60.0, [])
+	var out := importer.get_mesh()
+	return out if out != null else mesh
+
+
+static func _importer_of(mesh: ArrayMesh, all: Array) -> ImporterMesh:
 	var importer := ImporterMesh.new()
 	for i in all.size():
 		importer.add_surface(Mesh.PRIMITIVE_TRIANGLES, all[i], [], {}, mesh.surface_get_material(i), mesh.surface_get_name(i))
-	importer.generate_lods(25.0, 60.0, [])
-	var out := importer.get_mesh()
-	return out if out != null else mesh
+	return importer
 
 
 ## One static body with a box per solid prop (see [constant SOLID_BOX]), in world space and with no meshes, for a
