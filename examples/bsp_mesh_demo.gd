@@ -11,7 +11,7 @@ extends Node3D
 ## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
 ## thick at (256, 256, 16), at 0.01905 m per unit.
 
-const CHECKS := 102
+const CHECKS := 104
 const SECTIONS := 8
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
@@ -120,7 +120,7 @@ func _test_build(world: DotMapBspMesh) -> void:
 	_check(asked.size() == 5, "the material callback is asked once per surface: %d" % asked.size())
 	_check(asked.all(func(r: Dictionary) -> bool: return r.get("generic") != null), "every surface has a generic id")
 	var w := root.get_node_or_null("world")
-	_check(w != null and w.get_child_count() == 2, "the world is two chunks: %s" % [w.get_children() if w else "none"])
+	_check(w != null and w.get_children().filter(func(c: Node) -> bool: return not str(c.name).begins_with("shadow_")).size() == 2, "the world is two chunks: %s" % [w.get_children() if w else "none"])
 	var gate := root.get_node_or_null("gate_1") as Node3D
 	_check(gate != null and gate.position.is_equal_approx(world.model_origin(1)), "the door node sits at its origin")
 	var box := AABB()
@@ -277,8 +277,17 @@ func _test_glass() -> void:
 	_check(glass_nodes.size() == 2 and not other_nodes.is_empty(), "glass sits in its own mesh instances: %d" % glass_nodes.size())
 	var gi: MeshInstance3D = glass_nodes[0]
 	_check(gi.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "glass casts no shadow")
-	_check(other_nodes.all(func(m: MeshInstance3D) -> bool: return m.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF),
-			"walls still cast one")
+	var proxies := other_nodes.filter(func(m: MeshInstance3D) -> bool: return str(m.name).begins_with("shadow_"))
+	var visuals := other_nodes.filter(func(m: MeshInstance3D) -> bool: return not str(m.name).begins_with("shadow_"))
+	_check(not proxies.is_empty() and proxies.all(func(m: MeshInstance3D) -> bool:
+			return m.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY and m.mesh.get_surface_count() == 1),
+			"walls cast through one shadows-only surface each: %d" % proxies.size())
+	_check(visuals.all(func(m: MeshInstance3D) -> bool: return m.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF),
+			"the visual meshes cast none themselves")
+	var tris := 0
+	for m: MeshInstance3D in proxies:
+		tris += (m.mesh.surface_get_arrays(0)[Mesh.ARRAY_INDEX] as PackedInt32Array).size()
+	_check(tris > 0, "the proxies hold the walls' triangles: %d" % tris)
 	var mat := gi.mesh.surface_get_material(0) as StandardMaterial3D
 	_check(mat != null and mat.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA and mat.albedo_color.a < 0.5,
 			"glass is alpha-blended and see-through")

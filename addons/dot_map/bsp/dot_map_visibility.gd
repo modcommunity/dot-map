@@ -465,6 +465,12 @@ func _set_shown(item: Dictionary, show: bool, cast: bool = false) -> void:
 	var n: Node = item["node"]
 	if not is_instance_valid(n):
 		return
+	if n.has_meta(&"shadow_proxy"):
+		var proxy: Variant = n.get_meta(&"shadow_proxy")
+		if is_instance_valid(proxy):
+			(proxy as Node3D).visible = show or cast
+		(n as Node3D).visible = show
+		return
 	if cast:
 		(n as Node3D).visible = true
 		for g in ([n] if n is GeometryInstance3D else n.find_children("*", "GeometryInstance3D", true, false)):

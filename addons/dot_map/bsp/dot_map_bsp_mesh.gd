@@ -632,7 +632,57 @@ func build_node(material_for: Callable = Callable()) -> Node3D:
 				mi.name = "glass_" + str(mi.name)
 				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			parent.add_child(mi)
+			if shadow_proxy and model == WORLD and not g["glass"] and not g["sky3d"]:
+				_add_shadow_proxy(parent, mi)
 	return root
+
+
+## Whether [method build_node] draws a world chunk's sun shadow from a second, position-only, single-surface instance instead of the visual mesh (one draw per chunk per cascade, not one per material).
+static var shadow_proxy: bool = true
+
+## Camera distance (metres) beyond which a chunk's shadow proxy is not drawn into any cascade; 0 draws all. Wire a cvar to this before [method build_node].
+static var shadow_range: float = 0.0
+
+
+## Sets [member shadow_proxy] and [member shadow_range] for a caller that reaches this script by path.
+static func set_shadow_cost(proxy: bool, range_m: float) -> void:
+	shadow_proxy = proxy
+	shadow_range = maxf(range_m, 0.0)
+
+
+## Moves [param visual]'s shadow onto a shadows-only sibling holding its opaque surfaces as one; translucent surfaces (foliage, glass) cast none, as a card's alpha cannot be cheap in the shadow pass.
+func _add_shadow_proxy(parent: Node3D, visual: MeshInstance3D) -> void:
+	var mesh := visual.mesh
+	var verts := PackedVector3Array()
+	var index := PackedInt32Array()
+	for s in mesh.get_surface_count():
+		var m := mesh.surface_get_material(s) as BaseMaterial3D
+		if m != null and m.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+			continue
+		var a := mesh.surface_get_arrays(s)
+		var v: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+		var base := verts.size()
+		verts.append_array(v)
+		for i: int in a[Mesh.ARRAY_INDEX]:
+			index.append(base + i)
+	if index.is_empty():
+		return
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_INDEX] = index
+	var proxy_mesh := ArrayMesh.new()
+	proxy_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var proxy := MeshInstance3D.new()
+	proxy.name = "shadow_" + str(visual.name)
+	proxy.mesh = proxy_mesh
+	proxy.position = visual.position
+	proxy.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+	if shadow_range > 0.0:
+		proxy.visibility_range_end = shadow_range
+	visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	visual.set_meta(&"shadow_proxy", proxy)
+	parent.add_child(proxy)
 
 
 ## The map's breakable brush entities: [code]{model, entity, classname, targetname, health, glass, material}[/code]
