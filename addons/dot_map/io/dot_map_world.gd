@@ -38,6 +38,8 @@ var config_result: DotResult = null
 ## The drawn tree from [method DotMapBspMesh.build_node]; collision bodies sit under each model's node.
 var visual: Node3D
 var glass: Array[DotMapGlass] = []
+## Drives the ambient from the bake; null until [method light_with] finds a lightmapped world.
+var lit: DotMapLitWorld = null
 ## The drawn stand-in of each prop_door_rotating.
 var doors: Array[Node3D] = []
 var sounds: Node3D
@@ -55,7 +57,8 @@ var _boxes_dirty := false
 ## player_fn, send_fn, ladder_fn, swim_fn, material_for[/code] (callables). [param options]: [code]doc[/code]
 ## (the source document), [code]doc_path[/code], [code]store[/code] (store root), [code]authoritative[/code]
 ## (true), [code]rate[/code] (60), [code]seed[/code], [code]command_allow[/code], [code]map_id[/code],
-## [code]environment, props, sounds, collision[/code] (true), [code]layers[/code] ({solid, clip, glass} to
+## [code]environment, props, sounds, collision[/code] (true), [code]surfaces[/code] (a [DotMapSurfaces]; with no
+## [code]material_for[/code] hook the world is drawn through it, lightmapped, else through a default one), [code]lightmap[/code] (true), [code]layers[/code] ({solid, clip, glass} to
 ## a collision layer, default 1), [code]config[/code] ({game, config_dir, allow, defaults, get_fn, set_fn};
 ## the weakest layer is the manifest's [code]settings[/code], the cvars the map's own entities set, then
 ## [code]defaults[/code]; a key the game did not [code]allow[/code] is still refused).
@@ -93,6 +96,14 @@ func step(bodies: Array = []) -> void:
 	if _boxes_dirty:
 		_boxes_dirty = false
 		_push_boxes()
+
+
+## Lights the actors from the author's bake: the ambient at the camera drives [param environment] ([DotMapLitWorld]), and [param lamps] (the lights the bake already holds) are freed. Returns null for a world without a lightmap. Call once the game's environment exists.
+func light_with(environment: Environment, lamps: Array = [], sun: DirectionalLight3D = null) -> DotMapLitWorld:
+	lit = DotMapLitWorld.attach(self, mesh, environment, lamps, true, visual)
+	if lit != null:
+		lit.sun = sun
+	return lit
 
 
 ## A bullet along [param from] to [param to] against the map's own breakables, buttons and doors: the
@@ -221,6 +232,10 @@ func _assemble(doc: Dictionary, hooks: Dictionary, options: Dictionary) -> DotRe
 		return loaded
 	var ents := DotMapEntities.from_manifest(mesh.manifest)
 	var mat_for: Callable = hooks.get("material_for", Callable()) if hooks.get("material_for") is Callable else Callable()
+	if not mat_for.is_valid():
+		var surfaces: DotMapSurfaces = options.get("surfaces") if options.get("surfaces") is DotMapSurfaces else DotMapSurfaces.new()
+		surfaces.use_lightmap = bool(options.get("lightmap", true))
+		mat_for = surfaces.world_material_for(mesh, mesh.source_path.get_base_dir())
 	visual = mesh.build_node(mat_for)
 	add_child(visual)
 	var layers: Dictionary = options.get("layers", {})
@@ -228,6 +243,10 @@ func _assemble(doc: Dictionary, hooks: Dictionary, options: Dictionary) -> DotRe
 		var env := mesh.build_environment()
 		if env != null:
 			add_child(env)
+			var we := env.find_children("*", "WorldEnvironment", true, false)
+			var suns := env.find_children("*", "DirectionalLight3D", true, false)
+			if not we.is_empty():
+				light_with((we[0] as WorldEnvironment).environment, [], suns[0] as DirectionalLight3D if not suns.is_empty() else null)
 	if bool(options.get("props", true)):
 		add_child(mesh.build_props())
 	if bool(options.get("sounds", true)):

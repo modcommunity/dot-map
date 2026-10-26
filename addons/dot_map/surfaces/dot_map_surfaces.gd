@@ -142,6 +142,8 @@ var emissive_energy: float = 1.5
 ## The tint range [method original_tint] keeps to: a black original still shows its kind.
 const TINT_MIN := 0.25
 const TINT_MAX := 1.3
+## Darkest albedo a stand-in surface gets; an author's black face is lit by the baked light, so a true black would stay black however bright the room.
+const STAND_IN_FLOOR := 0.2
 
 ## Triplanar blend sharpness: higher is a harder seam on a bevel, lower a smeared one.
 var sharpness: float = 4.0
@@ -385,6 +387,8 @@ func _stand_in_material(world: DotMapBspMesh, rec: Dictionary, fb: Dictionary, c
 	var tint := Color.WHITE
 	if not fb.has("file"):
 		tint = original_tint(kind, colour) if kind != &"" else Color(float(colour[0]), float(colour[1]), float(colour[2]))
+		if kind == &"":
+			tint = Color(maxf(tint.r, STAND_IN_FLOOR), maxf(tint.g, STAND_IN_FLOOR), maxf(tint.b, STAND_IN_FLOOR))
 	var lit := use_lightmap and world.has_lightmap() and rec.has("lightmap_page") and not rec.has("glass")
 	var key := "stand_in|%s|%s|%s|%s" % [fb.get("file", kind), tint.to_html(), rec.get("lightmap_page", -1) if lit else -1, rec.get("emissive", false)]
 	if cache.has(key):
