@@ -66,7 +66,7 @@ var _concave_cache: Dictionary = {}
 ## Loaded meshes kept per prefix so a round-start rebuild of the same stage skips the read, hash and
 ## decompress; keyed on both files' modification times so a regenerated map is read again.
 static var cache_meshes := true
-static var cache_limit := 6
+static var cache_limit := 24
 static var _cache: Dictionary = {}
 
 

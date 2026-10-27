@@ -228,7 +228,7 @@ func _test_environment(world: DotMapBspMesh) -> void:
 	for cs: Node in cut.get_children():
 		var sz := ((cs as CollisionShape3D).shape as BoxShape3D).size
 		volume += sz.x * sz.y * sz.z
-	_check(cut.get_child_count() >= 2 and cut.get_child_count() <= DotMapBspMesh.DECOMPOSE_MAX_BOXES, "a hollow stand-in is cut into a few boxes: %d" % cut.get_child_count())
+	_check(cut.get_child_count() >= 2 and cut.get_child_count() <= DotMapBspMesh.decompose_max_boxes, "a hollow stand-in is cut into a few boxes: %d" % cut.get_child_count())
 	_check(volume < 0.6 * 2.0 * 2.0 * 2.0, "...which leave the empty corner free: %.2f m3 of 8" % volume)
 	var cut_again := world.build_prop_collision(ell)
 	_check(cut_again.get_child_count() == cut.get_child_count(), "cutting twice gives the same boxes")
