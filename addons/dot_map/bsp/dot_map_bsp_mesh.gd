@@ -1064,6 +1064,41 @@ var missing_proxied: int = 0
 static var _models_warned: Dictionary = {}
 
 
+## Leaves out the props the importer marked `loose` (free physics barrels): the game simulates those as toys
+## ([method loose_toys]) and draws and collides with them there. Off, they are static props like any other.
+var skip_loose: bool = false
+
+
+## The props marked `loose` as dot-props toy placements ([code]{toy, at, yaw}[/code]), in manifest order.
+func loose_toys() -> Array:
+	var out: Array = []
+	for rec: Dictionary in manifest.get("props", []):
+		if rec.has("loose"):
+			out.append({"toy": str(rec["loose"]), "at": rec["at"], "yaw": float(rec.get("yaw", 0.0))})
+	return out
+
+
+## The breakables that hold loose props up, as [method DotMapSupport.build_all] takes them; each `holds` is an index
+## into [method loose_toys] (not into the manifest's props).
+func supports() -> Array:
+	var order := {}
+	var i := 0
+	var props: Array = manifest.get("props", [])
+	for k in props.size():
+		if (props[k] as Dictionary).has("loose"):
+			order[k] = i
+			i += 1
+	var out: Array = []
+	for rec: Dictionary in breakables():
+		var held: Array = []
+		for h: Variant in rec.get("holds", []):
+			if order.has(int(h)):
+				held.append(order[int(h)])
+		if not held.is_empty() and rec.has("bounds"):
+			out.append({"bounds": rec["bounds"], "health": maxf(float(rec.get("health", 1.0)), 1.0), "holds": held, "model": int(rec["model"])})
+	return out
+
+
 ## The free stand-in models the converter placed for the map's own, as nodes under
 ## [code]Props[/code]. [param scene_for] takes the stand-in id and returns a [PackedScene]
 ## (default: [constant DEFAULT_PROP_DIRS], [code].glb[/code]). An id with no scene is skipped, except a
@@ -1077,6 +1112,8 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 	missing_proxied = 0
 	_unseen.clear()
 	for rec: Dictionary in manifest.get("props", []):
+		if skip_loose and rec.has("loose"):
+			continue
 		if rec.has("box"):
 			var block := _support_block(rec)
 			root.add_child(block)
@@ -1397,7 +1434,7 @@ func build_prop_collision(scene_for: Callable = Callable()) -> StaticBody3D:
 	var cache := {}
 	var longest_of := {}
 	for rec: Dictionary in manifest.get("props", []):
-		if not int(rec.get("solid", 0)) in SOLID_BOX:
+		if not int(rec.get("solid", 0)) in SOLID_BOX or (skip_loose and rec.has("loose")):
 			continue
 		var n: Node3D = null
 		if not rec.has("box"):
@@ -1438,6 +1475,8 @@ func _solid_boxes(rec: Dictionary, n: Node3D) -> Array[Dictionary]:
 
 ## A stand-in fills less of its bounds than this and it is cut into boxes.
 const HOLLOW_FILL := 0.6
+## The thinnest a box cut back to its surface may be, in metres: a plane of triangles must still stop a body.
+const MIN_BOX := 0.1
 ## Cells along a stand-in's longest side, the most boxes a prop is cut into, and the most triangles read to do it.
 static var decompose_cells: int = 12
 static var decompose_max_boxes: int = 32
@@ -1486,10 +1525,11 @@ static func _cut_into_boxes(n: Node3D) -> Array[AABB]:
 	for cells in range(decompose_cells, 2, -2):
 		var cell := longest / cells
 		var dims := Vector3i(maxi(1, ceili(box.size.x / cell - 0.001)), maxi(1, ceili(box.size.y / cell - 0.001)), maxi(1, ceili(box.size.z / cell - 0.001)))
-		var solid := _fill_cells(tris, box.position, cell, dims)
+		var seen: Array[AABB] = []
+		var solid := _fill_cells(tris, box.position, cell, dims, seen)
 		if cells == decompose_cells and float(solid.count(true)) / solid.size() >= HOLLOW_FILL:
 			return none
-		var boxes := _merge_cells(solid, dims, box, cell)
+		var boxes := _merge_cells(solid, dims, box, cell, seen)
 		if boxes.size() <= decompose_max_boxes:
 			return boxes
 	return none
@@ -1501,10 +1541,13 @@ static func _cell_index(c: Vector3i, dims: Vector3i) -> int:
 
 ## Occupancy of the grid ([param dims] cells of [param cell] metres from [param lo]): triangles sampled finer than a cell, then the
 ## empty cells that the outside cannot reach filled in.
-static func _fill_cells(tris: PackedVector3Array, lo: Vector3, cell: float, dims: Vector3i) -> Array[bool]:
+## [param seen] gets, per cell, the bounds of the surface points that fell in it (size -1 where none did: an enclosed fill).
+static func _fill_cells(tris: PackedVector3Array, lo: Vector3, cell: float, dims: Vector3i, seen: Array[AABB]) -> Array[bool]:
 	var solid: Array[bool] = []
 	solid.resize(dims.x * dims.y * dims.z)
 	solid.fill(false)
+	seen.resize(solid.size())
+	seen.fill(AABB(Vector3.ZERO, Vector3(-1, -1, -1)))
 	var top := Vector3i(dims.x - 1, dims.y - 1, dims.z - 1)
 	for i in range(0, tris.size() - 2, 3):
 		var a := tris[i]
@@ -1517,7 +1560,10 @@ static func _fill_cells(tris: PackedVector3Array, lo: Vector3, cell: float, dims
 				var q := a + (b - a) * (float(u) / k) + (c - a) * (float(v) / k)
 				var g := ((q - lo) / cell).floor()
 				var cx := Vector3i(clampi(int(g.x), 0, top.x), clampi(int(g.y), 0, top.y), clampi(int(g.z), 0, top.z))
-				solid[_cell_index(cx, dims)] = true
+				var ci := _cell_index(cx, dims)
+				solid[ci] = true
+				var prev := seen[ci]
+				seen[ci] = AABB(q, Vector3.ZERO) if prev.size.x < 0.0 else prev.expand(q)
 	# Flood the empty cells from every border cell; what stays unreached is enclosed.
 	var outside: Array[bool] = []
 	outside.resize(solid.size())
@@ -1547,7 +1593,8 @@ static func _fill_cells(tris: PackedVector3Array, lo: Vector3, cell: float, dims
 
 
 ## Occupied cells joined greedily into boxes: along x, then z while the whole run is occupied, then y while the whole slab is.
-static func _merge_cells(solid: Array[bool], dims: Vector3i, box: AABB, cell: float) -> Array[AABB]:
+## A box whose cells all hold surface is cut back to that surface (at least [constant MIN_BOX] thick), so a shelf's post is not a cell wide.
+static func _merge_cells(solid: Array[bool], dims: Vector3i, box: AABB, cell: float, seen: Array[AABB] = []) -> Array[AABB]:
 	var taken: Array[bool] = solid.duplicate()
 	var out: Array[AABB] = []
 	for y in dims.y:
@@ -1564,14 +1611,35 @@ static func _merge_cells(solid: Array[bool], dims: Vector3i, box: AABB, cell: fl
 				var y2 := y
 				while y2 + 1 < dims.y and _slab_taken(taken, dims, x, x2, y2 + 1, z, z2):
 					y2 += 1
+				var tight := AABB()
+				var first := true
+				var all_seen := not seen.is_empty()
 				for yy in range(y, y2 + 1):
 					for zz in range(z, z2 + 1):
 						for xx in range(x, x2 + 1):
-							taken[_cell_index(Vector3i(xx, yy, zz), dims)] = false
+							var ci := _cell_index(Vector3i(xx, yy, zz), dims)
+							taken[ci] = false
+							if all_seen:
+								if seen[ci].size.x < 0.0:
+									all_seen = false
+								else:
+									tight = seen[ci] if first else tight.merge(seen[ci])
+									first = false
 				var from := box.position + Vector3(x, y, z) * cell
 				var to := box.position + Vector3(x2 + 1, y2 + 1, z2 + 1) * cell
 				to = Vector3(minf(to.x, box.end.x), minf(to.y, box.end.y), minf(to.z, box.end.z))
-				out.append(AABB(from, to - from))
+				var whole := AABB(from, to - from)
+				if all_seen:
+					var grown := tight
+					for axis in 3:
+						if grown.size[axis] < MIN_BOX:
+							var mid := grown.position[axis] + grown.size[axis] * 0.5
+							grown.position[axis] = mid - MIN_BOX * 0.5
+							grown.size[axis] = MIN_BOX
+					whole = whole.intersection(grown)
+					if whole.size.x <= 0.0 or whole.size.y <= 0.0 or whole.size.z <= 0.0:
+						whole = AABB(from, to - from)
+				out.append(whole)
 	return out
 
 
