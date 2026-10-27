@@ -3,7 +3,7 @@ extends Node3D
 ## Renders one frame of a converted map the way a game builds it, through [DotMapWorld]: free photo and generated
 ## textures, the environment, the stand-in props, glass. Run it under a display (tools/screenshot.sh).
 ##
-##   godot --path . res://examples/bsp_world_shot.tscn -- --world=<prefix> --out=<png> [--view=spawn|overview] [--cam=x,y,z --look=x,y,z] [--nolight] [--nomodels] [--list=<file>]
+##   godot --path . res://examples/bsp_world_shot.tscn -- --world=<prefix> --out=<png> [--view=spawn|overview] [--cam=x,y,z --look=x,y,z] [--nolight] [--nomodels] [--aniso=0|2|4|8|16] [--list=<file>]
 ##
 ## `--list` is a file of lines `<png> <x,y,z cam> <x,y,z look>`: one load, a frame for each line (a map's props take minutes to parse).
 
@@ -62,6 +62,8 @@ func _ready() -> void:
 		var sun := DirectionalLight3D.new()
 		sun.rotation_degrees = Vector3(-55, 30, 0)
 		add_child(sun)
+	if args.has("aniso"):
+		get_viewport().anisotropic_filtering_level = {0: Viewport.ANISOTROPY_DISABLED, 2: Viewport.ANISOTROPY_2X, 4: Viewport.ANISOTROPY_4X, 8: Viewport.ANISOTROPY_8X}.get(int(args["aniso"]), Viewport.ANISOTROPY_16X)
 	var cam := Camera3D.new()
 	var view := _default_view(world, node, str(args.get("view", "")))
 	var from: Vector3 = view[0]
