@@ -11,8 +11,8 @@ extends Node3D
 ## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
 ## thick at (256, 256, 16), at 0.01905 m per unit.
 
-const CHECKS := 104
-const SECTIONS := 8
+const CHECKS := 115
+const SECTIONS := 9
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
 const TERRAIN := "res://examples/bsp_mesh/terrain_fixture.json"
@@ -42,6 +42,7 @@ func _run() -> void:
 	var lit_world := _test_lightmap()
 	if world != null and lit_world != null:
 		_test_drawn(world, lit_world)
+	_test_model_slim()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -468,4 +469,45 @@ func _test_drawn(world: DotMapBspMesh, lit_world: DotMapBspMesh) -> void:
 	drawn.detach()
 	_check(drawn.root == null and not is_instance_valid(drawn.lit), "detach lets go of the node")
 	host.queue_free()
+	_done()
+
+
+func _slim_source(alpha: float, size: int) -> ImageTexture:
+	var img := Image.create(size, size, true, Image.FORMAT_RGBA8)
+	for y in size:
+		for x in size:
+			img.set_pixel(x, y, Color(x / float(size), y / float(size), 0.5, alpha))
+	return ImageTexture.create_from_image(img)
+
+
+func _test_model_slim() -> void:
+	_section("model slim: library glTF textures lose channels they do not read, and identical ones are shared")
+	DotMapModelSlim.reset_stats()
+	var mode := DotMapModelSlim.compression()
+	var normal := DotMapModelSlim.slim_texture(_slim_source(1.0, 64), &"normal")
+	var normal_img := normal.get_image()
+	var want_normal := Image.FORMAT_RGTC_RG if mode == Image.COMPRESS_S3TC else Image.FORMAT_RG8
+	_check(mode < 0 or normal_img.is_compressed(), "a normal map is GPU-compressed where the platform can")
+	_check(mode != Image.COMPRESS_S3TC or normal_img.get_format() == want_normal, "a normal map keeps two channels: %d" % normal_img.get_format())
+	_check(mode >= 0 or normal_img.get_format() == Image.FORMAT_RG8, "without a compressed format a normal map is RG8")
+	var opaque := DotMapModelSlim.slim_texture(_slim_source(1.0, 64), &"colour").get_image()
+	_check(opaque.get_format() != Image.FORMAT_RGBA8 and not opaque.detect_alpha() == Image.ALPHA_BLEND, "an opaque albedo drops its alpha channel: %d" % opaque.get_format())
+	var keep := DotMapModelSlim.slim_texture(_slim_source(0.5, 64), &"colour").get_image()
+	_check(keep.detect_alpha() != Image.ALPHA_NONE or keep.is_compressed(), "an albedo that uses alpha keeps it")
+	_check(normal_img.has_mipmaps(), "the result has mipmaps")
+	var a := DotMapModelSlim.slim_texture(_slim_source(1.0, 32), &"data")
+	var b := DotMapModelSlim.slim_texture(_slim_source(1.0, 32), &"data")
+	_check(a == b and DotMapModelSlim.stats["shared"] >= 1, "two models with the same image share one texture")
+	_check(a != DotMapModelSlim.slim_texture(_slim_source(1.0, 32), &"colour"), "a different kind of use is a different texture")
+	DotMapModelSlim.max_texture_size = 16
+	var capped := DotMapModelSlim.slim_texture(_slim_source(1.0, 128), &"colour")
+	DotMapModelSlim.max_texture_size = 0
+	_check(capped.get_width() == 16, "max_texture_size halves a larger image to fit: %d" % capped.get_width())
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = _slim_source(1.0, 64)
+	mat.normal_texture = _slim_source(1.0, 64)
+	DotMapModelSlim.slim_material(mat)
+	_check(mat.albedo_texture.get_image().get_format() != Image.FORMAT_RGBA8 and mat.normal_texture.get_image().get_format() != Image.FORMAT_RGBA8,
+			"a material's slots are replaced")
+	_check(DotMapModelSlim.stats["bytes_after"] < DotMapModelSlim.stats["bytes_before"], "the slim textures hold fewer bytes: %s" % [DotMapModelSlim.stats])
 	_done()

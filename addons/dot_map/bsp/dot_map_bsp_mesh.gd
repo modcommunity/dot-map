@@ -1225,6 +1225,7 @@ func _library_model(id: String) -> Node3D:
 		var state := GLTFState.new()
 		if doc.append_from_file(path, state) == OK:
 			model = doc.generate_scene(state) as Node3D
+			DotMapModelSlim.slim_model(model)
 	if model == null:
 		return null
 	var box := _local_aabb(model)

@@ -3,7 +3,7 @@ extends Node3D
 ## Renders one frame of a converted map the way a game builds it, through [DotMapWorld]: free photo and generated
 ## textures, the environment, the stand-in props, glass. Run it under a display (tools/screenshot.sh).
 ##
-##   godot --path . res://examples/bsp_world_shot.tscn -- --world=<prefix> --out=<png> [--view=spawn|overview] [--cam=x,y,z --look=x,y,z] [--nolight] [--nomodels] [--list=<file>]
+##   godot --path . res://examples/bsp_world_shot.tscn -- --world=<prefix> --out=<png> [--view=spawn|overview] [--cam=x,y,z --look=x,y,z] [--nolight] [--nomodels] [--slim=0] [--cap=<px>] [--list=<file>]
 ##
 ## `--list` is a file of lines `<png> <x,y,z cam> <x,y,z look>`: one load, a frame for each line (a map's props take minutes to parse).
 
@@ -17,6 +17,8 @@ func _ready() -> void:
 		var kv := a.trim_prefix("--").split("=", true, 1)
 		args[kv[0]] = kv[1] if kv.size() > 1 else "1"
 	_out = str(args.get("out", _out))
+	DotMapModelSlim.enabled = str(args.get("slim", "1")) != "0"
+	DotMapModelSlim.max_texture_size = int(args.get("cap", 0))
 	var res := DotMapBspMesh.load_prefix(str(args.get("world", "")))
 	if not res.ok:
 		printerr("cannot load: ", res.error)
@@ -39,6 +41,7 @@ func _ready() -> void:
 		return
 	var dw: DotMapWorld = built.value
 	add_child(dw)
+	print("rss after build: %d MB, slimmed %s" % [_rss_mb(), DotMapModelSlim.stats])
 	if str(args.get("view", "")) == "overview":
 		# a map's fog is set for play inside it: from outside the map it hides the whole thing
 		for we in dw.find_children("*", "WorldEnvironment", true, false):
@@ -95,6 +98,7 @@ func _ready() -> void:
 			print("saved %s (%s)" % [f[0], error_string(err)])
 		get_tree().quit(0 if err == OK else 1)
 		return
+	print("rss after frames: %d MB" % _rss_mb())
 	var img := get_viewport().get_texture().get_image()
 	err = img.save_png(_out)
 	print("saved %s (%s) from %s to %s" % [_out, error_string(err), from, look])
@@ -132,3 +136,13 @@ func _default_view(world: DotMapBspMesh, node: Node3D, view: String) -> Array:
 	var r := maxf(box.size.x, box.size.z)
 	var from := centre + Vector3(r * 0.45, maxf(box.size.y, r * 0.7), r * 0.45)
 	return [from, centre]
+
+
+## Resident memory of this process in MB, from /proc/self/status.
+func _rss_mb() -> int:
+	var f := FileAccess.open("/proc/self/status", FileAccess.READ)
+	while f != null and not f.eof_reached():
+		var line := f.get_line()
+		if line.begins_with("VmRSS:"):
+			return int(line.get_slice(":", 1).strip_edges().split(" ")[0]) / 1024
+	return -1
