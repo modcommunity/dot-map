@@ -252,7 +252,12 @@ func _stand_ins() -> void:
 			and (brick as StandardMaterial3D).resource_name == "brick")
 	_check("tinted to the face's own colour, never white", (brick as StandardMaterial3D).albedo_color != Color.WHITE)
 	var flat: Material = mat_for.call({"free": "pbr:pbr_Xq7", "colour": [0.25, 0.5, 0.75]})
-	_check("an unnamed set is the face's colour flat", flat is StandardMaterial3D and (flat as StandardMaterial3D).albedo_color.is_equal_approx(Color(0.25, 0.5, 0.75)))
+	var fc: Color = (flat as StandardMaterial3D).albedo_color if flat is StandardMaterial3D else Color.BLACK
+	_check("an unnamed set is the face's colour flat, its cast kept but capped at a 1.6 channel ratio",
+			flat is StandardMaterial3D and fc.b > fc.r and fc.b <= fc.r * 1.6 + 0.001 and is_equal_approx((fc.r + fc.g + fc.b) / 3.0, 0.5))
+	var saturated: Material = mat_for.call({"free": "pbr:pbr_Xq7", "colour": [0.0, 0.0, 1.0]})
+	var sc: Color = (saturated as StandardMaterial3D).albedo_color
+	_check("a saturated blue average is not drawn as pure blue", sc.b < 0.7 and sc.r >= 0.2 and sc.b <= sc.r * 1.6 + 0.001)
 	var small: Material = mat_for.call({"free": "pbr:pbr_Moss"})
 	_check("the pack's small albedo wins over a guess", small is StandardMaterial3D and (small as StandardMaterial3D).albedo_texture != null
 			and (small as StandardMaterial3D).albedo_texture.get_width() == 8)
