@@ -14,6 +14,7 @@ The reasoning behind maps as content, one subject per file. [CLAUDE.md](../CLAUD
 | [converter-v2.md](converter-v2.md) | The next converter: a lossless store of each source map, a replacement layer with a coverage report, the entity-class library and the I/O runtime, and the migration plan |
 | [map-config.md](map-config.md) | `DotMapConfig`: per-map settings files with wildcards, the whitelist, applying on load and restoring on the next map, and the converter's starter file |
 | [io.md](io.md) | `DotMapIO`: the queue, the tick, delays and fire-once counts, the logic classes, the loop guard, a game's handlers and callables, recorded commands, Office's timed hazard as the test |
+| [nav-links.md](nav-links.md) | `DotMapNavLinks`: closed doors and teleports with their openers, as data for a navigation bake or an AI |
 | [culling.md](culling.md) | Culling for a hand-built level without BSP: what Godot 4.7 does natively, `DotOccluderBaker`, `DotAreaPortal`, measurements |
 | [load-threads.md](load-threads.md) | `map_load_threads`: which load stages run on workers, why the output is identical, where the load time goes, how a game binds the cvar |
 | [visibility.md](visibility.md) | `DotMapVisibility`: the converter's precomputed visibility and occluders, culling by the camera's cluster, area portals and doors, the no-holes test, measurements |
