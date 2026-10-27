@@ -145,9 +145,6 @@ const TINT_MAX := 1.3
 ## Darkest albedo a stand-in surface gets; an author's black face is lit by the baked light, so a true black would stay black however bright the room.
 const STAND_IN_FLOOR := 0.2
 
-## The strongest brightest-to-dimmest channel ratio a flat stand-in keeps: a face's average can be a saturated blue that reads as a missing-texture error.
-const STAND_IN_MAX_RATIO := 1.6
-
 ## Triplanar blend sharpness: higher is a harder seam on a bevel, lower a smeared one.
 var sharpness: float = 4.0
 
@@ -381,17 +378,6 @@ func _pack_fallback(dir: String, key: String, licence: Dictionary) -> Dictionary
 	return {"kind": &"", "colour": []}
 
 
-## [param c] pulled toward its grey until its channels are within [param max_ratio].
-static func _desaturated(c: Color, max_ratio: float) -> Color:
-	var hi := maxf(c.r, maxf(c.g, c.b))
-	var lo := minf(c.r, minf(c.g, c.b))
-	if hi <= max_ratio * lo:
-		return c
-	var g := (c.r + c.g + c.b) / 3.0
-	var k := clampf((max_ratio - 1.0) * g / maxf(hi - max_ratio * lo + (max_ratio - 1.0) * g, 0.0001), 0.0, 1.0)
-	return Color(g + (c.r - g) * k, g + (c.g - g) * k, g + (c.b - g) * k)
-
-
 ## A face whose PBR set is missing: the pack's small albedo, else the stand-in kind tinted to the face's average colour, else that colour flat; lit by the map's lightmap when it has one.
 func _stand_in_material(world: DotMapBspMesh, rec: Dictionary, fb: Dictionary, cache: Dictionary) -> Material:
 	var colour: Variant = rec.get("colour", fb.get("colour", []))
@@ -402,8 +388,8 @@ func _stand_in_material(world: DotMapBspMesh, rec: Dictionary, fb: Dictionary, c
 	if not fb.has("file"):
 		tint = original_tint(kind, colour) if kind != &"" else Color(float(colour[0]), float(colour[1]), float(colour[2]))
 		if kind == &"":
-			tint = _desaturated(tint, STAND_IN_MAX_RATIO)
-			tint = Color(maxf(tint.r, STAND_IN_FLOOR), maxf(tint.g, STAND_IN_FLOOR), maxf(tint.b, STAND_IN_FLOOR))
+			var g := maxf(0.299 * tint.r + 0.587 * tint.g + 0.114 * tint.b, STAND_IN_FLOOR)    # neutral grey: a face's own average hue read as flat blue and teal walls
+			tint = Color(g, g, g)
 	var lit := use_lightmap and world.has_lightmap() and rec.has("lightmap_page") and not rec.has("glass")
 	var key := "stand_in|%s|%s|%s|%s" % [fb.get("file", kind), tint.to_html(), rec.get("lightmap_page", -1) if lit else -1, rec.get("emissive", false)]
 	if cache.has(key):
