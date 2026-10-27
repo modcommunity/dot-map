@@ -1135,8 +1135,7 @@ func _proxy_for(rec: Dictionary) -> Node3D:
 		var trunk: Dictionary = _solid_shape({"stand_in": rec["stand_in"], "collide": src}, null)
 		var w: float = (trunk["size"] as Vector3).x if not trunk.is_empty() else clampf(minf(d[0], d[2]) * TRUNK_SHARE, TRUNK_MIN, TRUNK_MAX)
 		block = _support_block({"box": [w, d[1], w], "at": at, "yaw": yaw}, Color(0.36, 0.27, 0.18))
-		var crown := _support_block({"box": [d[0], d[1] * 0.65, d[2]], "at": [0, d[1] * 0.175, 0], "yaw": 0.0}, Color(0.2, 0.32, 0.18))
-		block.add_child(crown)
+		block.add_child(_crown_blob(Vector3(d[0], d[1] * 0.65, d[2]), Vector3(0, d[1] * 0.175, 0)))
 	else:
 		block = _support_block({"box": d, "at": at, "yaw": yaw})
 	block.name = "Proxy"
@@ -1438,13 +1437,15 @@ func _solid_boxes(rec: Dictionary, n: Node3D) -> Array[Dictionary]:
 ## A stand-in fills less of its bounds than this and it is cut into boxes.
 const HOLLOW_FILL := 0.6
 ## Cells along a stand-in's longest side, the most boxes a prop is cut into, and the most triangles read to do it.
-const DECOMPOSE_CELLS := 6
-const DECOMPOSE_MAX_BOXES := 6
-const DECOMPOSE_MAX_TRIS := 200000
+static var decompose_cells: int = 12
+static var decompose_max_boxes: int = 32
+## A stand-in whose longest side is under this stays one box: a lamp is not worth thirty.
+static var decompose_min_size: float = 0.8
+const DECOMPOSE_MAX_TRIS := 400000
 
 
 ## [param n]'s meshes as boxes of occupied cells, in the same {size, transform} form as [method _solid_shape]; [] when the model is
-## near enough a box already, too heavy to read, or would need more than [constant DECOMPOSE_MAX_BOXES] at any grid.
+## near enough a box already, too heavy to read, or would need more than [member decompose_max_boxes] at any grid.
 func _decomposed(rec: Dictionary, n: Node3D) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var key := str(rec.get("stand_in", ""))
@@ -1458,7 +1459,7 @@ func _decomposed(rec: Dictionary, n: Node3D) -> Array[Dictionary]:
 var _decompose_cache := {}
 
 
-## The boxes (in [param n]'s local space) of the finest grid that needs at most [constant DECOMPOSE_MAX_BOXES], or [] to keep one box.
+## The boxes (in [param n]'s local space) of the finest grid that needs at most [member decompose_max_boxes], or [] to keep one box.
 ## A cell is occupied where a triangle passes; an enclosed empty cell (a closed sofa) counts as occupied, the open space under a table does not.
 static func _cut_into_boxes(n: Node3D) -> Array[AABB]:
 	var none: Array[AABB] = []
@@ -1478,16 +1479,16 @@ static func _cut_into_boxes(n: Node3D) -> Array[AABB]:
 			return none
 	var box := _local_aabb(n)
 	var longest := maxf(box.size.x, maxf(box.size.y, box.size.z))
-	if tris.is_empty() or longest <= 0.001:
+	if tris.is_empty() or longest < maxf(0.001, decompose_min_size):
 		return none
-	for cells in range(DECOMPOSE_CELLS, 2, -2):
+	for cells in range(decompose_cells, 2, -2):
 		var cell := longest / cells
 		var dims := Vector3i(maxi(1, ceili(box.size.x / cell - 0.001)), maxi(1, ceili(box.size.y / cell - 0.001)), maxi(1, ceili(box.size.z / cell - 0.001)))
 		var solid := _fill_cells(tris, box.position, cell, dims)
-		if cells == DECOMPOSE_CELLS and float(solid.count(true)) / solid.size() >= HOLLOW_FILL:
+		if cells == decompose_cells and float(solid.count(true)) / solid.size() >= HOLLOW_FILL:
 			return none
 		var boxes := _merge_cells(solid, dims, box, cell)
-		if boxes.size() <= DECOMPOSE_MAX_BOXES:
+		if boxes.size() <= decompose_max_boxes:
 			return boxes
 	return none
 
@@ -1664,6 +1665,26 @@ static func _support_block(rec: Dictionary, tint: Color = Color(0.62, 0.6, 0.57)
 	var at: Array = rec.get("at", [0, 0, 0])
 	mi.position = Vector3(at[0], at[1], at[2])
 	mi.rotation_degrees.y = float(rec.get("yaw", 0.0))
+	return mi
+
+
+## A leafy ellipsoid for a missing tree's crown: a box read as a flat dark wall, a rounded green blob reads as a tree.
+static func _crown_blob(size: Vector3, at: Vector3) -> MeshInstance3D:
+	var ball := SphereMesh.new()
+	ball.radius = 0.5
+	ball.height = 1.0
+	ball.radial_segments = 12
+	ball.rings = 6
+	if not _tinted.has(&"crown"):
+		var m := StandardMaterial3D.new()
+		m.albedo_color = Color(0.3, 0.45, 0.22)
+		m.roughness = 1.0
+		_tinted[&"crown"] = m
+	ball.material = _tinted[&"crown"]
+	var mi := MeshInstance3D.new()
+	mi.mesh = ball
+	mi.scale = size
+	mi.position = at
 	return mi
 
 

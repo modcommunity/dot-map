@@ -79,7 +79,7 @@ static func notice(licence: Dictionary) -> String:
 	var p := pack_of(licence)
 	if p.is_empty() or not _unfetched.has(str(p["id"])):
 		return ""
-	return "Low-detail art: %d art slices not installed" % (_unfetched[str(p["id"])]["ids"] as PackedStringArray).size()
+	return "Low-detail art: %d art slices not installed (the maps repository's raw art stores are not staged: tools/stage_stores.sh)" % (_unfetched[str(p["id"])]["ids"] as PackedStringArray).size()
 
 
 ## Forgets what [method ensure] recorded (a test, or slices staged since).
@@ -90,11 +90,15 @@ static func reset() -> void:
 
 ## Downloads and mounts the slice when it is not, once per client (dot-cloud skips what it holds; an empty [param manifest_url] lets it resolve one). Ok with "" when
 ## the map ships none. A pack acquired with `--depends` has it already, so this is for a map loaded from a folder.
-static func ensure(licence: Dictionary, cloud: Object, manifest_url: String = "") -> DotResult:
+## With no [param cloud], a [param folder] (the pack's own) whose `licence.pbr_store` holds the art counts as installed: a checkout with the raw stores staged beside it.
+static func ensure(licence: Dictionary, cloud: Object, manifest_url: String = "", folder: String = "") -> DotResult:
 	var p := pack_of(licence)
 	if p.is_empty():
 		return DotResult.success("")
 	if cloud == null:
+		if _folder_has_art(licence, folder):
+			_unfetched.erase(str(p["id"]))
+			return DotResult.success("")
 		_unfetched[str(p["id"])] = {"ids": slice_ids(licence), "why": "no dot-cloud client"}
 		_show(licence)
 		return DotResult.success("")

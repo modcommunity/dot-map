@@ -2,7 +2,7 @@ extends Node
 ## Proves DotMapCredits and DotMapStore on a hand-written manifest and a stand-in cloud client.
 ## godot --headless --path . res://examples/store_demo.tscn
 
-const CHECKS := 57
+const CHECKS := 59
 const SECTIONS := 7
 
 var _passed := 0
@@ -207,6 +207,19 @@ func _missing_slices() -> void:
 	DotMapStore.reset()
 	await DotMapStore.ensure(lic, null)
 	_check("no cloud at all is a notice too, and ensure stays ok", DotMapStore.notice(lic) != "")
+	var art := lic.duplicate(true)
+	art["pbr_store"] = "stores/pbr-library"
+	art["textures"] = [{"kind": "pbr", "file": "pbr/Bricks", "tier": "1k"}]
+	var base := ProjectSettings.globalize_path("user://store_demo_art")
+	DotMapStore.reset()
+	await DotMapStore.ensure(art, null, "", base)
+	_check("no cloud and no staged art is a notice that names the stager", DotMapStore.notice(art).contains("stage_stores.sh"))
+	DirAccess.make_dir_recursive_absolute(base.path_join("stores/pbr-library/Bricks/1k"))
+	DotMapStore.reset()
+	res = await DotMapStore.ensure(art, null, "", base)
+	_check("no cloud but the raw stores staged beside the pack is installed art", res.ok and DotMapStore.notice(art) == "")
+	DirAccess.remove_absolute(base.path_join("stores/pbr-library/Bricks/1k"))
+	DotMapStore.reset()
 	var cloud := FakeCloud.new()
 	await DotMapStore.ensure(lic, cloud)
 	_check("a later fetch clears the notice", DotMapStore.notice(lic) == "")
