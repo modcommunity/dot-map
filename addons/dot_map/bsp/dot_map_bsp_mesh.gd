@@ -1426,7 +1426,7 @@ func _solid_boxes(rec: Dictionary, n: Node3D) -> Array[Dictionary]:
 	var whole := _solid_shape(rec, n)
 	if whole.is_empty():
 		return out
-	if n != null and not rec.has("box") and not is_tree(rec):
+	if n != null and not rec.has("box") and not is_tree(rec) and not _is_thin_original(rec, whole):
 		var parts := _decomposed(rec, n)
 		if not parts.is_empty():
 			return parts
@@ -1603,6 +1603,10 @@ func _solid_shape(rec: Dictionary, n: Node3D) -> Dictionary:
 		var box := _local_aabb(n)
 		size = box.size * n.scale
 		xf = Transform3D(n.basis.orthonormalized(), n.position + n.basis * box.get_center())
+		var thin := _thin_bounds(rec, size)
+		if not thin.is_empty():
+			size = thin["size"]
+			xf = thin["transform"]
 	if size.x <= 0.001 or size.y <= 0.001 or size.z <= 0.001:
 		return {}
 	if maxf(size.x, maxf(size.y, size.z)) < SOLID_MIN_SIDE or maxf(size.x, size.z) > SOLID_MAX_SIDE:
@@ -1611,6 +1615,31 @@ func _solid_shape(rec: Dictionary, n: Node3D) -> Dictionary:
 		var w := clampf(minf(size.x, size.z) * TRUNK_SHARE, TRUNK_MIN, TRUNK_MAX)
 		size = Vector3(w, size.y, w)
 	return {"size": size, "transform": xf}
+
+
+## A thin original (a handrail, a fence rail: under [constant THIN_SIDE] across) whose measure is known but not packed is
+## drawn as a stand-in several times wider; this returns the measured box in its place when the stand-in's footprint is over
+## [constant THIN_FOOTPRINT_RATIO] times the original's, else {}. Without it a rail seals a corridor its original left open.
+func _thin_bounds(rec: Dictionary, stand_in_size: Vector3) -> Dictionary:
+	var b: Variant = rec.get("bounds")
+	if not (b is Dictionary) or not (b as Dictionary).has("box"):
+		return {}
+	var d: Array = b["box"]
+	var at: Array = b.get("at", rec.get("at", [0, 0, 0]))
+	var size := Vector3(d[0], d[1], d[2])
+	if minf(size.x, size.z) >= THIN_SIDE or stand_in_size.x * stand_in_size.z < size.x * size.z * THIN_FOOTPRINT_RATIO:
+		return {}
+	return {"size": size, "transform": Transform3D(Basis(Vector3.UP, deg_to_rad(float(b.get("yaw", rec.get("yaw", 0.0))))), Vector3(at[0], at[1], at[2]))}
+
+
+## Whether [param whole] (from [method _solid_shape]) is the measured box of a thin original, which the stand-in's own shape must not replace.
+func _is_thin_original(rec: Dictionary, whole: Dictionary) -> bool:
+	var b: Variant = rec.get("bounds")
+	return b is Dictionary and (b as Dictionary).has("box") and (whole["size"] as Vector3).is_equal_approx(Vector3(b["box"][0], b["box"][1], b["box"][2]))
+
+
+const THIN_SIDE := 0.15
+const THIN_FOOTPRINT_RATIO := 4.0
 
 
 ## A tree collides as its trunk: a source tree's physics model is the trunk, and a box of the crown is an unseen wall round it.
