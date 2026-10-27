@@ -1110,12 +1110,12 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 				(g as GeometryInstance3D).visibility_range_end_margin = end * 0.1
 		root.add_child(n)
 		if collide_fn.is_valid() and int(rec.get("solid", 0)) in SOLID_BOX:
-			var box := _solid_shape(rec, n)
-			if not box.is_empty():
+			for box in _solid_boxes(rec, n):
 				var body := _body_for(box)
 				root.add_child(body)
 				collide_fn.call(body)
 	_free_templates(cache)
+	_decompose_cache.clear()
 	_warn_missing_models()
 	return root
 
@@ -1399,26 +1399,191 @@ func build_prop_collision(scene_for: Callable = Callable()) -> StaticBody3D:
 		if not int(rec.get("solid", 0)) in SOLID_BOX:
 			continue
 		var n: Node3D = null
-		if not rec.has("box") and not rec.has("collide"):
+		if not rec.has("box"):
 			n = _place_prop(rec, scene_for, cache, longest_of)
-			if n == null:
+			if n == null and not rec.has("collide"):
 				continue
-		var box := _solid_shape(rec, n)
+		for box in _solid_boxes(rec, n):
+			var shape := BoxShape3D.new()
+			shape.size = box["size"]
+			var cs := CollisionShape3D.new()
+			cs.shape = shape
+			cs.transform = box["transform"]
+			body.add_child(cs)
 		if n != null:
 			n.free()
-		if box.is_empty():
-			continue
-		var shape := BoxShape3D.new()
-		shape.size = box["size"]
-		var cs := CollisionShape3D.new()
-		cs.shape = shape
-		cs.transform = box["transform"]
-		body.add_child(cs)
 	_free_templates(cache)
+	_decompose_cache.clear()
 	if body.get_child_count() == 0:
 		body.free()
 		return null
 	return body
+
+
+## The boxes a solid prop collides as: its [method _solid_shape] box, or, when the drawn stand-in [param n] fills under
+## [constant HOLLOW_FILL] of that box (a sofa's corner, an arch, a table), boxes that follow the model, so the collision is not an unseen wall.
+func _solid_boxes(rec: Dictionary, n: Node3D) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var whole := _solid_shape(rec, n)
+	if whole.is_empty():
+		return out
+	if n != null and not rec.has("box") and not is_tree(rec):
+		var parts := _decomposed(rec, n)
+		if not parts.is_empty():
+			return parts
+	out.append(whole)
+	return out
+
+
+## A stand-in fills less of its bounds than this and it is cut into boxes.
+const HOLLOW_FILL := 0.6
+## Cells along a stand-in's longest side, the most boxes a prop is cut into, and the most triangles read to do it.
+const DECOMPOSE_CELLS := 6
+const DECOMPOSE_MAX_BOXES := 6
+const DECOMPOSE_MAX_TRIS := 200000
+
+
+## [param n]'s meshes as boxes of occupied cells, in the same {size, transform} form as [method _solid_shape]; [] when the model is
+## near enough a box already, too heavy to read, or would need more than [constant DECOMPOSE_MAX_BOXES] at any grid.
+func _decomposed(rec: Dictionary, n: Node3D) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var key := str(rec.get("stand_in", ""))
+	if not _decompose_cache.has(key):
+		_decompose_cache[key] = _cut_into_boxes(n)
+	for local: AABB in _decompose_cache[key]:
+		out.append({"size": local.size * n.scale, "transform": Transform3D(n.basis.orthonormalized(), n.position + n.basis * local.get_center())})
+	return out
+
+
+var _decompose_cache := {}
+
+
+## The boxes (in [param n]'s local space) of the finest grid that needs at most [constant DECOMPOSE_MAX_BOXES], or [] to keep one box.
+## A cell is occupied where a triangle passes; an enclosed empty cell (a closed sofa) counts as occupied, the open space under a table does not.
+static func _cut_into_boxes(n: Node3D) -> Array[AABB]:
+	var none: Array[AABB] = []
+	var tris := PackedVector3Array()
+	for m in n.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		var t := Transform3D.IDENTITY
+		var p: Node = mi
+		while p != null and p != n:
+			t = (p as Node3D).transform * t
+			p = p.get_parent()
+		for v in mi.mesh.get_faces():
+			tris.append(t * v)
+		if tris.size() > DECOMPOSE_MAX_TRIS * 3:
+			return none
+	var box := _local_aabb(n)
+	var longest := maxf(box.size.x, maxf(box.size.y, box.size.z))
+	if tris.is_empty() or longest <= 0.001:
+		return none
+	for cells in range(DECOMPOSE_CELLS, 2, -2):
+		var cell := longest / cells
+		var dims := Vector3i(maxi(1, ceili(box.size.x / cell - 0.001)), maxi(1, ceili(box.size.y / cell - 0.001)), maxi(1, ceili(box.size.z / cell - 0.001)))
+		var solid := _fill_cells(tris, box.position, cell, dims)
+		if cells == DECOMPOSE_CELLS and float(solid.count(true)) / solid.size() >= HOLLOW_FILL:
+			return none
+		var boxes := _merge_cells(solid, dims, box, cell)
+		if boxes.size() <= DECOMPOSE_MAX_BOXES:
+			return boxes
+	return none
+
+
+static func _cell_index(c: Vector3i, dims: Vector3i) -> int:
+	return (c.y * dims.z + c.z) * dims.x + c.x
+
+
+## Occupancy of the grid ([param dims] cells of [param cell] metres from [param lo]): triangles sampled finer than a cell, then the
+## empty cells that the outside cannot reach filled in.
+static func _fill_cells(tris: PackedVector3Array, lo: Vector3, cell: float, dims: Vector3i) -> Array[bool]:
+	var solid: Array[bool] = []
+	solid.resize(dims.x * dims.y * dims.z)
+	solid.fill(false)
+	var top := Vector3i(dims.x - 1, dims.y - 1, dims.z - 1)
+	for i in range(0, tris.size() - 2, 3):
+		var a := tris[i]
+		var b := tris[i + 1]
+		var c := tris[i + 2]
+		var edge := maxf((b - a).length(), maxf((c - b).length(), (a - c).length()))
+		var k := clampi(ceili(edge / (cell * 0.5)), 1, 64)
+		for u in k + 1:
+			for v in k + 1 - u:
+				var q := a + (b - a) * (float(u) / k) + (c - a) * (float(v) / k)
+				var g := ((q - lo) / cell).floor()
+				var cx := Vector3i(clampi(int(g.x), 0, top.x), clampi(int(g.y), 0, top.y), clampi(int(g.z), 0, top.z))
+				solid[_cell_index(cx, dims)] = true
+	# Flood the empty cells from every border cell; what stays unreached is enclosed.
+	var outside: Array[bool] = []
+	outside.resize(solid.size())
+	outside.fill(false)
+	var queue: Array[Vector3i] = []
+	for y in dims.y:
+		for z in dims.z:
+			for x in dims.x:
+				if (x == 0 or y == 0 or z == 0 or x == top.x or y == top.y or z == top.z) and not solid[_cell_index(Vector3i(x, y, z), dims)]:
+					outside[_cell_index(Vector3i(x, y, z), dims)] = true
+					queue.append(Vector3i(x, y, z))
+	var at := 0
+	while at < queue.size():
+		var cur := queue[at]
+		at += 1
+		for d in [Vector3i(1, 0, 0), Vector3i(-1, 0, 0), Vector3i(0, 1, 0), Vector3i(0, -1, 0), Vector3i(0, 0, 1), Vector3i(0, 0, -1)]:
+			var nx: Vector3i = cur + d
+			if nx.x < 0 or nx.y < 0 or nx.z < 0 or nx.x > top.x or nx.y > top.y or nx.z > top.z:
+				continue
+			var ix := _cell_index(nx, dims)
+			if not solid[ix] and not outside[ix]:
+				outside[ix] = true
+				queue.append(nx)
+	for i in solid.size():
+		solid[i] = solid[i] or not outside[i]
+	return solid
+
+
+## Occupied cells joined greedily into boxes: along x, then z while the whole run is occupied, then y while the whole slab is.
+static func _merge_cells(solid: Array[bool], dims: Vector3i, box: AABB, cell: float) -> Array[AABB]:
+	var taken: Array[bool] = solid.duplicate()
+	var out: Array[AABB] = []
+	for y in dims.y:
+		for z in dims.z:
+			for x in dims.x:
+				if not taken[_cell_index(Vector3i(x, y, z), dims)]:
+					continue
+				var x2 := x
+				while x2 + 1 < dims.x and taken[_cell_index(Vector3i(x2 + 1, y, z), dims)]:
+					x2 += 1
+				var z2 := z
+				while z2 + 1 < dims.z and _run_taken(taken, dims, x, x2, y, z2 + 1):
+					z2 += 1
+				var y2 := y
+				while y2 + 1 < dims.y and _slab_taken(taken, dims, x, x2, y2 + 1, z, z2):
+					y2 += 1
+				for yy in range(y, y2 + 1):
+					for zz in range(z, z2 + 1):
+						for xx in range(x, x2 + 1):
+							taken[_cell_index(Vector3i(xx, yy, zz), dims)] = false
+				var from := box.position + Vector3(x, y, z) * cell
+				var to := box.position + Vector3(x2 + 1, y2 + 1, z2 + 1) * cell
+				to = Vector3(minf(to.x, box.end.x), minf(to.y, box.end.y), minf(to.z, box.end.z))
+				out.append(AABB(from, to - from))
+	return out
+
+
+static func _run_taken(taken: Array[bool], dims: Vector3i, x1: int, x2: int, y: int, z: int) -> bool:
+	for x in range(x1, x2 + 1):
+		if not taken[_cell_index(Vector3i(x, y, z), dims)]:
+			return false
+	return true
+
+
+static func _slab_taken(taken: Array[bool], dims: Vector3i, x1: int, x2: int, y: int, z1: int, z2: int) -> bool:
+	for z in range(z1, z2 + 1):
+		if not _run_taken(taken, dims, x1, x2, y, z):
+			return false
+	return true
 
 
 ## {size, transform} (world space) of the box a solid prop record collides as, or {} for none. A `box` record (a

@@ -11,7 +11,7 @@ extends Node3D
 ## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
 ## thick at (256, 256, 16), at 0.01905 m per unit.
 
-const CHECKS := 119
+const CHECKS := 122
 const SECTIONS := 10
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
@@ -207,6 +207,33 @@ func _test_environment(world: DotMapBspMesh) -> void:
 	_check(solid_only != null and solid_only.get_child_count() == 1 and (solid_only.get_child(0) as CollisionShape3D).shape is BoxShape3D and absf((solid_only.get_child(0) as CollisionShape3D).position.x) < 1.0,
 			"build_prop_collision: one box for the one solid prop, in world space")
 	solid_only.free()
+	# An L-shaped stand-in (a floor plate and an upright slab) collides as boxes that follow it, not as the whole corner.
+	world.manifest["props"] = [{"stand_in": "ell", "at": [0, 0, 0], "yaw": 0.0, "scale": 1.0, "solid": 6}]
+	var ell := func(_id: String) -> PackedScene:
+		var root := Node3D.new()
+		for dims: Vector3 in [Vector3(2, 0.2, 2), Vector3(0.2, 2, 2)]:
+			var mi := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = dims
+			mi.mesh = bm
+			mi.position = Vector3(0, 0.1, 0) if dims.y < 1.0 else Vector3(-0.9, 1.0, 0)
+			root.add_child(mi)
+			mi.owner = root
+		var packed := PackedScene.new()
+		packed.pack(root)
+		root.free()
+		return packed
+	var cut := world.build_prop_collision(ell)
+	var volume := 0.0
+	for cs: Node in cut.get_children():
+		var sz := ((cs as CollisionShape3D).shape as BoxShape3D).size
+		volume += sz.x * sz.y * sz.z
+	_check(cut.get_child_count() >= 2 and cut.get_child_count() <= DotMapBspMesh.DECOMPOSE_MAX_BOXES, "a hollow stand-in is cut into a few boxes: %d" % cut.get_child_count())
+	_check(volume < 0.6 * 2.0 * 2.0 * 2.0, "...which leave the empty corner free: %.2f m3 of 8" % volume)
+	var cut_again := world.build_prop_collision(ell)
+	_check(cut_again.get_child_count() == cut.get_child_count(), "cutting twice gives the same boxes")
+	cut.free()
+	cut_again.free()
 	var plain_props := world.build_props()
 	_check(plain_props.find_children("Solid", "StaticBody3D", true, false).is_empty(), "no body unless the game asks for them")
 	plain_props.free()
