@@ -131,6 +131,8 @@ var _textures: Dictionary = {}
 var load_threads: int = DotMapParallelBuild.default_workers
 ## Longest side of a decoded texture file; larger ones are halved until they fit (0 keeps them). Store slices are imported, never touched.
 var max_texture_size: int = 2048
+## Roughness and AO maps keep half their size (a quarter of the memory) when true: they are smooth, and the sets carry hundreds of them. Off by default.
+var half_res_masks: bool = false
 var use_lightmap: bool = true
 ## Folder of the shared PBR sets (`<id>/<tier>/*.webp`) when the game delivers them apart from the pack; empty reads the folder the manifest names, beside the pack.
 var pbr_library: String = ""
@@ -334,7 +336,7 @@ func _prefetch(world: DotMapBspMesh, generated: Dictionary, library: Dictionary)
 		else:
 			disk.append(p)
 	var started := Time.get_ticks_msec()
-	_textures.merge(DotMapParallelBuild.textures(disk, load_threads, max_texture_size))
+	_textures.merge(DotMapParallelBuild.textures(disk, load_threads, max_texture_size, half_res_masks))
 	var decode_ms := Time.get_ticks_msec() - started
 	for p in imported:
 		_textures[p] = ResourceLoader.load_threaded_get(p) as Texture2D
@@ -512,17 +514,19 @@ func _file_texture(path: String) -> Texture2D:
 	var img := Image.load_from_file(path)
 	if img == null:
 		return null
-	prepare_image(img, path, max_texture_size)
+	prepare_image(img, path, max_texture_size, half_res_masks)
 	var tex := ImageTexture.create_from_image(img)
 	_textures[path] = tex
 	return tex
 
 
 ## Slims, caps, mip-maps and VRAM-compresses a decoded file image: a raw 1k RGB map is 4 MB with mips, the compressed one 0.7 MB. Safe on a worker.
-static func prepare_image(img: Image, path: String, max_size: int) -> void:
+static func prepare_image(img: Image, path: String, max_size: int, half_masks: bool = false) -> void:
 	if img.is_compressed():
 		return
 	slim_image(img, path)
+	if half_masks and path.get_file().get_basename() in ["roughness", "ao"] and mini(img.get_width(), img.get_height()) >= 8:
+		img.resize(img.get_width() / 2, img.get_height() / 2, Image.INTERPOLATE_LANCZOS)
 	while max_size > 0 and maxi(img.get_width(), img.get_height()) > max_size:
 		img.resize(maxi(1, img.get_width() / 2), maxi(1, img.get_height() / 2), Image.INTERPOLATE_LANCZOS)
 	img.generate_mipmaps()

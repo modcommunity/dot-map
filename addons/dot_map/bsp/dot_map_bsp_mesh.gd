@@ -1153,6 +1153,7 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 				var body := _body_for(box)
 				root.add_child(body)
 				collide_fn.call(body)
+	DotLog.info(CHANNEL, "props built", {"models": cache.get(OWNED_KEY, []).size(), "model_ms": cache.get("__ms", 0), "static_mb": OS.get_static_memory_usage() / 1048576})
 	_free_templates(cache)
 	_decompose_cache.clear()
 	_warn_missing_models()
@@ -1253,7 +1254,9 @@ func _place_prop(rec: Dictionary, scene_for: Callable, cache: Dictionary, longes
 		cache[id] = scene_for.call(id) if scene_for.is_valid() \
 				else find_resource(id, DEFAULT_PROP_DIRS, PackedStringArray([".glb", ".tscn"]))
 	if cache[id] == null and id.begins_with("lib/"):
+		var started := Time.get_ticks_msec()
 		cache[id] = _library_model(id)
+		cache["__ms"] = int(cache.get("__ms", 0)) + Time.get_ticks_msec() - started
 		if cache[id] != null:
 			cache.get_or_add(OWNED_KEY, []).append(cache[id])
 	var scene: Variant = cache[id]
@@ -1343,6 +1346,8 @@ func _library_model(id: String) -> Node3D:
 			model = doc.generate_scene(state) as Node3D
 			if model != null:
 				add_mesh_lods(model, model_lod_min_tris, model_max_tris)
+				if model_texture_max >= 0:
+					slim_model_textures(model, model_texture_max)
 	if model == null:
 		return null
 	var box := _local_aabb(model)
@@ -1364,6 +1369,43 @@ static var model_max_tris: int = 150000
 static func set_model_lod(min_tris: int, max_tris: int = 0) -> void:
 	model_lod_min_tris = maxi(min_tris, 0)
 	model_max_tris = maxi(max_tris, 0)
+
+
+## Longest side a library model's texture keeps (a glTF read at run time decodes to raw RGBA with mips, 85 MB for a 4k map); 0 keeps the model's own size, and every one is VRAM-compressed either way; below 0 leaves the textures as the glTF made them.
+static var model_texture_max: int = -1
+
+
+## Replaces every texture of the materials under [param root] with a capped, mip-mapped, compressed copy (once per texture, so a
+## texture two materials share stays shared) and frees the raw image; returns how many were replaced.
+static func slim_model_textures(root: Node, max_size: int) -> int:
+	var done := {}
+	var meshes := {}
+	var changed := 0
+	for found in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := found as MeshInstance3D
+		if mi.mesh == null or meshes.has(mi.mesh):
+			continue
+		meshes[mi.mesh] = true
+		for i in mi.mesh.get_surface_count():
+			var m := mi.mesh.surface_get_material(i) as BaseMaterial3D
+			if m == null or done.has(m):
+				continue
+			done[m] = true
+			for slot in BaseMaterial3D.TEXTURE_MAX:
+				var tex := m.get_texture(slot as BaseMaterial3D.TextureParam) as ImageTexture
+				if tex == null:
+					continue
+				if not done.has(tex):
+					var img := tex.get_image()
+					if img == null or img.is_compressed():
+						done[tex] = tex
+					else:
+						DotMapSurfaces.prepare_image(img, "model.png", max_size)  # a part-less name: every channel stays
+						done[tex] = ImageTexture.create_from_image(img)
+				if done[tex] != tex:
+					m.set_texture(slot as BaseMaterial3D.TextureParam, done[tex])
+					changed += 1
+	return changed
 
 
 ## Gives every unskinned [MeshInstance3D] mesh under [param root] with at least [param min_tris] triangles its LOD levels

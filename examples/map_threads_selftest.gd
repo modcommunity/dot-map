@@ -6,7 +6,7 @@ extends Node
 ## godot --headless --path . res://examples/map_threads_selftest.tscn
 ## [/codeblock]
 
-const CHECKS := 27
+const CHECKS := 28
 const SECTIONS := 4
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const COPIES := 40
@@ -162,9 +162,14 @@ func _test_textures() -> void:
 		img.save_png(path)
 		parts.append(path)
 	var slim := DotMapParallelBuild.textures(parts, 2)
+	var half := DotMapParallelBuild.textures(parts, 2, 0, true)
 	var formats := []
 	for p in parts:
 		formats.append((slim[p] as Texture2D).get_image().get_format())
 		DirAccess.remove_absolute(p)
 	_check(formats == [Image.FORMAT_RGB8, Image.FORMAT_RG8, Image.FORMAT_R8, Image.FORMAT_R8], "a set keeps only the channels it samples: albedo RGB, normal RG, roughness and AO R (%s)" % str(formats))
+	var widths := []
+	for p in parts:
+		widths.append([(slim[p] as Texture2D).get_width(), (half[p] as Texture2D).get_width()])
+	_check(widths == [[32, 32], [32, 32], [32, 16], [32, 16]], "half_res_masks halves roughness and AO only, and is off by default (%s)" % str(widths))
 	_completed += 1
