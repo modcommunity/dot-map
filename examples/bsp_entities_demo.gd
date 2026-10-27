@@ -11,8 +11,8 @@ extends Node3D
 ## (toggle doors moved by buttons that lock and unlock one another), hinged doors, shutters, and
 ## classes the converter keeps as data.
 
-const CHECKS := 42
-const SECTIONS := 6
+const CHECKS := 44
+const SECTIONS := 7
 const REAL := "res://examples/bsp_mesh/zm_4way_tunnel.entities.json"
 
 var _passed := 0
@@ -39,6 +39,7 @@ func _run() -> void:
 		_test_generic(ents)
 		_test_push()
 	_test_trails()
+	_test_decal_kinds()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -158,6 +159,14 @@ func _test_generic(ents: DotMapEntities) -> void:
 	_check(e.links.unresolved().size() == 1 and e.links.fired_by(7, "OnThing")[0]["delay"] == 0.5, "its outputs are in the graph")
 	var empty := DotMapEntities.from_manifest({})
 	_check(empty.movers.is_empty() and empty.links.size() == 0 and empty.mover_named("x") == null, "an old manifest with none of it reads as empty")
+	_done()
+
+
+func _test_decal_kinds() -> void:
+	_section("a decal whose texture says nothing is left out, not drawn as a dark stain")
+	var fx := DotMapFx.new()
+	_check(fx._kind_of("props/decal_prison01a").is_empty(), "an unknown name draws nothing")
+	_check(str(fx._kind_of("decals/blood3")[0]) == "blood" and str(fx._kind_of("decals/oilstain")[0]) == "stain", "known names keep their kind")
 	_done()
 
 

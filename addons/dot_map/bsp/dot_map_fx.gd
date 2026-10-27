@@ -53,7 +53,7 @@ func build(records: Array) -> Node3D:
 				cones.append(rec)
 			"infodecal":
 				decals.append(rec)
-	stats = {"sprites": 0, "cones": 0, "lights": 0, "decals": 0, "decals_unplaced": 0, "trails": 0, "skipped": 0}
+	stats = {"sprites": 0, "cones": 0, "lights": 0, "decals": 0, "decals_unplaced": 0, "decals_unknown": 0, "trails": 0, "skipped": 0}
 	_sprites(root, sprites)
 	_cones(root, cones)
 	_decals(root, decals)
@@ -332,6 +332,7 @@ const KINDS := [
 	["grate", "grate", 0.9, 0.9], ["vent", "grate", 0.7, 0.5], ["drain", "grate", 0.9, 0.9],
 	["outlet", "plate", 0.18, 0.18], ["switch", "plate", 0.18, 0.18], ["button", "plate", 0.18, 0.18],
 	["puddle", "puddle", 1.2, 1.2],
+	["stain", "stain", 0.9, 0.9], ["grime", "stain", 0.9, 0.9], ["dirt", "stain", 0.9, 0.9], ["splat", "stain", 0.9, 0.9], ["oil", "stain", 0.9, 0.9],
 	["crack", "crack", 0.8, 0.8], ["bullet", "crack", 0.25, 0.25], ["scorch", "crack", 0.8, 0.8], ["burn", "crack", 0.8, 0.8],
 ]
 
@@ -363,6 +364,9 @@ func _decals(root: Node3D, recs: Array) -> void:
 			continue
 		var n: Vector3 = (best["normal"] as Vector3).normalized()
 		var spec := _kind_of(str(k.get("texture", "")).to_lower())
+		if spec.is_empty():
+			stats["decals_unknown"] = int(stats.get("decals_unknown", 0)) + 1
+			continue
 		var index := int(rec.get("index", 0))
 		var decal := Decal.new()
 		decal.texture_albedo = _decal_texture(str(spec[0]), index % 2)
@@ -382,11 +386,12 @@ func _decals(root: Node3D, recs: Array) -> void:
 		stats["decals"] += 1
 
 
+## Kind, width and height of a decal from its texture name; empty when the name says nothing we can draw.
 func _kind_of(name: String) -> Array:
 	for row: Array in KINDS:
 		if name.contains(str(row[0])):
 			return [row[1], row[2], row[3]]
-	return ["stain", 0.9, 0.9]
+	return []   # an unknown decal is left out: a dark stain stood in for each one and read as a black blob on the wall
 
 
 func _decal_texture(kind: String, variant: int) -> Texture2D:
