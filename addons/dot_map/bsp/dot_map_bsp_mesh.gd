@@ -416,15 +416,17 @@ static func cutout_texture(pattern: StringName) -> ImageTexture:
 					if x < 10 or x >= n - 10 or y % 24 < 6:
 						img.set_pixel(x, y, solid)
 		&"leaves":
+			# Many small overlapping leaves, the shade varying per leaf: a few big blobs left the sky showing as black patches.
 			var rng := RandomNumberGenerator.new()
 			rng.seed = 7
-			for k in 70:
+			for k in 420:
 				var c := Vector2(rng.randf() * n, rng.randf() * n)
-				var r := rng.randf_range(5.0, 11.0)
-				var shade := rng.randf_range(0.55, 1.0)
-				var col := Color(0.16 * shade, 0.38 * shade, 0.1 * shade, 1.0)
-				for dy in range(-12, 13):
-					for dx in range(-12, 13):
+				var r := rng.randf_range(3.0, 7.0)
+				var shade := rng.randf_range(0.45, 1.0)
+				var col := Color(0.17 * shade, 0.4 * shade, 0.1 * shade, 1.0)
+				var ext := int(ceilf(r * 1.3)) + 1
+				for dy in range(-ext, ext + 1):
+					for dx in range(-ext, ext + 1):
 						if Vector2(dx * 0.7, dy * 1.2).length() <= r:
 							img.set_pixel(posmod(int(c.x) + dx, n), posmod(int(c.y) + dy, n), col)
 	img.generate_mipmaps()

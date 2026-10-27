@@ -11,7 +11,7 @@ extends Node3D
 ## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
 ## thick at (256, 256, 16), at 0.01905 m per unit.
 
-const CHECKS := 122
+const CHECKS := 123
 const SECTIONS := 10
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
@@ -385,6 +385,14 @@ func _test_glass() -> void:
 		return float(n) / float(w * w)
 	_check(absf(covered.call(1) - covered.call(0)) < 0.12 and covered.call(2) > 0.1,
 			"a thin cutout keeps its coverage in the mips, so a fence does not vanish at distance (%.2f, %.2f vs %.2f)" % [covered.call(1), covered.call(2), covered.call(0)])
+	var leaf_img := DotMapBspMesh.cutout_texture(&"leaves").get_image()
+	var leaf_solid := 0
+	for ly in leaf_img.get_height():
+		for lx in leaf_img.get_width():
+			if leaf_img.get_pixel(lx, ly).a >= 0.5:
+				leaf_solid += 1
+	var leaf_share := float(leaf_solid) / float(leaf_img.get_width() * leaf_img.get_height())
+	_check(leaf_share > 0.8 and leaf_share < 1.0, "a foliage card is mostly leaf, with small gaps and no black sky patches (%.2f)" % leaf_share)
 	_check(DotMapBspMesh.glass_material(&"fence").alpha_antialiasing_mode == BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE, "cutouts use alpha to coverage")
 	_check(DotMapBspMesh.glass_material(&"nonsense") == DotMapBspMesh.glass_material(&"glass"), "an unknown kind is clear glass, shared")
 	_check(world.breakables().size() == 1 and str(world.breakables()[0]["glass"]) == "glass", "one breakable glass model")
