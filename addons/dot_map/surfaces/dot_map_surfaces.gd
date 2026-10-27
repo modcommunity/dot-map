@@ -129,6 +129,8 @@ var water_material: Material = null
 var _textures: Dictionary = {}
 ## Workers that decode the world's texture files ahead of the material pass ([code]map_load_threads[/code]): 0 inline, -1 automatic.
 var load_threads: int = DotMapParallelBuild.default_workers
+## Longest side of a decoded texture file; larger ones are halved until they fit (0 keeps them). Store slices are imported, never touched.
+var max_texture_size: int = 2048
 var use_lightmap: bool = true
 ## Folder of the shared PBR sets (`<id>/<tier>/*.webp`) when the game delivers them apart from the pack; empty reads the folder the manifest names, beside the pack.
 var pbr_library: String = ""
@@ -331,9 +333,27 @@ func _prefetch(world: DotMapBspMesh, generated: Dictionary, library: Dictionary)
 			ResourceLoader.load_threaded_request(p)
 		else:
 			disk.append(p)
-	_textures.merge(DotMapParallelBuild.textures(disk, load_threads))
+	var started := Time.get_ticks_msec()
+	_textures.merge(DotMapParallelBuild.textures(disk, load_threads, max_texture_size))
+	var decode_ms := Time.get_ticks_msec() - started
 	for p in imported:
 		_textures[p] = ResourceLoader.load_threaded_get(p) as Texture2D
+	DotLog.info(CHANNEL, "texture prefetch", {"disk": disk.size(), "decode_ms": decode_ms, "imported": imported.size(), "formats": texture_report(_textures), "static_mb": OS.get_static_memory_usage() / 1048576})
+
+
+## Texture count and megabytes per image format, for the memory log.
+static func texture_report(textures: Dictionary) -> Dictionary:
+	var out := {}
+	for t: Variant in textures.values():
+		if t is CompressedTexture2D or t is ImageTexture:
+			var img := (t as Texture2D).get_image()
+			if img != null:
+				var key := str(img.get_format())
+				var e: Array = out.get(key, [0, 0])
+				e[0] += 1
+				e[1] += img.get_data().size() / 1048576.0
+				out[key] = e
+	return out
 
 
 ## The first existing file of the set's [param part] (webp, then jpg), or "".
@@ -492,11 +512,32 @@ func _file_texture(path: String) -> Texture2D:
 	var img := Image.load_from_file(path)
 	if img == null:
 		return null
-	slim_image(img, path)
-	img.generate_mipmaps()
+	prepare_image(img, path, max_texture_size)
 	var tex := ImageTexture.create_from_image(img)
 	_textures[path] = tex
 	return tex
+
+
+## Slims, caps, mip-maps and VRAM-compresses a decoded file image: a raw 1k RGB map is 4 MB with mips, the compressed one 0.7 MB. Safe on a worker.
+static func prepare_image(img: Image, path: String, max_size: int) -> void:
+	if img.is_compressed():
+		return
+	slim_image(img, path)
+	while max_size > 0 and maxi(img.get_width(), img.get_height()) > max_size:
+		img.resize(maxi(1, img.get_width() / 2), maxi(1, img.get_height() / 2), Image.INTERPOLATE_LANCZOS)
+	img.generate_mipmaps()
+	var mode := Image.COMPRESS_S3TC if OS.has_feature("s3tc") else (Image.COMPRESS_ETC2 if OS.has_feature("etc2") else -1)
+	if mode < 0 or OS.get_environment("NOCOMP") != "" or img.get_width() < 4 or img.get_height() < 4:
+		return
+	var channels := Image.USED_CHANNELS_RGBA
+	match img.get_format():
+		Image.FORMAT_R8:
+			channels = Image.USED_CHANNELS_R
+		Image.FORMAT_RG8:
+			channels = Image.USED_CHANNELS_RG
+		Image.FORMAT_RGB8:
+			channels = Image.USED_CHANNELS_RGB
+	img.compress_from_channels(mode as Image.CompressMode, channels)
 
 
 ## Drops the channels a set's [param path] part never samples: roughness and AO keep red, a normal map red and green

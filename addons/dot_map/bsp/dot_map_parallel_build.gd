@@ -46,7 +46,7 @@ static func concave_faces(world: DotMapBspMesh, recs: Array, origin: Vector3, wo
 
 
 ## Decodes and mip-maps image files on workers, a batch at a time, and returns path -> [ImageTexture] (made here, on the calling thread). A file that does not decode is left out.
-static func textures(paths: PackedStringArray, workers: int) -> Dictionary:
+static func textures(paths: PackedStringArray, workers: int, max_size: int = 0) -> Dictionary:
 	var out := {}
 	var step := batch_size(workers)
 	for from in range(0, paths.size(), step):
@@ -54,8 +54,7 @@ static func textures(paths: PackedStringArray, workers: int) -> Dictionary:
 		var images := DotParallel.run(func(i: int) -> Variant:
 			var img := Image.load_from_file(paths[from + i])
 			if img != null:
-				DotMapSurfaces.slim_image(img, paths[from + i])
-				img.generate_mipmaps()
+				DotMapSurfaces.prepare_image(img, paths[from + i], max_size)
 			return img, n, &"map.textures", workers)
 		for i in n:
 			if images[i] != null:
