@@ -1325,7 +1325,7 @@ func _library_model(id: String, parsed: GLTFState = null) -> Node3D:
 		return null
 	var model: Node3D = null
 	if path.begins_with("res://") and ResourceLoader.exists(path):
-		var packed := load(path) as PackedScene
+		var packed := (_imported_scenes[path] if _imported_scenes.has(path) else load(path)) as PackedScene
 		model = packed.instantiate() as Node3D if packed != null else null
 	elif FileAccess.file_exists(path):
 		var defect := gltf_defect(path)
@@ -1378,12 +1378,18 @@ func _note_defect(path: String, defect: String) -> void:
 		DotLog.warn(CHANNEL, "a library model is damaged and drawn as a box instead: " + defect, {"model": path})
 
 
-## Parses the glTF files of the library models in [param ids] that are not yet in [param cache] on workers
+## Imported library scenes already loaded by [method _preload_library_models], by path.
+var _imported_scenes := {}
+
+
+## Loads the library models in [param ids] that are not yet in [param cache] ahead of the build: imported [code]res://[/code] scenes with
+## [method ResourceLoader.load_threaded_request], plain glTF files (also under [code]res://[/code], when never imported) parsed on workers
 ## ([member load_threads], never the web), then builds each scene here, so the ~85 ms parse of every model is not serial.
 func _preload_library_models(ids: Array, scene_for: Callable, cache: Dictionary) -> void:
 	if DotParallel.resolve_workers(load_threads) <= 1 or not DotParallel.available():
 		return
 	var todo: Array = []
+	var imported := {}
 	for id: String in ids:
 		if cache.has(id):
 			continue
@@ -1391,9 +1397,14 @@ func _preload_library_models(ids: Array, scene_for: Callable, cache: Dictionary)
 				else find_resource(id, DEFAULT_PROP_DIRS, PackedStringArray([".glb", ".tscn"]))
 		if cache[id] == null and id.begins_with("lib/"):
 			var path := _library_path(id)
-			if path != "" and not path.begins_with("res://") and FileAccess.file_exists(path) and gltf_defect(path) == "":
+			if path.begins_with("res://") and ResourceLoader.exists(path) and not imported.has(path):
+				imported[path] = true
+				ResourceLoader.load_threaded_request(path)
+			if path != "" and not imported.has(path) and not ResourceLoader.exists(path) and FileAccess.file_exists(path) and gltf_defect(path) == "":
 				todo.append([id, path])
 	var started := Time.get_ticks_msec()
+	for path: String in imported:  # request order, so the result does not depend on which worker finished first
+		_imported_scenes[path] = ResourceLoader.load_threaded_get(path)
 	var step := DotMapParallelBuild.batch_size(load_threads)
 	for from in range(0, todo.size(), step):
 		var n := mini(step, todo.size() - from)
