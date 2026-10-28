@@ -1111,6 +1111,11 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 	missing_models = 0
 	missing_proxied = 0
 	_unseen.clear()
+	var lib_ids := {}
+	for rec: Dictionary in manifest.get("props", []):
+		if not rec.has("box") and str(rec.get("stand_in", "")).begins_with("lib/") and not (skip_loose and rec.has("loose")):
+			lib_ids[str(rec["stand_in"])] = true
+	_preload_library_models(lib_ids.keys(), scene_for, cache)
 	for rec: Dictionary in manifest.get("props", []):
 		if skip_loose and rec.has("loose"):
 			continue
@@ -1314,21 +1319,10 @@ static func gltf_defect(path: String) -> String:
 
 ## A shipped library model (stand-in id [code]lib/<name>[/code]) loaded from the pack, re-rooted so its bottom centre sits at
 ## the origin; null when the pack lacks it. A glTF outside the project has no import, so it is read with [GLTFDocument].
-func _library_model(id: String) -> Node3D:
-	var row := {}
-	for r: Dictionary in licence().get("model_stand_ins", []):
-		if str(r.get("stand_in", "")) == id:
-			row = r
-	if row.is_empty() or not row.has("store_file"):
+func _library_model(id: String, parsed: GLTFState = null) -> Node3D:
+	var path := _library_path(id)
+	if path == "":
 		return null
-	var root := model_library if not model_library.is_empty() \
-			else source_path.get_base_dir().path_join(str(licence().get("model_store", "model-library"))).simplify_path()
-	var path := root.path_join(str(row["store_file"]))
-	for lib in model_libraries:
-		var cand := lib.path_join(str(row["store_file"]))
-		if ResourceLoader.exists(cand) or FileAccess.file_exists(cand):
-			path = cand
-			break
 	var model: Node3D = null
 	if path.begins_with("res://") and ResourceLoader.exists(path):
 		var packed := load(path) as PackedScene
@@ -1336,13 +1330,15 @@ func _library_model(id: String) -> Node3D:
 	elif FileAccess.file_exists(path):
 		var defect := gltf_defect(path)
 		if defect != "":
-			if not defective_models.has(path):
-				defective_models.append(path)
-				DotLog.warn(CHANNEL, "a library model is damaged and drawn as a box instead: " + defect, {"model": path})
+			_note_defect(path, defect)
 			return null
+		var state := parsed
 		var doc := GLTFDocument.new()
-		var state := GLTFState.new()
-		if doc.append_from_file(path, state) == OK:
+		if state == null:
+			state = GLTFState.new()
+			if doc.append_from_file(path, state) != OK:
+				state = null
+		if state != null:
 			model = doc.generate_scene(state) as Node3D
 			if model != null:
 				add_mesh_lods(model, model_lod_min_tris, model_max_tris)
@@ -1355,6 +1351,61 @@ func _library_model(id: String) -> Node3D:
 	var holder := Node3D.new()
 	holder.add_child(model)
 	return holder
+
+
+## Where library model [param id] is on disk ("" when the pack does not list it).
+func _library_path(id: String) -> String:
+	var row := {}
+	for r: Dictionary in licence().get("model_stand_ins", []):
+		if str(r.get("stand_in", "")) == id:
+			row = r
+	if row.is_empty() or not row.has("store_file"):
+		return ""
+	var root := model_library if not model_library.is_empty() \
+			else source_path.get_base_dir().path_join(str(licence().get("model_store", "model-library"))).simplify_path()
+	var path := root.path_join(str(row["store_file"]))
+	for lib in model_libraries:
+		var cand := lib.path_join(str(row["store_file"]))
+		if ResourceLoader.exists(cand) or FileAccess.file_exists(cand):
+			path = cand
+			break
+	return path
+
+
+func _note_defect(path: String, defect: String) -> void:
+	if not defective_models.has(path):
+		defective_models.append(path)
+		DotLog.warn(CHANNEL, "a library model is damaged and drawn as a box instead: " + defect, {"model": path})
+
+
+## Parses the glTF files of the library models in [param ids] that are not yet in [param cache] on workers
+## ([member load_threads], never the web), then builds each scene here, so the ~85 ms parse of every model is not serial.
+func _preload_library_models(ids: Array, scene_for: Callable, cache: Dictionary) -> void:
+	if DotParallel.resolve_workers(load_threads) <= 1 or not DotParallel.available():
+		return
+	var todo: Array = []
+	for id: String in ids:
+		if cache.has(id):
+			continue
+		cache[id] = scene_for.call(id) if scene_for.is_valid() \
+				else find_resource(id, DEFAULT_PROP_DIRS, PackedStringArray([".glb", ".tscn"]))
+		if cache[id] == null and id.begins_with("lib/"):
+			var path := _library_path(id)
+			if path != "" and not path.begins_with("res://") and FileAccess.file_exists(path) and gltf_defect(path) == "":
+				todo.append([id, path])
+	var started := Time.get_ticks_msec()
+	var step := DotMapParallelBuild.batch_size(load_threads)
+	for from in range(0, todo.size(), step):
+		var n := mini(step, todo.size() - from)
+		var states := DotParallel.run(func(i: int) -> Variant:
+			var st := GLTFState.new()
+			return st if GLTFDocument.new().append_from_file(todo[from + i][1], st) == OK else null, n, &"map.gltf", load_threads)
+		for i in n:
+			var id: String = todo[from + i][0]
+			cache[id] = _library_model(id, states[i]) if states[i] != null else null
+			if cache[id] != null:
+				cache.get_or_add(OWNED_KEY, []).append(cache[id])
+	cache["__ms"] = int(cache.get("__ms", 0)) + Time.get_ticks_msec() - started
 
 
 ## Triangles a library model's mesh must have before [method add_mesh_lods] simplifies it (the engine then picks a coarser level by
