@@ -390,9 +390,7 @@ func _prefetch_done(plan: Dictionary, decode_ms: int) -> void:
 
 ## The suffix of the pre-baked texture this build loads (`tools/bake_textures.gd`), "" when it has no VRAM format to read.
 static func baked_variant() -> String:
-	if OS.get_environment("NOCOMP") != "":
-		return ""
-	return "s3tc" if OS.has_feature("s3tc") else ("etc2" if OS.has_feature("etc2") else "")
+	return DotMapTextureBake.pick_variant(OS.has_feature, OS.get_environment("NOCOMP") != "")
 
 
 ## The pre-baked `<name>.<variant>.res` beside [param path] (already capped, mip-mapped and compressed, so no decode), or null when there is none, it is unreadable, predates the bake metadata, was baked from another file, or is not the size [member max_texture_size] and [member half_res_masks] want.
@@ -404,7 +402,7 @@ func _baked_texture(path: String) -> Texture2D:
 	if not FileAccess.file_exists(baked):
 		return null
 	var tex := ResourceLoader.load(baked, "ImageTexture") as Texture2D
-	if tex == null or not DotMapTextureBake.fits(tex, path, max_texture_size):
+	if tex == null or not DotMapTextureBake.fits(tex, path, max_texture_size, variant):
 		return null
 	return tex
 

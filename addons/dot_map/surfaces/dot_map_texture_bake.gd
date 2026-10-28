@@ -10,6 +10,16 @@ const META := &"dot_bake"
 const VARIANTS := {"s3tc": Image.COMPRESS_S3TC, "etc2": Image.COMPRESS_ETC2}
 
 
+## The variant a GPU reads, by [param has_feature] (a Callable taking a feature name, `OS.has_feature` at runtime), or "" for none: s3tc first, then etc2. bptc and astc are not baked, so a GPU with only those decodes the source. [param disabled] forces "".
+static func pick_variant(has_feature: Callable, disabled: bool = false) -> String:
+	if disabled:
+		return ""
+	for variant: String in VARIANTS:
+		if has_feature.call(variant):
+			return variant
+	return ""
+
+
 ## Bakes [param src] into [param out_base] + ".<variant>.res" for both variants, capped to [param max_size] (0 for no cap). The files written, or an error for a file that does not decode or is under 4 px (never compressed, so the runtime keeps decoding it).
 static func bake_file(src: String, out_base: String, max_size: int) -> DotResult:
 	var first := Image.load_from_file(src)
@@ -24,7 +34,7 @@ static func bake_file(src: String, out_base: String, max_size: int) -> DotResult
 		DotMapSurfaces.prepare_image(img, src, max_size, false, VARIANTS[variant])
 		var out := "%s.%s.res" % [out_base, variant]
 		var tex := ImageTexture.create_from_image(img)
-		tex.set_meta(META, {"size": _length(src), "md5": FileAccess.get_md5(src), "w": first.get_width(), "h": first.get_height(), "max": max_size})
+		tex.set_meta(META, {"size": _length(src), "md5": FileAccess.get_md5(src), "w": first.get_width(), "h": first.get_height(), "max": max_size, "variant": variant})
 		if ResourceSaver.save(tex, out) != OK:
 			return DotResult.fail(DotError.CODE_IO, "cannot write %s" % out)
 		written.append(out)
@@ -60,15 +70,19 @@ static func is_current(out_base: String, src: String, max_size: int) -> bool:
 			return false
 		if md5.is_empty():
 			md5 = FileAccess.get_md5(src)
+		if meta.has("variant") and meta["variant"] != variant:
+			return false
 		if meta["md5"] != md5:
 			return false
 	return true
 
 
-## True when [param tex] (a baked file) is the right one for [param src] under [param cap] (0: none): baked from a file of this size, and neither smaller than the cap asks for nor larger. No source beside it means the bake is all there is.
-static func fits(tex: Texture2D, src: String, cap: int) -> bool:
+## True when [param tex] (a baked file) is the right one for [param src] under [param cap] (0: none) and, when given, for [param variant] (a file's own record of its format; files baked before it carry none and pass): baked from a file of this size, and neither smaller than the cap asks for nor larger. No source beside it means the bake is all there is.
+static func fits(tex: Texture2D, src: String, cap: int, variant: String = "") -> bool:
 	var meta: Dictionary = tex.get_meta(META, {})
 	if meta.is_empty():
+		return false
+	if not variant.is_empty() and meta.has("variant") and meta["variant"] != variant:
 		return false
 	if not FileAccess.file_exists(src):
 		return true

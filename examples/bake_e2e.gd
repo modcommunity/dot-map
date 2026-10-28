@@ -7,8 +7,10 @@ extends Node
 ## [/codeblock]
 ## The originals are only read. With no store found (a fresh clone) the section is skipped and says so.
 
-const CHECKS := 14
-const SECTIONS := 1
+const REAL := 15
+const PICK := 8
+const CHECKS := REAL + PICK
+const SECTIONS := 2
 const SETS := 20
 const CAP := 256
 const SCRATCH := "user://bake_e2e"
@@ -24,6 +26,7 @@ var _completed := 0
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
 	print("dot-map texture bake, end to end")
+	_test_variant_pick()
 	_test_real_textures()
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -77,13 +80,30 @@ func _mean_error(a: Image, b: Image) -> float:
 	return total / float(maxi(n, 1))
 
 
+func _test_variant_pick() -> void:
+	_entered += 1
+	var feats := func(list: Array) -> Callable: return func(f: String) -> bool: return f in list
+	_check(DotMapTextureBake.pick_variant(feats.call(["s3tc", "bptc"])) == "s3tc", "a desktop GPU (s3tc, bptc) reads the s3tc bake")
+	_check(DotMapTextureBake.pick_variant(feats.call(["etc2", "astc"])) == "etc2", "a phone or browser GPU (etc2, astc) reads the etc2 bake")
+	_check(DotMapTextureBake.pick_variant(feats.call(["s3tc", "etc2"])) == "s3tc", "a GPU with both prefers s3tc")
+	_check(DotMapTextureBake.pick_variant(feats.call(["astc", "bptc"])).is_empty(), "a GPU with only astc or bptc has no bake and decodes the source")
+	_check(DotMapTextureBake.pick_variant(feats.call([])).is_empty(), "no GPU format (dedicated server, headless) picks nothing")
+	_check(DotMapTextureBake.pick_variant(feats.call(["s3tc"]), true).is_empty(), "NOCOMP forces no bake")
+	var tex := ImageTexture.create_from_image(Image.create(8, 8, false, Image.FORMAT_RGB8))
+	tex.set_meta(DotMapTextureBake.META, {"size": 1, "md5": "", "w": 8, "h": 8, "max": 0, "variant": "etc2"})
+	_check(not DotMapTextureBake.fits(tex, "res://missing.webp", 0, "s3tc"), "a bake that records another variant is ignored")
+	tex.set_meta(DotMapTextureBake.META, {"size": 1, "md5": "", "w": 8, "h": 8, "max": 0})
+	_check(DotMapTextureBake.fits(tex, "res://missing.webp", 0, "s3tc"), "a bake from before the variant record still loads")
+	_completed += 1
+
+
 func _test_real_textures() -> void:
 	_entered += 1
 	var store := _find_store()
 	var variant := DotMapSurfaces.baked_variant()
 	if store.is_empty() or variant.is_empty():
 		print("  skipped: %s" % ("no map store on this machine" if store.is_empty() else "no VRAM format on this build"))
-		for i in CHECKS:
+		for i in REAL:
 			_check(true, "-")
 		_completed += 1
 		return
@@ -170,6 +190,13 @@ func _test_real_textures() -> void:
 	DirAccess.remove_absolute("%s.etc2.res" % copied[7].get_basename())
 	var again := DotMapTextureBake.bake_store(SCRATCH, "", CAP)
 	_check(again["baked"] == 5 and again["skipped"] == SETS - 5 and again["failed"] == 0, "a re-bake redoes only the missing, unreadable, changed, bare and half-missing ones (%s)" % str(again))
+	var other := "etc2" if variant == "s3tc" else "s3tc"
+	var wrong := copied[8]
+	DirAccess.copy_absolute("%s.%s.res" % [wrong.get_basename(), other], "%s.%s.res" % [wrong.get_basename(), variant])
+	var s8 := DotMapSurfaces.new()
+	s8.max_texture_size = CAP
+	var t_wrong := s8._file_texture(wrong)
+	_check(t_wrong != null and t_wrong.resource_path.is_empty(), "the other variant's bake under this variant's name is ignored")
 	_remove_tree(SCRATCH)
 	_completed += 1
 
