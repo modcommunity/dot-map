@@ -20,6 +20,7 @@ uniform bool has_normal = false;
 uniform bool has_roughness = false;
 uniform bool has_ao = false;
 uniform vec3 floor_light : source_color = vec3(0.0);
+uniform float max_chroma_ratio = 0.0;
 
 varying vec3 wpos;
 varying vec3 wnorm;
@@ -29,6 +30,18 @@ void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	wnorm = normalize(mat3(MODEL_MATRIX) * NORMAL);
 	blend_w = COLOR.r;
+}
+
+// Pulls a bake toward its own mean until brightest/dimmest channel is within max_chroma_ratio (0 = off); DotMapSurfaces.limit_chroma is the CPU twin.
+vec3 limit_chroma(vec3 c) {
+	float g = (c.r + c.g + c.b) / 3.0;
+	float hi = max(c.r, max(c.g, c.b));
+	float lo = min(c.r, min(c.g, c.b));
+	float denom = hi + (max_chroma_ratio - 1.0) * g - max_chroma_ratio * lo;
+	if (g > 0.0 && denom > 0.0) {
+		c = vec3(g) + (c - vec3(g)) * min(1.0, (max_chroma_ratio - 1.0) * g / denom);
+	}
+	return c;
 }
 
 // A tangent normal from red and green alone: an imported normal map is two-channel (RGTC), and so is a raw one once slimmed.
@@ -61,7 +74,11 @@ void fragment() {
 				+ texture(albedo2_tex, wpos.xy / metres).rgb * w.z) * tint;
 		s = mix(s, s2, smoothstep(0.25, 0.75, blend_w));
 	}
-	vec3 light = emissive > 0.0 ? vec3(emissive) : max(texture(lightmap, UV2).rgb * exposure, floor_light);
+	vec3 baked = texture(lightmap, UV2).rgb * exposure;
+	if (max_chroma_ratio > 0.0) {
+		baked = limit_chroma(baked);
+	}
+	vec3 light = emissive > 0.0 ? vec3(emissive) : max(baked, floor_light);
 	// A low sun bakes far above 1 (red 3.7 on the Atix street) and the filmic curve clips that to flat yellow: the overshoot
 	// rolls off toward 1.5 and bleaches toward grey, as film does. At or below 1 nothing changes, so ordinary bakes are untouched.
 	float peak = max(light.r, max(light.g, light.b));

@@ -307,16 +307,20 @@ func light_floor() -> Color:
 const MAX_TINT_RATIO := 2.5
 
 
-## Pulls [param c] toward its own grey until its channels are within [constant MAX_TINT_RATIO]; the author's warm or cool cast stays, a saturated one does not.
+## Pulls [param c] toward its own grey until its channels are within [constant MAX_TINT_RATIO] (and [member lightmap_max_chroma_ratio] when set); the author's warm or cool cast stays, a saturated one does not.
 static func _limit_tint(c: Vector3) -> Color:
-	var g := (c.x + c.y + c.z) / 3.0
-	var hi := maxf(c.x, maxf(c.y, c.z))
-	var lo := minf(c.x, minf(c.y, c.z))
-	var denom := hi + (MAX_TINT_RATIO - 1.0) * g - MAX_TINT_RATIO * lo
-	if g > 0.0 and denom > 0.0:
-		var k := minf(1.0, (MAX_TINT_RATIO - 1.0) * g / denom)
-		c = Vector3(g, g, g) + (c - Vector3(g, g, g)) * k
+	c = DotMapSurfaces.limit_chroma(c, MAX_TINT_RATIO)
+	c = DotMapSurfaces.limit_chroma(c, lightmap_max_chroma_ratio)
 	return Color(c.x, c.y, c.z)
+
+
+## Strongest ratio of brightest to dimmest channel the lightmap, its floor light and an actor's ambient keep; 0 (default) leaves the author's colour balance alone. A game sets it before the world's materials are built.
+static var lightmap_max_chroma_ratio: float = 0.0
+
+
+## Sets [member lightmap_max_chroma_ratio] for a caller that reaches this script by path.
+static func set_lightmap_max_chroma_ratio(value: float) -> void:
+	lightmap_max_chroma_ratio = maxf(value, 0.0)
 
 
 ## The default [member visibility_floor].

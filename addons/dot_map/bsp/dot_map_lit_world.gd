@@ -38,6 +38,18 @@ static func attach(parent: Node, world: DotMapBspMesh, environment: Environment,
 	return node
 
 
+## An actor's ambient [param c] after the visibility floor and, when set, [member DotMapBspMesh.lightmap_max_chroma_ratio].
+static func lifted(c: Color) -> Color:
+	var floor_lum := DotMapBspMesh.visibility_floor
+	var lum := c.get_luminance()
+	if floor_lum > 0.0 and lum < floor_lum:
+		c = c * (floor_lum / lum) if lum > 0.0 else Color(floor_lum, floor_lum, floor_lum)
+	if DotMapBspMesh.lightmap_max_chroma_ratio > 0.0:
+		var v := DotMapSurfaces.limit_chroma(Vector3(c.r, c.g, c.b), DotMapBspMesh.lightmap_max_chroma_ratio)
+		c = Color(v.x, v.y, v.z)
+	return c
+
+
 func _process(delta: float) -> void:
 	if sun != null and is_instance_valid(sun) and sun.light_energy < min_sun_energy:
 		sun.light_energy = min_sun_energy
@@ -52,10 +64,7 @@ func _process(delta: float) -> void:
 	if frame != null and frame.is_inside_tree():
 		at = frame.global_transform.affine_inverse() * at
 	var c := world.ambient_at(at, Vector3.UP)
-	var floor_lum := DotMapBspMesh.visibility_floor
-	if floor_lum > 0.0 and c.get_luminance() < floor_lum:
-		var lum := c.get_luminance()
-		c = c * (floor_lum / lum) if lum > 0.0 else Color(floor_lum, floor_lum, floor_lum)
+	c = lifted(c)
 	if c.get_luminance() <= 0.0:
 		return
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR

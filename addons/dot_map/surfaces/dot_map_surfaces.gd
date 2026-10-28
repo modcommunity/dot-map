@@ -668,9 +668,22 @@ func _lightmapped(world: DotMapBspMesh, rec: Dictionary, free: String, tint: Col
 	m.set_shader_parameter("exposure", world.lightmap_scale())
 	var fl := world.light_floor()
 	m.set_shader_parameter("floor_light", Vector3(fl.r, fl.g, fl.b))
+	m.set_shader_parameter("max_chroma_ratio", DotMapBspMesh.lightmap_max_chroma_ratio)
 	if rec.get("emissive", false):
 		m.set_shader_parameter("emissive", emissive_energy)
 	return m
+
+
+## Pulls [param c] toward its own mean until its brightest and dimmest channels are within [param ratio] (0 or less: unchanged); the mean, so the luminance, is kept. The shader's twin, and the floor light's and an actor's ambient's one helper.
+static func limit_chroma(c: Vector3, ratio: float) -> Vector3:
+	if ratio <= 0.0:
+		return c
+	var g := (c.x + c.y + c.z) / 3.0
+	var denom := maxf(c.x, maxf(c.y, c.z)) + (ratio - 1.0) * g - ratio * minf(c.x, minf(c.y, c.z))
+	if g <= 0.0 or denom <= 0.0:
+		return c
+	var k := minf(1.0, (ratio - 1.0) * g / denom)
+	return Vector3(g, g, g) + (c - Vector3(g, g, g)) * k
 
 
 ## CPU twin of the roll-off in lightmapped.gdshader (a baked value above 1 eases toward 1.5 and bleaches); the demo pins both.

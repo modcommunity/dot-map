@@ -15,8 +15,8 @@ extends Node3D
 ## map that is inside out, or a texture twice the size it should be, so the frames have to be
 ## looked at.
 
-const CHECKS := 122
-const SECTIONS := 6
+const CHECKS := 134
+const SECTIONS := 7
 
 const COLUMNS := 5
 const CUBE := 3.0
@@ -43,6 +43,7 @@ func _run() -> void:
 	_test_paths()
 	_test_liquids()
 	_test_light_rolloff()
+	_test_chroma_limit()
 	_build_gallery()
 
 	var prefix := ""
@@ -192,6 +193,39 @@ func _test_light_rolloff() -> void:
 	var code := DotMapSurfaces.LIGHTMAPPED.code
 	_check(code.contains("if (peak > 1.0)") and code.contains("1.0 + 0.5 * (1.0 - exp(-(peak - 1.0) / 0.5))"), "the shader holds the same constants")
 	_check(code.contains("clamp((peak - 1.0) / 3.0, 0.0, 0.6)"), "the shader bleaches by the same rule")
+	_done()
+
+
+func _test_chroma_limit() -> void:
+	_section("the optional chroma limit is off by default and pulls a blue bake toward grey")
+	var blue := Vector3(0.19, 0.21, 0.88)
+	var ratio := func(v: Vector3) -> float: return maxf(v.x, maxf(v.y, v.z)) / minf(v.x, minf(v.y, v.z))
+	_check(DotMapBspMesh.lightmap_max_chroma_ratio == 0.0, "the setting defaults to off")
+	var same := true
+	for v: Vector3 in [Vector3.ZERO, blue, Vector3(3.7, 2.0, 0.5), Vector3(1, 0, 0)]:
+		same = same and DotMapSurfaces.limit_chroma(v, 0.0) == v
+	_check(same, "ratio 0 returns every sample unchanged")
+	var out := DotMapSurfaces.limit_chroma(blue, 1.6)
+	_check(ratio.call(out) <= 1.6001, "a blue sample is limited to 1.6 (%.3f)" % ratio.call(out))
+	_check(is_equal_approx(out.x + out.y + out.z, blue.x + blue.y + blue.z), "the mean, so the luminance, is kept")
+	_check(out.z > out.x, "the hue is kept, only weaker")
+	var mild := Vector3(0.5, 0.55, 0.6)
+	_check(DotMapSurfaces.limit_chroma(mild, 1.6) == mild, "a sample already within the ratio is untouched")
+	_check(ratio.call(DotMapSurfaces.limit_chroma(Vector3(0.0, 0.2, 0.9), 1.6)) <= 1.6001, "a zero channel is limited too")
+	_check(DotMapSurfaces.limit_chroma(Vector3.ZERO, 1.6) == Vector3.ZERO, "black stays black")
+	var code := DotMapSurfaces.LIGHTMAPPED.code
+	_check(code.contains("uniform float max_chroma_ratio = 0.0;") and code.contains("if (max_chroma_ratio > 0.0)"), "the shader limit is a uniform that defaults off")
+	_check(code.contains("(max_chroma_ratio - 1.0) * g / denom"), "the shader uses the same rule")
+	var was := DotMapBspMesh.lightmap_max_chroma_ratio
+	var floor_off := DotMapBspMesh._limit_tint(blue)
+	DotMapBspMesh.set_lightmap_max_chroma_ratio(1.6)
+	var floor_on := DotMapBspMesh._limit_tint(blue)
+	var amb_on := DotMapLitWorld.lifted(Color(blue.x, blue.y, blue.z))
+	DotMapBspMesh.set_lightmap_max_chroma_ratio(0.0)
+	var amb_off := DotMapLitWorld.lifted(Color(blue.x, blue.y, blue.z))
+	DotMapBspMesh.set_lightmap_max_chroma_ratio(was)
+	_check(ratio.call(Vector3(floor_off.r, floor_off.g, floor_off.b)) <= 2.5001 and floor_on.b / floor_on.r <= 1.6001, "the floor light honours it (2.5 off, 1.6 on)")
+	_check(amb_on.b / amb_on.r <= 1.6001 and amb_off.b / amb_off.r > 2.5, "an actor's ambient honours it and is untouched when off")
 	_done()
 
 
