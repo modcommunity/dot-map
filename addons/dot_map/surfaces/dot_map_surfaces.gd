@@ -248,6 +248,27 @@ func material(kind: StringName, tint: Color = Color.WHITE) -> StandardMaterial3D
 ## textures: a surface's `free` key names a surface kind, or a generated flat colour the pack carries as a file
 ## beside [param dir] (the pack's directory).
 func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
+	var sets := _resolve_sets(world, dir)
+	var generated: Dictionary = sets["generated"]
+	var library: Dictionary = sets["library"]
+	var stand_in: Dictionary = sets["stand_in"]
+	var missing: Array = sets["missing"]
+	for key: String in missing:
+		if not missing_sets.has(key):
+			missing_sets.append(key)
+	if not stand_in.is_empty():
+		DotLog.debug(CHANNEL, "PBR sets not installed; each is drawn as a stand-in kind in its faces' own colour", {"sets": stand_in.size()})
+	_prefetch(world, generated, library)
+	return _material_callable(world, generated, library, stand_in)
+
+
+## Reads the map's textures ahead of [method world_material_for] without holding the main thread: decoded in batches on workers, a frame yielded whenever [param slice_ms] has passed, so dot-cloud's fetch callbacks and the loading cover keep running. The later [method world_material_for] finds them cached. Inline (no yield) when there are no workers.
+func prefetch(world: DotMapBspMesh, dir: String, slice_ms: int = 8) -> void:
+	var sets := _resolve_sets(world, dir)
+	await _prefetch_async(world, sets["generated"], sets["library"], slice_ms)
+
+
+func _resolve_sets(world: DotMapBspMesh, dir: String) -> Dictionary:
 	var generated := {}
 	var library := {}
 	var store := str(world.licence().get("pbr_store", ""))
@@ -257,15 +278,16 @@ func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 		elif str(t["kind"]) == "pbr":
 			library[str(t["key"])] = _pbr_dir(dir, store, t)
 	var stand_in := {}
+	var missing := []
 	for key: String in library.keys():
 		if not _has_set(library[key]):
 			stand_in[key] = _pack_fallback(dir, key, world.licence())
 			library.erase(key)
-			if not missing_sets.has(key):
-				missing_sets.append(key)
-	if not stand_in.is_empty():
-		DotLog.debug(CHANNEL, "PBR sets not installed; each is drawn as a stand-in kind in its faces' own colour", {"sets": stand_in.size()})
-	_prefetch(world, generated, library)
+			missing.append(key)
+	return {"generated": generated, "library": library, "stand_in": stand_in, "missing": missing}
+
+
+func _material_callable(world: DotMapBspMesh, generated: Dictionary, library: Dictionary, stand_in: Dictionary) -> Callable:
 	var cache := {}
 	return func(rec: Dictionary) -> Material:
 		if rec.get("water", false):
@@ -307,10 +329,8 @@ func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 		return m
 
 
-## Reads the texture files the world's surfaces use before the serial material pass: disk files decoded on workers, imported ones through [ResourceLoader]'s own threads. Nothing happens inline.
-func _prefetch(world: DotMapBspMesh, generated: Dictionary, library: Dictionary) -> void:
-	if DotParallel.resolve_workers(load_threads) == 0:
-		return
+## Splits the files the world's surfaces use into those still to decode from disk and the imported ones (already requested); a pre-baked file is taken here.
+func _prefetch_plan(world: DotMapBspMesh, generated: Dictionary, library: Dictionary) -> Dictionary:
 	var used := {}
 	for rec: Dictionary in world.surfaces:
 		used[str(rec.get("free", ""))] = true
@@ -327,20 +347,66 @@ func _prefetch(world: DotMapBspMesh, generated: Dictionary, library: Dictionary)
 					files.append(found)
 	var disk := PackedStringArray()
 	var imported := PackedStringArray()
+	var baked := 0
 	for p in files:
 		if _textures.has(p):
 			continue
 		if p.begins_with("res://") and ResourceLoader.exists(p):
 			imported.append(p)
 			ResourceLoader.load_threaded_request(p)
+			continue
+		var b := _baked_texture(p)
+		if b != null:
+			_textures[p] = b
+			baked += 1
 		else:
 			disk.append(p)
+	return {"disk": disk, "imported": imported, "baked": baked}
+
+
+func _prefetch(world: DotMapBspMesh, generated: Dictionary, library: Dictionary) -> void:
+	if DotParallel.resolve_workers(load_threads) == 0:
+		return
+	var plan := _prefetch_plan(world, generated, library)
 	var started := Time.get_ticks_msec()
-	_textures.merge(DotMapParallelBuild.textures(disk, load_threads, max_texture_size, half_res_masks))
-	var decode_ms := Time.get_ticks_msec() - started
-	for p in imported:
+	_textures.merge(DotMapParallelBuild.textures(plan["disk"], load_threads, max_texture_size, half_res_masks))
+	_prefetch_done(plan, Time.get_ticks_msec() - started)
+
+
+func _prefetch_async(world: DotMapBspMesh, generated: Dictionary, library: Dictionary, slice_ms: int) -> void:
+	if DotParallel.resolve_workers(load_threads) == 0:
+		return
+	var plan := _prefetch_plan(world, generated, library)
+	var started := Time.get_ticks_msec()
+	_textures.merge(await DotMapParallelBuild.textures_async(plan["disk"], load_threads, max_texture_size, half_res_masks, slice_ms))
+	_prefetch_done(plan, Time.get_ticks_msec() - started)
+
+
+func _prefetch_done(plan: Dictionary, decode_ms: int) -> void:
+	for p: String in plan["imported"]:
 		_textures[p] = ResourceLoader.load_threaded_get(p) as Texture2D
-	DotLog.info(CHANNEL, "texture prefetch", {"disk": disk.size(), "decode_ms": decode_ms, "imported": imported.size(), "formats": texture_report(_textures), "static_mb": OS.get_static_memory_usage() / 1048576})
+	DotLog.info(CHANNEL, "texture prefetch", {"disk": plan["disk"].size(), "baked": plan["baked"], "decode_ms": decode_ms, "imported": plan["imported"].size(), "formats": texture_report(_textures), "static_mb": OS.get_static_memory_usage() / 1048576})
+
+
+## The suffix of the pre-baked texture this build loads (`tools/bake_textures.gd`), "" when it has no VRAM format to read.
+static func baked_variant() -> String:
+	if OS.get_environment("NOCOMP") != "":
+		return ""
+	return "s3tc" if OS.has_feature("s3tc") else ("etc2" if OS.has_feature("etc2") else "")
+
+
+## The pre-baked `<name>.<variant>.res` beside [param path] (already capped, mip-mapped and compressed, so no decode), or null when there is none, it is larger than [member max_texture_size] or [member half_res_masks] wants another size.
+func _baked_texture(path: String) -> Texture2D:
+	var variant := baked_variant()
+	if variant.is_empty() or half_res_masks:
+		return null
+	var baked := "%s.%s.res" % [path.get_basename(), variant]
+	if not FileAccess.file_exists(baked):
+		return null
+	var tex := ResourceLoader.load(baked, "ImageTexture") as Texture2D
+	if tex == null or (max_texture_size > 0 and maxi(tex.get_width(), tex.get_height()) > max_texture_size):
+		return null
+	return tex
 
 
 ## Texture count and megabytes per image format, for the memory log.
@@ -511,6 +577,10 @@ func _file_texture(path: String) -> Texture2D:
 		var imported := load(path) as Texture2D
 		_textures[path] = imported
 		return imported
+	var baked := _baked_texture(path)
+	if baked != null:
+		_textures[path] = baked
+		return baked
 	var img := Image.load_from_file(path)
 	if img == null:
 		return null
@@ -521,7 +591,7 @@ func _file_texture(path: String) -> Texture2D:
 
 
 ## Slims, caps, mip-maps and VRAM-compresses a decoded file image: a raw 1k RGB map is 4 MB with mips, the compressed one 0.7 MB. Safe on a worker.
-static func prepare_image(img: Image, path: String, max_size: int, half_masks: bool = false) -> void:
+static func prepare_image(img: Image, path: String, max_size: int, half_masks: bool = false, mode_override: int = -1) -> void:
 	if img.is_compressed():
 		return
 	slim_image(img, path)
@@ -530,8 +600,8 @@ static func prepare_image(img: Image, path: String, max_size: int, half_masks: b
 	while max_size > 0 and maxi(img.get_width(), img.get_height()) > max_size:
 		img.resize(maxi(1, img.get_width() / 2), maxi(1, img.get_height() / 2), Image.INTERPOLATE_LANCZOS)
 	img.generate_mipmaps()
-	var mode := Image.COMPRESS_S3TC if OS.has_feature("s3tc") else (Image.COMPRESS_ETC2 if OS.has_feature("etc2") else -1)
-	if mode < 0 or OS.get_environment("NOCOMP") != "" or img.get_width() < 4 or img.get_height() < 4:
+	var mode := mode_override if mode_override >= 0 else (Image.COMPRESS_S3TC if OS.has_feature("s3tc") else (Image.COMPRESS_ETC2 if OS.has_feature("etc2") else -1))
+	if mode < 0 or (mode_override < 0 and OS.get_environment("NOCOMP") != "") or img.get_width() < 4 or img.get_height() < 4:
 		return
 	var channels := Image.USED_CHANNELS_RGBA
 	match img.get_format():

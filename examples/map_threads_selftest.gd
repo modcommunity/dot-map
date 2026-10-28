@@ -6,8 +6,8 @@ extends Node
 ## godot --headless --path . res://examples/map_threads_selftest.tscn
 ## [/codeblock]
 
-const CHECKS := 28
-const SECTIONS := 4
+const CHECKS := 40
+const SECTIONS := 6
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const COPIES := 40
 
@@ -16,6 +16,7 @@ var _failed := 0
 var _failures := PackedStringArray()
 var _entered := 0
 var _completed := 0
+var _frames := 0
 
 
 func _ready() -> void:
@@ -26,6 +27,8 @@ func _ready() -> void:
 	_test_meshes(world)
 	_test_shapes(world)
 	_test_textures()
+	_test_bake()
+	await _test_async()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -35,6 +38,10 @@ func _ready() -> void:
 	if bad:
 		print("ERROR: %d checks in %d sections ran, %d in %d expected." % [_passed + _failed, _completed, CHECKS, SECTIONS])
 	get_tree().quit(1 if bad or _failed > 0 else 0)
+
+
+func _process(_delta: float) -> void:
+	_frames += 1
 
 
 func _check(ok: bool, what: String) -> void:
@@ -167,9 +174,100 @@ func _test_textures() -> void:
 	for p in parts:
 		formats.append((slim[p] as Texture2D).get_image().get_format())
 		DirAccess.remove_absolute(p)
-	_check(formats == [Image.FORMAT_RGB8, Image.FORMAT_RG8, Image.FORMAT_R8, Image.FORMAT_R8], "a set keeps only the channels it samples: albedo RGB, normal RG, roughness and AO R (%s)" % str(formats))
+	var want_formats := [Image.FORMAT_RGB8, Image.FORMAT_RG8, Image.FORMAT_R8, Image.FORMAT_R8]
+	if DotMapSurfaces.baked_variant() == "s3tc":
+		want_formats = [Image.FORMAT_DXT1, Image.FORMAT_RGTC_RG, Image.FORMAT_RGTC_R, Image.FORMAT_RGTC_R]
+	_check(formats == want_formats, "a set keeps only the channels it samples: albedo RGB, normal RG, roughness and AO R (%s)" % str(formats))
 	var widths := []
 	for p in parts:
 		widths.append([(slim[p] as Texture2D).get_width(), (half[p] as Texture2D).get_width()])
 	_check(widths == [[32, 32], [32, 32], [32, 16], [32, 16]], "half_res_masks halves roughness and AO only, and is off by default (%s)" % str(widths))
 	_completed += 1
+
+
+func _noise_webp(path: String, size: int, seed_value: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	var img := Image.create(size, size, false, Image.FORMAT_RGB8)
+	for y in size:
+		for x in size:
+			img.set_pixel(x, y, Color(rng.randf(), rng.randf(), rng.randf()))
+	img.save_webp(path, true)
+
+
+## The pre-baked files equal what the runtime builds, are capped, and are read from beside the source.
+func _test_bake() -> void:
+	_entered += 1
+	var store := "user://bake_store"
+	var out := "user://bake_out"
+	DirAccess.make_dir_recursive_absolute(store + "/set_a/1k")
+	var parts := ["albedo", "normal", "roughness", "ao"]
+	for i in 4:
+		_noise_webp("%s/set_a/1k/%s.webp" % [store, parts[i]], 256 if i == 0 else 64, i + 1)
+	var stats := DotMapTextureBake.bake_store(store, out, 128)
+	_check(stats["baked"] == 4 and stats["failed"] == 0, "four files baked into a scratch directory (%s)" % str(stats))
+	var again := DotMapTextureBake.bake_store(store, out, 128)
+	_check(again["skipped"] == 4 and again["baked"] == 0, "a second bake skips what is current (%s)" % str(again))
+	var both := FileAccess.file_exists(out + "/set_a/1k/albedo.s3tc.res") and FileAccess.file_exists(out + "/set_a/1k/albedo.etc2.res")
+	_check(both and not FileAccess.file_exists(store + "/set_a/1k/albedo.s3tc.res"), "both variants written under --out, none beside the source")
+	var tex := ResourceLoader.load(out + "/set_a/1k/albedo.s3tc.res") as Texture2D
+	_check(tex != null and tex.get_width() == 128, "the 256 px albedo is capped to 128 (%s)" % str(tex.get_width() if tex != null else -1))
+	var want := Image.load_from_file(store + "/set_a/1k/normal.webp")
+	DotMapSurfaces.prepare_image(want, "normal.webp", 128, false, Image.COMPRESS_S3TC)
+	var got := (ResourceLoader.load(out + "/set_a/1k/normal.s3tc.res") as Texture2D).get_image()
+	_check(got.is_compressed() and got.get_mipmap_count() == want.get_mipmap_count() and got.get_format() == want.get_format() and got.get_data() == want.get_data(), "a baked normal map is the runtime's own compressed, mip-mapped RG image (format %d)" % got.get_format())
+	DotMapTextureBake.bake_store(store, "", 128)
+	var surfaces := DotMapSurfaces.new()
+	var p := store + "/set_a/1k/albedo.webp"
+	if DotMapSurfaces.baked_variant().is_empty():
+		_check(true, "no VRAM format on this build: the runtime keeps decoding")
+		_check(true, "-")
+		_check(true, "-")
+	else:
+		var baked := surfaces._baked_texture(p)
+		_check(baked != null and baked.get_width() == 128, "the runtime takes the baked file beside the source")
+		surfaces.max_texture_size = 64
+		_check(surfaces._baked_texture(p) == null, "a baked file larger than max_texture_size is refused")
+		surfaces.max_texture_size = 2048
+		surfaces.half_res_masks = true
+		_check(surfaces._baked_texture(p) == null, "half_res_masks decodes instead")
+	surfaces.half_res_masks = false
+	var file_tex := surfaces._file_texture(store + "/set_a/1k/roughness.webp")
+	_check(file_tex != null and file_tex.get_width() == 64, "_file_texture returns the texture either way")
+	for dir in [store, out]:
+		_remove_tree(dir)
+	_completed += 1
+
+
+## Frames advance while textures are decoded in slices, and the result equals the blocking call.
+func _test_async() -> void:
+	_entered += 1
+	var paths := PackedStringArray()
+	for i in 48:
+		var path := "user://map_async_%d.png" % i
+		var img := Image.create(256, 256, false, Image.FORMAT_RGB8)
+		img.fill(Color(i / 48.0, 0.4, 0.8))
+		img.save_png(path)
+		paths.append(path)
+	var base := DotMapParallelBuild.textures(paths, 2)
+	var before := _frames
+	var got: Dictionary = await DotMapParallelBuild.textures_async(paths, 2, 0, false, 0)
+	_check(_frames - before >= 3, "the main loop ran %d frames during the prefetch" % (_frames - before))
+	var same := got.size() == base.size()
+	for p: String in base:
+		same = same and got.has(p) and (base[p] as Texture2D).get_image().get_data() == (got[p] as Texture2D).get_image().get_data()
+	_check(same, "the sliced prefetch decodes the same pixels as the blocking one")
+	before = _frames
+	await DotMapParallelBuild.textures_async(paths, 2, 0, false, 100000)
+	_check(_frames == before, "a long slice does not yield")
+	for p in paths:
+		DirAccess.remove_absolute(p)
+	_completed += 1
+
+
+func _remove_tree(dir: String) -> void:
+	for sub in DirAccess.get_directories_at(dir):
+		_remove_tree(dir.path_join(sub))
+	for f in DirAccess.get_files_at(dir):
+		DirAccess.remove_absolute(dir.path_join(f))
+	DirAccess.remove_absolute(dir)

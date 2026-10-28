@@ -61,6 +61,28 @@ static func textures(paths: PackedStringArray, workers: int, max_size: int = 0, 
 	return out
 
 
+## [method textures] that yields a frame whenever [param slice_ms] has passed since the last one, so the main loop (dot-cloud's fetch callbacks, the loading cover) runs between batches. A coroutine: `await` it.
+static func textures_async(paths: PackedStringArray, workers: int, max_size: int = 0, half_masks: bool = false, slice_ms: int = 8) -> Dictionary:
+	var out := {}
+	var step := batch_size(workers)
+	var tree := Engine.get_main_loop() as SceneTree
+	var slice_from := Time.get_ticks_msec()
+	for from in range(0, paths.size(), step):
+		var n := mini(step, paths.size() - from)
+		var images := DotParallel.run(func(i: int) -> Variant:
+			var img := Image.load_from_file(paths[from + i])
+			if img != null:
+				DotMapSurfaces.prepare_image(img, paths[from + i], max_size, half_masks)
+			return img, n, &"map.textures", workers)
+		for i in n:
+			if images[i] != null:
+				out[paths[from + i]] = ImageTexture.create_from_image(images[i])
+		if tree != null and Time.get_ticks_msec() - slice_from >= slice_ms:
+			await tree.process_frame
+			slice_from = Time.get_ticks_msec()
+	return out
+
+
 ## The mean of the sky-facing (+y) ambient cube face over [param n] samples of 21 floats.
 static func sky_mean(ambient: PackedFloat32Array, n: int) -> Vector3:
 	var c := Vector3.ZERO
