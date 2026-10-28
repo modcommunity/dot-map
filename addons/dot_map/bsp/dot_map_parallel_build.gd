@@ -4,7 +4,6 @@ extends RefCounted
 ##
 ## Every task reads frozen data and returns arrays; scenes, meshes, shapes and textures are made on the calling thread, in index order, so the result is the same for any worker count.
 
-const CHANNEL := "dot_map.parallel"
 ## Entries per worker in flight at once: the arrays of a whole map are never held together.
 const PER_WORKER := 4
 

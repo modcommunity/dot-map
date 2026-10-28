@@ -26,8 +26,6 @@ extends RefCounted
 ## quarter_pipe), [code]thickness[/code] (arch, metres), [code]holes[/code] (slab_holes:
 ## [code][[x, z, width, depth], ...][/code] from the slab's centre, metres).
 
-const CHANNEL := "dot_map.brush"
-
 const META_KIND := &"dot_map_brush"
 
 const KINDS: PackedStringArray = [

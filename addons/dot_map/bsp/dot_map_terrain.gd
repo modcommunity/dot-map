@@ -7,7 +7,6 @@ extends RefCounted
 ## first hill; this surface is the same one the converter's flood walked. Every cell is split
 ## along its (i, j)-(i+1, j+1) diagonal here and in the converter; keep the two in step.
 
-const CHANNEL := "map.terrain"
 const FORMAT := 1
 ## The steepest terrain a walker climbs, rise per metre (dotbsp.terrain.WALK_RISE).
 const WALK_RISE := 1.0
