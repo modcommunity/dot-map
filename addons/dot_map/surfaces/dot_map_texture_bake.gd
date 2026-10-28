@@ -4,6 +4,9 @@ extends RefCounted
 ##
 ## `<name>.s3tc.res` (desktop) and `<name>.etc2.res` (web and phones) are [ImageTexture]s of the capped, slimmed, mip-mapped, VRAM-compressed image: loading one is a read and an upload (0.2 ms, against 11 to 14 ms to decode a 1k webp and 3 ms more to compress it). [DotMapSurfaces] reads them from beside the source file. Never bake on the target: the files are engine-version specific, like an import.
 
+## Metadata key holding the source size, md5, dimensions and the bake cap.
+const META := &"dot_bake"
+
 const VARIANTS := {"s3tc": Image.COMPRESS_S3TC, "etc2": Image.COMPRESS_ETC2}
 
 
@@ -20,7 +23,9 @@ static func bake_file(src: String, out_base: String, max_size: int) -> DotResult
 		var img := first.duplicate() as Image
 		DotMapSurfaces.prepare_image(img, src, max_size, false, VARIANTS[variant])
 		var out := "%s.%s.res" % [out_base, variant]
-		if ResourceSaver.save(ImageTexture.create_from_image(img), out) != OK:
+		var tex := ImageTexture.create_from_image(img)
+		tex.set_meta(META, {"size": _length(src), "md5": FileAccess.get_md5(src), "w": first.get_width(), "h": first.get_height(), "max": max_size})
+		if ResourceSaver.save(tex, out) != OK:
 			return DotResult.fail(DotError.CODE_IO, "cannot write %s" % out)
 		written.append(out)
 	return DotResult.success(written)
@@ -33,13 +38,54 @@ static func bake_store(store: String, out_dir: String = "", max_size: int = 2048
 	for f in _files(store):
 		var rel := f.trim_prefix(store).trim_prefix("/")
 		var base := (out_dir.path_join(rel) if not out_dir.is_empty() else f).get_basename()
-		if FileAccess.file_exists(base + ".s3tc.res") and FileAccess.file_exists(base + ".etc2.res") and FileAccess.get_modified_time(base + ".s3tc.res") >= FileAccess.get_modified_time(f):
+		if is_current(base, f, max_size):
 			stats["skipped"] += 1
 			continue
 		var res := bake_file(f, base, max_size)
 		stats["baked" if res.ok else "failed"] += 1
 	stats["ms"] = Time.get_ticks_msec() - started
 	return stats
+
+
+## True when every variant exists beside [param out_base] and was baked from the current bytes of [param src] at [param max_size].
+static func is_current(out_base: String, src: String, max_size: int) -> bool:
+	var md5 := ""
+	for variant: String in VARIANTS:
+		var p := "%s.%s.res" % [out_base, variant]
+		if not FileAccess.file_exists(p):
+			return false
+		var tex := ResourceLoader.load(p, "ImageTexture", ResourceLoader.CACHE_MODE_IGNORE) as Texture2D
+		var meta: Dictionary = tex.get_meta(META, {}) if tex != null else {}
+		if meta.is_empty() or int(meta["max"]) != max_size or int(meta["size"]) != _length(src):
+			return false
+		if md5.is_empty():
+			md5 = FileAccess.get_md5(src)
+		if meta["md5"] != md5:
+			return false
+	return true
+
+
+## True when [param tex] (a baked file) is the right one for [param src] under [param cap] (0: none): baked from a file of this size, and neither smaller than the cap asks for nor larger. No source beside it means the bake is all there is.
+static func fits(tex: Texture2D, src: String, cap: int) -> bool:
+	var meta: Dictionary = tex.get_meta(META, {})
+	if meta.is_empty():
+		return false
+	if not FileAccess.file_exists(src):
+		return true
+	if int(meta["size"]) != _length(src):
+		return false
+	var w := int(meta["w"])
+	var h := int(meta["h"])
+	while cap > 0 and maxi(w, h) > cap:
+		w = maxi(1, w / 2)
+		h = maxi(1, h / 2)
+	var want := maxi(w, h)
+	return maxi(tex.get_width(), tex.get_height()) == want
+
+
+static func _length(path: String) -> int:
+	var f := FileAccess.open(path, FileAccess.READ)
+	return f.get_length() if f != null else -1
 
 
 static func _files(dir: String) -> PackedStringArray:

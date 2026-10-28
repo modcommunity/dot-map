@@ -395,7 +395,7 @@ static func baked_variant() -> String:
 	return "s3tc" if OS.has_feature("s3tc") else ("etc2" if OS.has_feature("etc2") else "")
 
 
-## The pre-baked `<name>.<variant>.res` beside [param path] (already capped, mip-mapped and compressed, so no decode), or null when there is none, it is larger than [member max_texture_size] or [member half_res_masks] wants another size.
+## The pre-baked `<name>.<variant>.res` beside [param path] (already capped, mip-mapped and compressed, so no decode), or null when there is none, it is unreadable, predates the bake metadata, was baked from another file, or is not the size [member max_texture_size] and [member half_res_masks] want.
 func _baked_texture(path: String) -> Texture2D:
 	var variant := baked_variant()
 	if variant.is_empty() or half_res_masks:
@@ -404,7 +404,7 @@ func _baked_texture(path: String) -> Texture2D:
 	if not FileAccess.file_exists(baked):
 		return null
 	var tex := ResourceLoader.load(baked, "ImageTexture") as Texture2D
-	if tex == null or (max_texture_size > 0 and maxi(tex.get_width(), tex.get_height()) > max_texture_size):
+	if tex == null or not DotMapTextureBake.fits(tex, path, max_texture_size):
 		return null
 	return tex
 
@@ -592,16 +592,27 @@ func _file_texture(path: String) -> Texture2D:
 
 ## Slims, caps, mip-maps and VRAM-compresses a decoded file image: a raw 1k RGB map is 4 MB with mips, the compressed one 0.7 MB. Safe on a worker.
 static func prepare_image(img: Image, path: String, max_size: int, half_masks: bool = false, mode_override: int = -1) -> void:
+	if shrink_image(img, path, max_size, half_masks):
+		compress_image(img, mode_override)
+
+
+## The part of [method prepare_image] that is safe on a pool worker: channels, size and mipmaps. False when [param img] is already compressed. Compression is separate because it runs its own pool group, and a group waited on from inside a pool task deadlocks.
+static func shrink_image(img: Image, path: String, max_size: int, half_masks: bool = false) -> bool:
 	if img.is_compressed():
-		return
+		return false
 	slim_image(img, path)
 	if half_masks and path.get_file().get_basename() in ["roughness", "ao"] and mini(img.get_width(), img.get_height()) >= 8:
 		img.resize(img.get_width() / 2, img.get_height() / 2, Image.INTERPOLATE_LANCZOS)
 	while max_size > 0 and maxi(img.get_width(), img.get_height()) > max_size:
 		img.resize(maxi(1, img.get_width() / 2), maxi(1, img.get_height() / 2), Image.INTERPOLATE_LANCZOS)
 	img.generate_mipmaps()
+	return true
+
+
+## VRAM-compresses a [method shrink_image]d image for the build's format ([param mode_override] picks one); call it from the main thread, never from a pool task.
+static func compress_image(img: Image, mode_override: int = -1) -> void:
 	var mode := mode_override if mode_override >= 0 else (Image.COMPRESS_S3TC if OS.has_feature("s3tc") else (Image.COMPRESS_ETC2 if OS.has_feature("etc2") else -1))
-	if mode < 0 or (mode_override < 0 and OS.get_environment("NOCOMP") != "") or img.get_width() < 4 or img.get_height() < 4:
+	if mode < 0 or (mode_override < 0 and OS.get_environment("NOCOMP") != "") or img.is_compressed() or img.get_width() < 4 or img.get_height() < 4:
 		return
 	var channels := Image.USED_CHANNELS_RGBA
 	match img.get_format():

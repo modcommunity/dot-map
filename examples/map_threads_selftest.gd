@@ -10,6 +10,8 @@ const CHECKS := 40
 const SECTIONS := 6
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const COPIES := 40
+## A section that has not finished by then is a hang: a blocked main thread cannot time itself out, so a thread watches.
+const SECTION_DEADLINE_MS := 90000
 
 var _passed := 0
 var _failed := 0
@@ -17,11 +19,16 @@ var _failures := PackedStringArray()
 var _entered := 0
 var _completed := 0
 var _frames := 0
+var _section := "start"
+var _section_since := Time.get_ticks_msec()
+var _watching := true
+var _watchdog := Thread.new()
 
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
 	print("dot-map threaded load")
+	_watchdog.start(_watch)
 	var world := _big_world()
 	_test_defaults(world)
 	_test_meshes(world)
@@ -29,6 +36,8 @@ func _ready() -> void:
 	_test_textures()
 	_test_bake()
 	await _test_async()
+	_watching = false
+	_watchdog.wait_to_finish()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -38,6 +47,22 @@ func _ready() -> void:
 	if bad:
 		print("ERROR: %d checks in %d sections ran, %d in %d expected." % [_passed + _failed, _completed, CHECKS, SECTIONS])
 	get_tree().quit(1 if bad or _failed > 0 else 0)
+
+
+func _watch() -> void:
+	while _watching:
+		OS.delay_msec(250)
+		var stuck := Time.get_ticks_msec() - _section_since
+		if _watching and stuck > SECTION_DEADLINE_MS:
+			print("HANG: section '%s' has run %d s without finishing, %d checks done; killing the run" % [_section, stuck / 1000, _passed + _failed])
+			OS.kill(OS.get_process_id())
+
+
+## Names the section now running and restarts its deadline.
+func _enter(section: String) -> void:
+	_entered += 1
+	_section = section
+	_section_since = Time.get_ticks_msec()
 
 
 func _process(_delta: float) -> void:
@@ -90,7 +115,7 @@ func _mesh_digest(world: DotMapBspMesh, workers: int) -> Dictionary:
 
 
 func _test_defaults(world: DotMapBspMesh) -> void:
-	_entered += 1
+	_enter("defaults")
 	_check(DotMapParallelBuild.default_workers == 0, "default is off")
 	_check(world.load_threads == 0, "a new world is inline")
 	_check(DotMapSurfaces.new().load_threads == 0, "new surfaces are inline")
@@ -103,7 +128,7 @@ func _test_defaults(world: DotMapBspMesh) -> void:
 
 
 func _test_meshes(world: DotMapBspMesh) -> void:
-	_entered += 1
+	_enter("meshes")
 	var base := _mesh_digest(world, 0)
 	_check(int(base["groups"]) >= 7 and int(base["verts"]) > 1000, "the synthetic world has %d groups, %d vertices" % [base["groups"], base["verts"]])
 	for workers in [1, 2, 4, -1]:
@@ -127,7 +152,7 @@ func _shape_digest(world: DotMapBspMesh, workers: int) -> Array:
 
 
 func _test_shapes(world: DotMapBspMesh) -> void:
-	_entered += 1
+	_enter("shapes")
 	var base := _shape_digest(world, 0)
 	_check(base[0] == 2 * COPIES and base[1] > 0, "%d hulls, %d concave shapes" % [base[0], base[1]])
 	for workers in [1, 2, 4, -1]:
@@ -138,7 +163,7 @@ func _test_shapes(world: DotMapBspMesh) -> void:
 
 
 func _test_textures() -> void:
-	_entered += 1
+	_enter("textures")
 	var paths := PackedStringArray()
 	for i in 11:
 		var img := Image.create(64 + 8 * i, 64, false, Image.FORMAT_RGB8)
@@ -197,7 +222,7 @@ func _noise_webp(path: String, size: int, seed_value: int) -> void:
 
 ## The pre-baked files equal what the runtime builds, are capped, and are read from beside the source.
 func _test_bake() -> void:
-	_entered += 1
+	_enter("bake")
 	var store := "user://bake_store"
 	var out := "user://bake_out"
 	DirAccess.make_dir_recursive_absolute(store + "/set_a/1k")
@@ -224,6 +249,7 @@ func _test_bake() -> void:
 		_check(true, "-")
 		_check(true, "-")
 	else:
+		surfaces.max_texture_size = 128
 		var baked := surfaces._baked_texture(p)
 		_check(baked != null and baked.get_width() == 128, "the runtime takes the baked file beside the source")
 		surfaces.max_texture_size = 64
@@ -241,7 +267,7 @@ func _test_bake() -> void:
 
 ## Frames advance while textures are decoded in slices, and the result equals the blocking call.
 func _test_async() -> void:
-	_entered += 1
+	_enter("async")
 	var paths := PackedStringArray()
 	for i in 48:
 		var path := "user://map_async_%d.png" % i
