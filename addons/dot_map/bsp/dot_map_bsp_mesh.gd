@@ -314,11 +314,13 @@ static func _limit_tint(c: Vector3) -> Color:
 	return Color(c.x, c.y, c.z)
 
 
-## Strongest ratio of brightest to dimmest channel the lightmap, its floor light and an actor's ambient keep; 0 (default) leaves the author's colour balance alone. A game sets it before the world's materials are built.
+## Strongest brightest/dimmest channel ratio the lightmap, floor light and actor ambient keep; 0 (default) = off.
+## Process-wide. The actor ambient and floor light read it live, but the world shader gets a copy only
+## when its materials are built, so set it before building the world.
 static var lightmap_max_chroma_ratio: float = 0.0
 
 
-## Sets [member lightmap_max_chroma_ratio] for a caller that reaches this script by path.
+## Sets [member lightmap_max_chroma_ratio] (process-wide; set before the world's materials are built) for a caller that reaches this script by path.
 static func set_lightmap_max_chroma_ratio(value: float) -> void:
 	lightmap_max_chroma_ratio = maxf(value, 0.0)
 
