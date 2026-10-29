@@ -28,6 +28,7 @@ func _ready() -> void:
 	var dir := str(args["world"]).get_base_dir()
 	var surfaces := DotMapSurfaces.new()
 	surfaces.use_lightmap = not args.has("nolight")
+	surfaces.half_res_masks = not args.has("fullmasks")
 	var mat_for := surfaces.world_material_for(world, dir)
 	var built := DotMapWorld.build(world, {"material_for": mat_for})
 	if not built.ok:

@@ -101,8 +101,8 @@ var _textures: Dictionary = {}
 var load_threads: int = DotMapParallelBuild.default_workers
 ## Longest side of a decoded texture file; larger ones are halved until they fit (0 keeps them). Store slices are imported, never touched.
 var max_texture_size: int = 2048
-## Roughness and AO maps keep half their size (a quarter of the memory) when true: they are smooth, and the sets carry hundreds of them. Off by default.
-var half_res_masks: bool = false
+## Roughness and AO maps keep half their size (a quarter of the memory) when true, decoded, imported or baked alike (the top mip is sliced off, nothing re-encoded). On by default: a frame diff on a manor map is at most 5 of 255.
+var half_res_masks: bool = true
 var use_lightmap: bool = true
 ## Folder of the shared PBR sets (`<id>/<tier>/*.webp`) when the game delivers them apart from the pack; empty reads the folder the manifest names, beside the pack.
 var pbr_library: String = ""
@@ -327,7 +327,7 @@ func _prefetch_plan(world: DotMapBspMesh, generated: Dictionary, library: Dictio
 			continue
 		var b := _baked_texture(p)
 		if b != null:
-			_textures[p] = b
+			_textures[p] = _masked(p, b)
 			baked += 1
 		else:
 			disk.append(p)
@@ -354,7 +354,7 @@ func _prefetch_async(world: DotMapBspMesh, generated: Dictionary, library: Dicti
 
 func _prefetch_done(plan: Dictionary, decode_ms: int) -> void:
 	for p: String in plan["imported"]:
-		_textures[p] = ResourceLoader.load_threaded_get(p) as Texture2D
+		_textures[p] = _masked(p, ResourceLoader.load_threaded_get(p) as Texture2D)
 	DotLog.info(CHANNEL, "texture prefetch", {"disk": plan["disk"].size(), "baked": plan["baked"], "decode_ms": decode_ms, "imported": plan["imported"].size(), "formats": texture_report(_textures), "static_mb": OS.get_static_memory_usage() / 1048576})
 
 
@@ -366,7 +366,7 @@ static func baked_variant() -> String:
 ## The pre-baked `<name>.<variant>.res` beside [param path] (already capped, mip-mapped and compressed, so no decode), or null when there is none, it is unreadable, predates the bake metadata, was baked from another file, or is not the size [member max_texture_size] and [member half_res_masks] want.
 func _baked_texture(path: String) -> Texture2D:
 	var variant := baked_variant()
-	if variant.is_empty() or half_res_masks:
+	if variant.is_empty():
 		return null
 	var baked := "%s.%s.res" % [path.get_basename(), variant]
 	if not FileAccess.file_exists(baked):
@@ -542,11 +542,12 @@ func _file_texture(path: String) -> Texture2D:
 		return _textures[path]
 	# A mounted store slice holds the engine's import (VRAM-compressed, mipmapped), never the source file.
 	if path.begins_with("res://") and ResourceLoader.exists(path):
-		var imported := load(path) as Texture2D
+		var imported := _masked(path, load(path) as Texture2D)
 		_textures[path] = imported
 		return imported
 	var baked := _baked_texture(path)
 	if baked != null:
+		baked = _masked(path, baked)
 		_textures[path] = baked
 		return baked
 	var img := Image.load_from_file(path)
@@ -556,6 +557,23 @@ func _file_texture(path: String) -> Texture2D:
 	var tex := ImageTexture.create_from_image(img)
 	_textures[path] = tex
 	return tex
+
+
+## [param tex] of a roughness or AO map without its top mip level when [member half_res_masks] is on: an imported or baked map is already compressed, so the next level of its own chain is cut out, with no decode or recompress.
+func _masked(path: String, tex: Texture2D) -> Texture2D:
+	if tex == null or not half_res_masks or not path.get_file().get_basename() in ["roughness", "ao"]:
+		return tex
+	return without_top_mip(tex)
+
+
+## [param tex] cut to the next level of its own mip chain (a quarter of the memory) as a new texture; [param tex] itself when it has no level to spare or is under 8 px.
+static func without_top_mip(tex: Texture2D) -> Texture2D:
+	var img := tex.get_image() if tex != null else null
+	if img == null or not img.has_mipmaps() or mini(img.get_width(), img.get_height()) < 8:
+		return tex
+	var half := Image.create_from_data(maxi(1, img.get_width() >> 1), maxi(1, img.get_height() >> 1), true, img.get_format(),
+			img.get_data().slice(img.get_mipmap_offset(1)))
+	return ImageTexture.create_from_image(half) if half != null else tex
 
 
 ## Slims, caps, mip-maps and VRAM-compresses a decoded file image: a raw 1k RGB map is 4 MB with mips, the compressed one 0.7 MB. Safe on a worker.
@@ -583,6 +601,8 @@ static func compress_image(img: Image, mode_override: int = -1) -> void:
 	if mode < 0 or (mode_override < 0 and OS.get_environment("NOCOMP") != "") or img.is_compressed() or img.get_width() < 4 or img.get_height() < 4:
 		return
 	var channels := Image.USED_CHANNELS_RGBA
+	if img.get_format() == Image.FORMAT_RGBA8 and img.detect_used_channels() == Image.USED_CHANNELS_RGB:
+		channels = Image.USED_CHANNELS_RGB    # an opaque alpha channel doubles the compressed size for nothing
 	match img.get_format():
 		Image.FORMAT_R8:
 			channels = Image.USED_CHANNELS_R

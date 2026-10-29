@@ -202,7 +202,7 @@ func _test_textures() -> void:
 	var widths := []
 	for p in parts:
 		widths.append([(slim[p] as Texture2D).get_width(), (half[p] as Texture2D).get_width()])
-	_check(widths == [[32, 32], [32, 32], [32, 16], [32, 16]], "half_res_masks halves roughness and AO only, and is off by default (%s)" % str(widths))
+	_check(widths == [[32, 32], [32, 32], [32, 16], [32, 16]], "half_res_masks halves roughness and AO only (%s)" % str(widths))
 	_completed += 1
 
 
@@ -252,8 +252,10 @@ func _test_bake() -> void:
 		_check(surfaces._baked_texture(p) == null, "a baked file larger than max_texture_size is refused")
 		surfaces.max_texture_size = 2048
 		surfaces.half_res_masks = true
-		_check(surfaces._baked_texture(p) == null, "half_res_masks decodes instead")
+		var rough_half := surfaces._file_texture(store + "/set_a/1k/roughness.webp")
+		_check(rough_half != null and rough_half.get_width() == 32, "half_res_masks halves a baked roughness map too (%s)" % (rough_half.get_width() if rough_half != null else -1))
 	surfaces.half_res_masks = false
+	surfaces._textures.clear()
 	var file_tex := surfaces._file_texture(store + "/set_a/1k/roughness.webp")
 	_check(file_tex != null and file_tex.get_width() == 64, "_file_texture returns the texture either way")
 	for dir in [store, out]:

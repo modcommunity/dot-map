@@ -2,7 +2,7 @@ extends Node3D
 
 ## [DotMapBspMesh]: the converter's fixture read, built, and ray-cast.
 
-const CHECKS := 138
+const CHECKS := 143
 const SECTIONS := 11
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
@@ -648,4 +648,18 @@ func _test_prepare_image() -> void:
 	_check(not tiny.is_compressed(), "an image under one block stays raw")
 	var t := ImageTexture.create_from_image(_filled(16, 16, Image.FORMAT_RGB8, ramp))
 	_check(DotMapSurfaces.texture_report({"a": t}).size() == 1, "texture_report counts a texture by format")
+	var opaque := _filled(64, 64, Image.FORMAT_RGBA8, func(x: int, _y: int) -> Color: return Color(0.2, 0.6, x / 63.0, 1.0))
+	DotMapSurfaces.prepare_image(opaque, "res://x/albedo.png", 2048)
+	_check(not s3tc or opaque.get_format() == Image.FORMAT_DXT1, "an RGBA image whose alpha is all opaque is DXT1, not DXT5: %s" % opaque.get_format())
+	var src := _filled(64, 32, Image.FORMAT_RGB8, ramp)
+	src.generate_mipmaps()
+	var half := DotMapSurfaces.without_top_mip(ImageTexture.create_from_image(src)).get_image()
+	_check(half.get_width() == 32 and half.get_height() == 16 and half.has_mipmaps(), "without_top_mip halves the size and keeps the rest of the chain: %sx%s" % [half.get_width(), half.get_height()])
+	_check(half.get_data() == src.get_data().slice(src.get_mipmap_offset(1)), "its bytes are the source's mip 1, nothing re-encoded")
+	var flat := ImageTexture.create_from_image(_filled(64, 32, Image.FORMAT_RGB8, ramp))
+	_check(DotMapSurfaces.without_top_mip(flat) == flat, "a texture without mips is returned unchanged")
+	var masks := DotMapSurfaces.new()
+	masks.half_res_masks = true
+	var mip_tex := ImageTexture.create_from_image(src)
+	_check(masks._masked("res://x/albedo.webp", mip_tex) == mip_tex and masks._masked("res://x/roughness.webp", mip_tex) != mip_tex, "only roughness and ao lose their top mip")
 	_done()
