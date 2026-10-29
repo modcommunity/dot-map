@@ -638,10 +638,36 @@ static func set_model_lod(min_tris: int, max_tris: int = 0) -> void:
 static var model_texture_max: int = -1
 
 
+## Whether [method slim_model_textures] halves a model's roughness, metallic and AO maps (the glTF ORM image); the diff against full size is in docs/surfaces.md.
+static var model_half_masks: bool = true
+
+## Whether [method slim_model_textures] halves a model's normal maps.
+static var model_half_normals: bool = true
+
+
+## Whether a material slot is cut to half size under the two options; albedo and emission never are.
+static func slot_halves(slot: int, masks: bool, normals: bool) -> bool:
+	return (masks and slot in [BaseMaterial3D.TEXTURE_ROUGHNESS, BaseMaterial3D.TEXTURE_METALLIC, BaseMaterial3D.TEXTURE_AMBIENT_OCCLUSION]) \
+			or (normals and slot == BaseMaterial3D.TEXTURE_NORMAL)
+
+
+## [param tex] at half size: a decoded image is resized before it is capped, mip-mapped and compressed; a compressed one loses its top mip, with no re-encode.
+static func half_model_texture(tex: ImageTexture, max_size: int) -> ImageTexture:
+	var img := tex.get_image()
+	if img.is_compressed():
+		return DotMapSurfaces.without_top_mip(tex) as ImageTexture
+	if mini(img.get_width(), img.get_height()) >= 8:
+		img.resize(img.get_width() / 2, img.get_height() / 2, Image.INTERPOLATE_LANCZOS)
+	DotMapSurfaces.prepare_image(img, "model.png", max_size)
+	return ImageTexture.create_from_image(img)
+
+
 ## Replaces every texture of the materials under [param root] with a capped, mip-mapped, compressed copy (once per texture, so a
-## texture two materials share stays shared) and frees the raw image; returns how many were replaced.
+## texture two materials share stays shared) and frees the raw image; returns how many were replaced. Roughness, metallic, AO and
+## normal maps are halved first under [member model_half_masks] and [member model_half_normals].
 static func slim_model_textures(root: Node, max_size: int) -> int:
 	var done := {}
+	var halved := {}
 	var meshes := {}
 	var changed := 0
 	for found in root.find_children("*", "MeshInstance3D", true, false):
@@ -658,15 +684,21 @@ static func slim_model_textures(root: Node, max_size: int) -> int:
 				var tex := m.get_texture(slot as BaseMaterial3D.TextureParam) as ImageTexture
 				if tex == null:
 					continue
-				if not done.has(tex):
+				var half := slot_halves(slot, model_half_masks, model_half_normals)
+				var seen := halved if half else done
+				if not seen.has(tex):
 					var img := tex.get_image()
-					if img == null or img.is_compressed():
-						done[tex] = tex
+					if img == null:
+						seen[tex] = tex
+					elif half:
+						seen[tex] = half_model_texture(tex, max_size)
+					elif img.is_compressed():
+						seen[tex] = tex
 					else:
 						DotMapSurfaces.prepare_image(img, "model.png", max_size)  # a part-less name: every channel stays
-						done[tex] = ImageTexture.create_from_image(img)
-				if done[tex] != tex:
-					m.set_texture(slot as BaseMaterial3D.TextureParam, done[tex])
+						seen[tex] = ImageTexture.create_from_image(img)
+				if seen[tex] != tex:
+					m.set_texture(slot as BaseMaterial3D.TextureParam, seen[tex])
 					changed += 1
 	return changed
 

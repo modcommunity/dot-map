@@ -25,6 +25,10 @@ func _ready() -> void:
 	print(world.describe_lines())
 	print("free: %s, props: %d, ambient sounds: %d" % [world.is_free(), world.manifest.get("props", []).size(),
 			world.sounds_data().get("ambient", []).size()])
+	if args.has("slimmodels"):
+		DotMapBspMesh.model_texture_max = 0    # compress the library models' textures, as a game that turns the cap on does
+	DotMapBspMesh.model_half_masks = not args.has("fullmodelmasks")
+	DotMapBspMesh.model_half_normals = not args.has("fullmodelnormals")
 	var dir := str(args["world"]).get_base_dir()
 	var surfaces := DotMapSurfaces.new()
 	surfaces.use_lightmap = not args.has("nolight")

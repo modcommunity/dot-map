@@ -2,7 +2,7 @@ extends Node
 
 ## [DotMapParallelBuild]: the threaded load stages give byte-identical output to the inline ones.
 
-const CHECKS := 42
+const CHECKS := 47
 const SECTIONS := 6
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const COPIES := 40
@@ -209,7 +209,53 @@ func _test_textures() -> void:
 		widths_n.append((half_n[p] as Texture2D).get_width())
 	_check(widths_n == [32, 16, 32, 32], "half_res_normals halves the normal map only (%s)" % str(widths_n))
 	_check(DotMapSurfaces.halves("normal", true, false) == false and DotMapSurfaces.halves("normal", false, true), "halves() reads each option for its own parts")
+	_test_model_halving()
 	_completed += 1
+
+
+
+## A library model's roughness, metallic, AO and normal maps are halved; albedo is not, and a shared ORM image stays shared.
+func _test_model_halving() -> void:
+	var raw := func(): return ImageTexture.create_from_image(Image.create(32, 32, false, Image.FORMAT_RGB8))
+	var packed: ImageTexture = raw.call()
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = raw.call()
+	mat.normal_enabled = true
+	mat.normal_texture = raw.call()
+	mat.roughness_texture = packed
+	mat.metallic_texture = packed
+	mat.ao_enabled = true
+	mat.ao_texture = packed
+	var mi := MeshInstance3D.new()
+	mi.mesh = QuadMesh.new()
+	mi.mesh.surface_set_material(0, mat)
+	var holder := Node3D.new()
+	holder.add_child(mi)
+	var kept := DotMapBspMesh.model_half_masks
+	var kept_n := DotMapBspMesh.model_half_normals
+	DotMapBspMesh.model_half_masks = true
+	DotMapBspMesh.model_half_normals = true
+	DotMapBspMesh.slim_model_textures(holder, 0)
+	var ws := [mat.albedo_texture.get_width(), mat.normal_texture.get_width(), mat.roughness_texture.get_width(), mat.ao_texture.get_width()]
+	_check(ws == [32, 16, 16, 16], "slim_model_textures halves normal, roughness and AO but not albedo (%s)" % str(ws))
+	_check(mat.roughness_texture == mat.ao_texture and mat.ao_texture == mat.metallic_texture, "a shared ORM image is still one texture after halving")
+	_check(DotMapBspMesh.slot_halves(BaseMaterial3D.TEXTURE_ALBEDO, true, true) == false and DotMapBspMesh.slot_halves(BaseMaterial3D.TEXTURE_EMISSION, true, true) == false,
+			"albedo and emission are never halved")
+	DotMapBspMesh.slim_model_textures(holder, 0)
+	_check(mat.normal_texture.get_width() == 8, "an already compressed map loses its top mip without a re-encode (%d)" % mat.normal_texture.get_width())
+	var second := StandardMaterial3D.new()
+	second.roughness_texture = raw.call()
+	second.normal_enabled = true
+	second.normal_texture = raw.call()
+	mi.mesh = QuadMesh.new()
+	mi.mesh.surface_set_material(0, second)
+	DotMapBspMesh.model_half_masks = false
+	DotMapBspMesh.model_half_normals = false
+	DotMapBspMesh.slim_model_textures(holder, 0)
+	_check(second.roughness_texture.get_width() == 32 and second.normal_texture.get_width() == 32, "both options off leave the maps at full size (%d, %d)" % [second.roughness_texture.get_width(), second.normal_texture.get_width()])
+	DotMapBspMesh.model_half_masks = kept
+	DotMapBspMesh.model_half_normals = kept_n
+	holder.free()
 
 
 func _noise_webp(path: String, size: int, seed_value: int) -> void:
