@@ -3,8 +3,4 @@
 addons/dot_map/bsp/dot_map_visibility.gd::_active_lights::alloc_array	2
 addons/dot_map/bsp/dot_map_visibility.gd::_active_lights::alloc_dict	1
 addons/dot_map/bsp/dot_map_visibility.gd::_active_lights::find_children	1
-addons/dot_map/bsp/dot_map_visibility.gd::_apply_shown::alloc_array	1
-addons/dot_map/bsp/dot_map_visibility.gd::_mask_areas::alloc_array	1
-addons/dot_map/bsp/dot_map_visibility.gd::_mask_areas::alloc_dict	1
 addons/dot_map/bsp/dot_map_visibility.gd::_set_shown::find_children	2
-addons/dot_map/bsp/dot_map_visibility.gd::clusters_in_box::alloc_dict	1

@@ -1,37 +1,6 @@
-extends Node
+extends "suite_base.gd"
 
-## The harness of [code]io_world_demo[/code] (counters, check, record builders) and its door stand-in sections; split out only to keep each file small.
-
-var _passed := 0
-var _failed := 0
-var _failures := PackedStringArray()
-var _entered := 0
-var _completed := 0
-
-
-func _section(title: String) -> void:
-	_entered += 1
-	print("  " + title)
-
-
-func _done() -> void:
-	_completed += 1
-
-
-func _check(ok: bool, what: String) -> void:
-	if ok:
-		_passed += 1
-	else:
-		_failed += 1
-		_failures.append(what)
-
-
-func _rec(index: int, cls: String, tname: String, pairs: Array = [], outs: Array = []) -> Dictionary:
-	var outputs: Array = []
-	for o: Array in outs:
-		outputs.append({"output": o[0], "target": o[1], "input": o[2], "param": o[3] if o.size() > 3 else "",
-				"delay": o[4] if o.size() > 4 else 0.0, "times": o[5] if o.size() > 5 else -1})
-	return {"index": index, "classname": cls, "targetname": tname, "parentname": "", "pairs": pairs, "outputs": outputs}
+## The harness of [code]io_world_demo[/code] (record and world builders) and its door stand-in sections; split out only to keep each file small.
 
 
 func _io(records: Array, rate: int = 20) -> DotMapIO:

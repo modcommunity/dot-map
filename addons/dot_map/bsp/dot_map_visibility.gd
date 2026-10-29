@@ -55,6 +55,11 @@ var _camera_clusters := PackedInt32Array()
 var _visible_bits := PackedByteArray()
 var _updates: int = 0
 var _dirty: bool = true
+# Scratch buffers reused by the per-update walks; each is cleared on entry and never escapes.
+var _reach := {}
+var _todo: Array[int] = []
+var _box_clusters := {}
+var _no_lights: Array[Dictionary] = []
 
 
 static func parse_mode(text: String) -> Mode:
@@ -309,8 +314,10 @@ func _or_row(c: int) -> void:
 func _mask_areas(cams: PackedInt32Array) -> void:
 	if _portals.is_empty() or not _portal_open.values().has(false):
 		return
-	var reach := {}
-	var todo: Array[int] = []
+	var reach := _reach
+	var todo := _todo
+	reach.clear()
+	todo.clear()
 	for c in cams:
 		var a := _cluster_area[c]
 		if not reach.has(a):
@@ -346,9 +353,10 @@ func leaf_at(p: Vector3) -> int:
 
 ## Every cluster whose leaves a box (the drawn tree's space) touches.
 func clusters_in_box(box: AABB) -> PackedInt32Array:
-	var out := {}
 	if _clusters == 0:
 		return PackedInt32Array()
+	var out := _box_clusters
+	out.clear()
 	var c := box.get_center()
 	var h := box.size * 0.5
 	var stack := PackedInt32Array([_head])
@@ -377,7 +385,7 @@ func clusters_in_box(box: AABB) -> PackedInt32Array:
 
 ## Applies each item's "want" (drawn or not), then lets hidden ones keep casting shadows per [member shadows].
 func _apply_shown(local: Vector3) -> void:
-	var lights: Array[Dictionary] = []
+	var lights := _no_lights
 	if shadows == Shadows.REACHING:
 		lights = _active_lights(local)
 	for item in _items:
