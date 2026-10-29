@@ -2,7 +2,7 @@ extends Node3D
 
 ## Builds a converted map the way a game does and prints where its texture memory goes: the renderer's own counters, then every
 ## texture reached from the scene by category (CPU image bytes, format, mips). tools/texture_audit.sh runs it under a display.
-##   -- --world=<prefix> [--cap=<model texture px, default 0 = own size>] [--nomodels] [--half=0|1]
+##   -- --world=<prefix> [--cap=<model texture px, default 0 = own size>] [--nomodels] [--half=0|1] [--fullnormals]
 
 var _seen := {}
 var _rows := {}
@@ -27,6 +27,8 @@ func _ready() -> void:
 	var surfaces := DotMapSurfaces.new()
 	if args.has("half"):
 		surfaces.half_res_masks = args["half"] != "0"
+	if args.has("fullnormals"):
+		surfaces.half_res_normals = false
 	var built := DotMapWorld.build(world, {"material_for": surfaces.world_material_for(world, str(args["world"]).get_base_dir())})
 	if not built.ok:
 		printerr("cannot build: ", built.error)

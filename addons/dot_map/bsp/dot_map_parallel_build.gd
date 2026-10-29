@@ -45,7 +45,7 @@ static func concave_faces(world: DotMapBspMesh, recs: Array, origin: Vector3, wo
 
 
 ## Decodes and mip-maps image files on workers, a batch at a time, and returns path -> [ImageTexture] (made here, on the calling thread). A file that does not decode is left out.
-static func textures(paths: PackedStringArray, workers: int, max_size: int = 0, half_masks: bool = false) -> Dictionary:
+static func textures(paths: PackedStringArray, workers: int, max_size: int = 0, half_masks: bool = false, half_normals: bool = false) -> Dictionary:
 	var out := {}
 	var step := batch_size(workers)
 	for from in range(0, paths.size(), step):
@@ -53,7 +53,7 @@ static func textures(paths: PackedStringArray, workers: int, max_size: int = 0, 
 		var images := DotParallel.run(func(i: int) -> Variant:
 			var img := Image.load_from_file(paths[from + i])
 			if img != null:
-				DotMapSurfaces.shrink_image(img, paths[from + i], max_size, half_masks)
+				DotMapSurfaces.shrink_image(img, paths[from + i], max_size, half_masks, half_normals)
 			return img, n, &"map.textures", workers)
 		for i in n:
 			if images[i] != null:
@@ -63,7 +63,7 @@ static func textures(paths: PackedStringArray, workers: int, max_size: int = 0, 
 
 
 ## [method textures] that yields a frame whenever [param slice_ms] has passed since the last one, so the main loop (dot-cloud's fetch callbacks, the loading cover) runs between batches. A coroutine: `await` it.
-static func textures_async(paths: PackedStringArray, workers: int, max_size: int = 0, half_masks: bool = false, slice_ms: int = 8) -> Dictionary:
+static func textures_async(paths: PackedStringArray, workers: int, max_size: int = 0, half_masks: bool = false, slice_ms: int = 8, half_normals: bool = false) -> Dictionary:
 	var out := {}
 	var step := batch_size(workers)
 	var tree := Engine.get_main_loop() as SceneTree
@@ -73,7 +73,7 @@ static func textures_async(paths: PackedStringArray, workers: int, max_size: int
 		var images := DotParallel.run(func(i: int) -> Variant:
 			var img := Image.load_from_file(paths[from + i])
 			if img != null:
-				DotMapSurfaces.shrink_image(img, paths[from + i], max_size, half_masks)
+				DotMapSurfaces.shrink_image(img, paths[from + i], max_size, half_masks, half_normals)
 			return img, n, &"map.textures", workers)
 		for i in n:
 			if images[i] != null:

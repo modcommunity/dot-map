@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Where a converted map's texture memory goes, by category (builds the world under Xvfb, prints AUDIT rows).
 #
-#   heavy -- tools/texture_audit.sh <world prefix> [--cap=<px>] [--nomodels] [--half=0|1]
+#   heavy -- tools/texture_audit.sh <world prefix> [--cap=<px>] [--nomodels] [--half=0|1] [--fullnormals]
 #
 # Not --headless: that driver has no renderer to count. Mesa llvmpipe stands in for a GPU.
 set -uo pipefail

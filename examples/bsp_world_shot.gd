@@ -29,6 +29,7 @@ func _ready() -> void:
 	var surfaces := DotMapSurfaces.new()
 	surfaces.use_lightmap = not args.has("nolight")
 	surfaces.half_res_masks = not args.has("fullmasks")
+	surfaces.half_res_normals = not args.has("fullnormals")
 	var mat_for := surfaces.world_material_for(world, dir)
 	var built := DotMapWorld.build(world, {"material_for": mat_for})
 	if not built.ok:

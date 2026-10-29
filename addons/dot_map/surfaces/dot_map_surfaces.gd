@@ -103,6 +103,8 @@ var load_threads: int = DotMapParallelBuild.default_workers
 var max_texture_size: int = 2048
 ## Roughness and AO maps keep half their size (a quarter of the memory) when true, decoded, imported or baked alike (the top mip is sliced off, nothing re-encoded). On by default: a frame diff on a manor map is at most 5 of 255.
 var half_res_masks: bool = true
+## Normal maps keep half their size too (same top-mip slice). On by default: a daylight frame at ground level differs by 0.19 of 255 on average, and it takes 258 MB off the manor.
+var half_res_normals: bool = true
 var use_lightmap: bool = true
 ## Folder of the shared PBR sets (`<id>/<tier>/*.webp`) when the game delivers them apart from the pack; empty reads the folder the manifest names, beside the pack.
 var pbr_library: String = ""
@@ -339,7 +341,7 @@ func _prefetch(world: DotMapBspMesh, generated: Dictionary, library: Dictionary)
 		return
 	var plan := _prefetch_plan(world, generated, library)
 	var started := Time.get_ticks_msec()
-	_textures.merge(DotMapParallelBuild.textures(plan["disk"], load_threads, max_texture_size, half_res_masks))
+	_textures.merge(DotMapParallelBuild.textures(plan["disk"], load_threads, max_texture_size, half_res_masks, half_res_normals))
 	_prefetch_done(plan, Time.get_ticks_msec() - started)
 
 
@@ -348,7 +350,7 @@ func _prefetch_async(world: DotMapBspMesh, generated: Dictionary, library: Dicti
 		return
 	var plan := _prefetch_plan(world, generated, library)
 	var started := Time.get_ticks_msec()
-	_textures.merge(await DotMapParallelBuild.textures_async(plan["disk"], load_threads, max_texture_size, half_res_masks, slice_ms))
+	_textures.merge(await DotMapParallelBuild.textures_async(plan["disk"], load_threads, max_texture_size, half_res_masks, slice_ms, half_res_normals))
 	_prefetch_done(plan, Time.get_ticks_msec() - started)
 
 
@@ -553,17 +555,22 @@ func _file_texture(path: String) -> Texture2D:
 	var img := Image.load_from_file(path)
 	if img == null:
 		return null
-	prepare_image(img, path, max_texture_size, half_res_masks)
+	prepare_image(img, path, max_texture_size, half_res_masks, -1, half_res_normals)
 	var tex := ImageTexture.create_from_image(img)
 	_textures[path] = tex
 	return tex
 
 
-## [param tex] of a roughness or AO map without its top mip level when [member half_res_masks] is on: an imported or baked map is already compressed, so the next level of its own chain is cut out, with no decode or recompress.
+## [param tex] of a roughness, AO or normal map without its top mip level when [member half_res_masks] or [member half_res_normals] says so: an imported or baked map is already compressed, so the next level of its own chain is cut out, with no decode or recompress.
 func _masked(path: String, tex: Texture2D) -> Texture2D:
-	if tex == null or not half_res_masks or not path.get_file().get_basename() in ["roughness", "ao"]:
+	if tex == null or not halves(path.get_file().get_basename(), half_res_masks, half_res_normals):
 		return tex
 	return without_top_mip(tex)
+
+
+## Whether the part named [param part] (albedo, normal, roughness, ao) is kept at half size under the two options.
+static func halves(part: String, masks: bool, normals: bool) -> bool:
+	return (masks and part in ["roughness", "ao"]) or (normals and part == "normal")
 
 
 ## [param tex] cut to the next level of its own mip chain (a quarter of the memory) as a new texture; [param tex] itself when it has no level to spare or is under 8 px.
@@ -577,17 +584,17 @@ static func without_top_mip(tex: Texture2D) -> Texture2D:
 
 
 ## Slims, caps, mip-maps and VRAM-compresses a decoded file image: a raw 1k RGB map is 4 MB with mips, the compressed one 0.7 MB. Safe on a worker.
-static func prepare_image(img: Image, path: String, max_size: int, half_masks: bool = false, mode_override: int = -1) -> void:
-	if shrink_image(img, path, max_size, half_masks):
+static func prepare_image(img: Image, path: String, max_size: int, half_masks: bool = false, mode_override: int = -1, half_normals: bool = false) -> void:
+	if shrink_image(img, path, max_size, half_masks, half_normals):
 		compress_image(img, mode_override)
 
 
 ## The part of [method prepare_image] that is safe on a pool worker: channels, size and mipmaps. False when [param img] is already compressed. Compression is separate because it runs its own pool group, and a group waited on from inside a pool task deadlocks.
-static func shrink_image(img: Image, path: String, max_size: int, half_masks: bool = false) -> bool:
+static func shrink_image(img: Image, path: String, max_size: int, half_masks: bool = false, half_normals: bool = false) -> bool:
 	if img.is_compressed():
 		return false
 	slim_image(img, path)
-	if half_masks and path.get_file().get_basename() in ["roughness", "ao"] and mini(img.get_width(), img.get_height()) >= 8:
+	if halves(path.get_file().get_basename(), half_masks, half_normals) and mini(img.get_width(), img.get_height()) >= 8:
 		img.resize(img.get_width() / 2, img.get_height() / 2, Image.INTERPOLATE_LANCZOS)
 	while max_size > 0 and maxi(img.get_width(), img.get_height()) > max_size:
 		img.resize(maxi(1, img.get_width() / 2), maxi(1, img.get_height() / 2), Image.INTERPOLATE_LANCZOS)

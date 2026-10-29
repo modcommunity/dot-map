@@ -2,7 +2,7 @@ extends Node
 
 ## [DotMapParallelBuild]: the threaded load stages give byte-identical output to the inline ones.
 
-const CHECKS := 40
+const CHECKS := 42
 const SECTIONS := 6
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const COPIES := 40
@@ -191,6 +191,7 @@ func _test_textures() -> void:
 		parts.append(path)
 	var slim := DotMapParallelBuild.textures(parts, 2)
 	var half := DotMapParallelBuild.textures(parts, 2, 0, true)
+	var half_n := DotMapParallelBuild.textures(parts, 2, 0, false, true)
 	var formats := []
 	for p in parts:
 		formats.append((slim[p] as Texture2D).get_image().get_format())
@@ -203,6 +204,11 @@ func _test_textures() -> void:
 	for p in parts:
 		widths.append([(slim[p] as Texture2D).get_width(), (half[p] as Texture2D).get_width()])
 	_check(widths == [[32, 32], [32, 32], [32, 16], [32, 16]], "half_res_masks halves roughness and AO only (%s)" % str(widths))
+	var widths_n := []
+	for p in parts:
+		widths_n.append((half_n[p] as Texture2D).get_width())
+	_check(widths_n == [32, 16, 32, 32], "half_res_normals halves the normal map only (%s)" % str(widths_n))
+	_check(DotMapSurfaces.halves("normal", true, false) == false and DotMapSurfaces.halves("normal", false, true), "halves() reads each option for its own parts")
 	_completed += 1
 
 
