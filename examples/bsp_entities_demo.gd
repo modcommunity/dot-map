@@ -1,15 +1,6 @@
 extends Node3D
 
 ## [DotMapEntities] on a real converted map's entity data.
-##
-## [codeblock]
-## godot --headless --path . res://examples/bsp_entities_demo.tscn
-## [/codeblock]
-##
-## The data is [code]examples/bsp_mesh/zm_4way_tunnel.entities.json[/code], written by
-## [code]tools/bsp/tests/entities_fixture.py[/code] from a community map with three lifts
-## (toggle doors moved by buttons that lock and unlock one another), hinged doors, shutters, and
-## classes the converter keeps as data.
 
 const CHECKS := 44
 const SECTIONS := 7

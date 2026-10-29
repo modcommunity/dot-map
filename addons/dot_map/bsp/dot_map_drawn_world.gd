@@ -30,10 +30,7 @@ static func read(prefix: String, cloud: Object = null) -> DotResult:
 	return DotResult.success(world)
 
 
-## Draws [param world] under [param parent]. [param options]:
-## `transform` (Transform3D, the pack's frame in the parent's), `surfaces_root` (the game's vendored kinds, rebased; "" is the addon's),
-## `lightmap` (true), `only_world` (true: brush entities are movers and breakables the game may not have kept, so drawing them would show what is not there),
-## `props` (false: the pack's stand-ins collide with nothing), `probes` (8; 0 none), `cull` (true; never headless), `environment` and `lamps` (for [DotMapLitWorld]), `cloud`.
+## Draws [param world] under [param parent].
 static func attach(parent: Node3D, world: DotMapBspMesh, options: Dictionary = {}) -> DotMapDrawnWorld:
 	var drawn := DotMapDrawnWorld.new()
 	drawn.world = world

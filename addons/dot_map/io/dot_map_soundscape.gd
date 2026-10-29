@@ -1,10 +1,8 @@
 class_name DotMapSoundscape
 extends DotMapEntity
 
-## env_soundscape and its proxy/triggerable variants: a named ambience that a player within
-## [member radius] hears. Each step [DotMapVolumes] picks, per player, the nearest enabled
-## soundscape that covers it and tells the game through a [code]soundscape[/code] event
-## ([code]body, name, entity, positions[/code]) when the choice changes; the game owns the audio.
+## env_soundscape and its proxy/triggerable variants: a named ambience that a player within [member radius]
+## hears.
 
 ## Source units; -1 covers the whole map.
 var radius := 128.0

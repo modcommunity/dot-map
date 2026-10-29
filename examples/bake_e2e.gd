@@ -1,11 +1,8 @@
 extends Node
 
-## [DotMapTextureBake] end to end on 20 real albedo maps copied from a map store: bake, load through [DotMapSurfaces], compare, fall back.
-##
-## [codeblock]
-## godot --headless --path . res://examples/bake_e2e.tscn
-## [/codeblock]
-## The originals are only read. With no store found (a fresh clone) the section is skipped and says so.
+## [DotMapTextureBake] end to end on 20 real albedo maps copied from a map store: bake, load through
+## [DotMapSurfaces], compare, fall back. The originals are only read. With no store found (a fresh clone) the
+## section is skipped and says so.
 
 const REAL := 15
 const PICK := 8
@@ -152,6 +149,12 @@ func _test_real_textures() -> void:
 	_check(exact, "the baked image is byte-equal to the runtime's own compressed, mip-mapped image")
 	_check(close, "decompressed, it is within 3%% mean error of a decode and downscale of the source (worst %.4f)" % worst)
 
+	_test_bake_fallbacks(copied, variant)
+	_remove_tree(SCRATCH)
+	_completed += 1
+
+
+func _test_bake_fallbacks(copied: PackedStringArray, variant: String) -> void:
 	var missing := copied[0]
 	DirAccess.remove_absolute("%s.%s.res" % [missing.get_basename(), variant])
 	var s2 := DotMapSurfaces.new()
@@ -197,8 +200,6 @@ func _test_real_textures() -> void:
 	s8.max_texture_size = CAP
 	var t_wrong := s8._file_texture(wrong)
 	_check(t_wrong != null and t_wrong.resource_path.is_empty(), "the other variant's bake under this variant's name is ignored")
-	_remove_tree(SCRATCH)
-	_completed += 1
 
 
 func _remove_tree(dir: String) -> void:

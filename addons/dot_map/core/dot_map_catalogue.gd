@@ -2,26 +2,15 @@
 class_name DotMapCatalogue
 extends Resource
 
-## Every map a server knows about, and the file an operator edits.
-##
-## [b]The catalogue is separate from the rotation on purpose.[/b] A server knows about
-## two hundred maps and rotates through twelve of them; the other hundred and eighty
-## still have leaderboards, are still nominatable, and still have to resolve when
-## somebody links to one. Merging the two lists means removing a map from the rotation
-## also removes it from the records — which is how a leaderboard nobody meant to
-## delete disappears.
-##
-## Plain JSON, because on a community server the person who maintains this is a person
-## with a text editor.
+## Every map a server knows about, and the file an operator edits. The catalogue is separate from the
+## rotation on purpose.
 
 const CHANNEL := "map.catalogue"
 
 const FORMAT_VERSION := 1
 
-## Emitted at the end of [method refresh_content], after the followed pack maps were dropped and
-## re-added as fresh defs (whose [member DotMapDef.in_rotation] is true). Whatever marks maps
-## in or out of play ([DotMapRotationFile]) re-applies itself here, so a pack installed or a
-## session turned after boot does not put unlisted maps back into the draw.
+## Emitted at the end of [method refresh_content], after the followed pack maps were dropped and re-added as
+## fresh defs (whose [member DotMapDef.in_rotation] is true).
 signal content_refreshed
 
 @export var maps: Array[DotMapDef] = []
@@ -64,14 +53,9 @@ func add(map: DotMapDef) -> DotResult:
 	return DotResult.success(map)
 
 
-## Add a delivered map by its pack key (see [method DotMapDef.from_content_key]), with
-## the scene inside the pack the game loads for it. The usual way to turn a game
-## descriptor's `maps:` list into a catalogue:
-##
-## [codeblock]
-## for key in server.games.current_maps():
-##     catalogue.add_delivered(key, "map.tscn")
-## [/codeblock]
+## Add a delivered map by its pack key (see [method DotMapDef.from_content_key]), with the scene inside the pack the game loads for it.
+## The usual way to turn a game descriptor's `maps:` list into a catalogue:
+## [code]for key in server.games.current_maps(): catalogue.add_delivered(key, "map.tscn")[/code]
 func add_delivered(key: String, scene: String) -> DotResult:
 	var map := DotMapDef.from_content_key(key, scene)
 
@@ -85,20 +69,9 @@ func add_delivered(key: String, scene: String) -> DotResult:
 	return add(map)
 
 
-## Follow a [DotContentIndex]: every map entry of a mounted pack, in the index's current
-## session, becomes a [DotMapDef] here, and the rows are rebuilt whenever a pack arrives or the
-## session changes. This is how a Workshop subscription reaches the map menu without the menu
-## naming a pack.
-##
-## [param accepted_kinds] is the game's [code]accepts.map_kinds[/code]. [b]Empty means none,
-## not any[/b]: the Workshop is opt-in per game, so a game that states no kinds must not have a
-## map pack it cannot load pushed into its menu. [code]"*"[/code] accepts every kind. An entry's
-## [code]map_kind[/code] is an open set; one this game does not accept is left in the index and
-## offered to nobody.
-##
-## A map the catalogue already holds under the same id (the game's own, an operator's) always
-## wins: a pack cannot replace a map by claiming its id. Nothing is ever removed from the index,
-## so a session change drops this catalogue's followed rows and re-adds the visible ones.
+## Follow a [DotContentIndex]: every map entry of a mounted pack, in the index's current session, becomes a
+## [DotMapDef] here, and the rows are rebuilt whenever a pack arrives or the session changes. This is how a
+## Workshop subscription reaches the map menu without the menu naming a pack.
 func follow_content(index: DotContentIndex, accepted_kinds: PackedStringArray = PackedStringArray()) -> void:
 	unfollow_content()
 	if index == null:
@@ -240,12 +213,8 @@ func available(kind: StringName = &"", players: int = 0) -> Array[DotMapDef]:
 	return out
 
 
-## Maps whose id or display name contains [param text], case-insensitively.
-##
-## An exact id match is returned alone and first. [b]Not merely an ordering
-## nicety.[/b] A player typing the full name of a map they want must get that map: on
-## a server with [code]surf_tidewater[/code] and [code]surf_tidewater2[/code], a substring
-## search returns both and whatever picks the first has chosen for them.
+## Maps whose id or display name contains [param text], case-insensitively. An exact id match is returned
+## alone and first. Not merely an ordering nicety.
 func search(text: String, limit: int = 20) -> Array[DotMapDef]:
 	var needle := text.strip_edges().to_lower()
 	var out: Array[DotMapDef] = []
@@ -291,8 +260,6 @@ func problems() -> PackedStringArray:
 	return out
 
 
-# --- Serialisation ---------------------------------------------------------
-
 func to_dictionary() -> Dictionary:
 	var list: Array = []
 
@@ -336,10 +303,9 @@ static func from_dictionary(data: Dictionary) -> DotResult:
 		var added := catalogue.add(map)
 
 		if not added.ok:
-			# One bad entry does not condemn the file. A server with a hundred and
-			# ninety-nine good maps and one typo should boot on the hundred and
-			# ninety-nine — and say which one it dropped, loudly, rather than
-			# refusing to start with an error nobody can locate.
+			# One bad entry does not condemn the file. A server with a hundred and ninety-nine good maps and one typo
+			# should boot on the hundred and ninety-nine — and say which one it dropped, loudly, rather than refusing
+			# to start with an error nobody can locate.
 			refused.append("%s: %s" % [String(map.id), added.error.message])
 
 	if not refused.is_empty():

@@ -1,14 +1,6 @@
 extends Node3D
 
 ## [DotMapVisibility]: a hand-made three-cluster map, then real converted maps ray-cast for holes.
-##
-## [codeblock]
-## godot --headless --path . res://examples/vis_demo.tscn -- --maps=<prefix>,<prefix> [--points=40] [--rays=300]
-## [/codeblock]
-##
-## For every map named, the world and its props are built with a triangle body per drawn chunk and
-## prop; from sample points in open space, rays go out in every direction, and every chunk or prop a
-## ray hits first must be drawn for a camera there. One that is not is a hole the player would see.
 
 const SYNTH_CHECKS := 16
 const MAP_CHECKS := 4
@@ -162,27 +154,9 @@ func _test_map(prefix: String, points: int, rays: int) -> void:
 	add_child(vis)
 	vis.setup(world, node)
 	_check(vis.has_pvs(), "%s carries visibility data (%d clusters)" % [prefix, int(world.manifest.get("vis", {}).get("clusters", 0))])
-	var bodies := {}
-	var space_box := AABB()
-	for item in vis._items:
-		var body := StaticBody3D.new()
-		var target: Node = item["node"]
-		for mi in ([target] if target is MeshInstance3D else target.find_children("*", "MeshInstance3D", true, false)):
-			var mesh := (mi as MeshInstance3D).mesh
-			if mesh == null:
-				continue
-			var shape := CollisionShape3D.new()
-			var tri := ConcavePolygonShape3D.new()
-			tri.set_faces(mesh.get_faces())
-			tri.backface_collision = true
-			shape.shape = tri
-			shape.transform = (mi as Node3D).global_transform
-			body.add_child(shape)
-			if target is MeshInstance3D:
-				space_box = space_box.merge((mi as MeshInstance3D).global_transform * mesh.get_aabb()) if space_box.size != Vector3.ZERO \
-						else (mi as MeshInstance3D).global_transform * mesh.get_aabb()
-		add_child(body)
-		bodies[body.get_instance_id()] = item
+	var built := _collide_items(vis)
+	var bodies: Dictionary = built["bodies"]
+	var space_box: AABB = built["box"]
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	var space := get_world_3d().direct_space_state
@@ -231,17 +205,48 @@ func _test_map(prefix: String, points: int, rays: int) -> void:
 						(item["node"] as Node).name, p.distance_to(hit["position"])] + " camera %s hit %s item %s" % [
 						vis._camera_clusters, vis.clusters_in_box(AABB(hit["position"] - Vector3.ONE * 0.05, Vector3.ONE * 0.1)),
 						item["clusters"]])
+	_report_map(prefix, vis, points, rays, done, shown_sum, gaps, holes)
+	vis.queue_free()
+	node.queue_free()
+	for id: int in bodies:
+		(instance_from_id(id) as Node).queue_free()
+	_completed += 1
+
+
+## A static body of triangles per visibility item, so rays hit what the culler hides; returns {bodies, box}.
+func _collide_items(vis: DotMapVisibility) -> Dictionary:
+	var bodies := {}
+	var space_box := AABB()
+	for item in vis._items:
+		var body := StaticBody3D.new()
+		var target: Node = item["node"]
+		for mi in ([target] if target is MeshInstance3D else target.find_children("*", "MeshInstance3D", true, false)):
+			var mesh := (mi as MeshInstance3D).mesh
+			if mesh == null:
+				continue
+			var shape := CollisionShape3D.new()
+			var tri := ConcavePolygonShape3D.new()
+			tri.set_faces(mesh.get_faces())
+			tri.backface_collision = true
+			shape.shape = tri
+			shape.transform = (mi as Node3D).global_transform
+			body.add_child(shape)
+			if target is MeshInstance3D:
+				space_box = space_box.merge((mi as MeshInstance3D).global_transform * mesh.get_aabb()) if space_box.size != Vector3.ZERO \
+						else (mi as MeshInstance3D).global_transform * mesh.get_aabb()
+		add_child(body)
+		bodies[body.get_instance_id()] = item
+	return {"bodies": bodies, "box": space_box}
+
+
+## Prints the sampling summary and the first holes, then asserts there are none and that the PVS hides something.
+func _report_map(prefix: String, vis: DotMapVisibility, points: int, rays: int, done: int, shown_sum: float, gaps: int, holes: PackedStringArray) -> void:
 	print("    %d points, %d rays each, %.0f%% of %d chunks and props drawn on average, %d occluder triangles, %d rays through an undrawn solid" % [
 			done, rays, 100.0 * shown_sum / maxf(1.0, done), vis._items.size(), vis.describe()["occluder_triangles"], gaps])
 	for h in holes.slice(0, 10):
 		print("    " + h)
 	_check(holes.is_empty() and done >= points / 2, "%s: no ray from %d points meets a hidden chunk or prop (%d holes)" % [prefix, done, holes.size()])
 	_check(shown_sum / maxf(1.0, done) < 0.95, "%s: the PVS hides something on average" % prefix)
-	vis.queue_free()
-	node.queue_free()
-	for id: int in bodies:
-		(instance_from_id(id) as Node).queue_free()
-	_completed += 1
 
 
 ## Whether the segment passes through a solid leaf: the drawn world has a gap there (a face the

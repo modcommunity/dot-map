@@ -2,11 +2,9 @@
 class_name DotAreaPortal
 extends Node3D
 
-## A door-sized box that blocks the view while closed: place it in a doorway or window, call [method set_open] from the door.
-##
-## Godot's [OccluderInstance3D] is static, so a door that opens cannot be an occluder on its own. This node owns one
-## and swaps its shape in and out. For a BSP map, [method DotMapVisibility.bind_area_portals] also forwards the state
-## to the map's area portals (matched by [member key] or [member door]).
+## A door-sized box that blocks the view while closed: place it in a doorway or window, call [method
+## set_open] from the door. Godot's [OccluderInstance3D] is static, so a door that opens cannot be an
+## occluder on its own. This node owns one and swaps its shape in and out.
 
 ## Emitted when the state changes.
 signal toggled(open: bool)

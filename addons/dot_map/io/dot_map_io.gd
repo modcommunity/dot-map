@@ -1,14 +1,9 @@
 class_name DotMapIO
 extends RefCounted
 
-## The runtime for a map's input/output logic: outputs fire inputs at other entities after a delay.
-## It is deterministic: time is the game's tick (see [method advance]), never the wall clock, and
-## nothing here knows a body, a mesh or a sound. Only the server runs it.
-##
-## A game plugs in with [method register_handler] (what its own classes do with an input),
-## [method register_class] (a class with state of its own) and the callables [member damage_fn],
-## [member move_fn], [member effect_fn], [member event_fn]. Commands a map issues (a server
-## command entity) are recorded in [member commands] and never executed.
+## The runtime for a map's input/output logic: outputs fire inputs at other entities after a delay. It is
+## deterministic: time is the game's tick (see [method advance]), never the wall clock, and nothing here
+## knows a body, a mesh or a sound. Only the server runs it.
 
 const CHANNEL := "map.io"
 const CODE_SOURCE_FORMAT := "dot-bsp-source"
@@ -386,10 +381,9 @@ func bind_breakables(records: Array) -> int:
 	return n
 
 
-## Binds every brush entity to the drawn model under [param root] that carries its model number
-## (the [code]model[/code] key "*N"; the node's [code]model[/code] meta), and a [DotMapGlass] of that
-## model to its breakable. [param root] is what [method DotMapBspMesh.build_node] returned, or a
-## tree a game built the same way. Returns the entities that got a node.
+## Binds every brush entity to the drawn model under [param root] that carries its model number (the
+## [code]model[/code] key "*N"; the node's [code]model[/code] meta), and a [DotMapGlass] of that model to its
+## breakable.
 func bind_world(root: Node) -> int:
 	var by_model := {}
 	var glass_by_model := {}

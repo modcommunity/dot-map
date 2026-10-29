@@ -1,11 +1,7 @@
 class_name DotMapTerrain
 extends RefCounted
-## A converted map's displacement ground as a heightfield (tools/bsp/dotbsp/terrain.py writes
-## it): one triangle shape to collide with, a mesh to draw, and the points an AI graph walks.
-##
-## A stepped field of boxes cannot be climbed past a step per cell, so hilly ground ended at the
-## first hill; this surface is the same one the converter's flood walked. Every cell is split
-## along its (i, j)-(i+1, j+1) diagonal here and in the converter; keep the two in step.
+## A converted map's displacement ground as a heightfield (tools/bsp/dotbsp/terrain.py writes it): one
+## triangle shape to collide with, a mesh to draw, and the points an AI graph walks.
 
 const FORMAT := 1
 ## The steepest terrain a walker climbs, rise per metre (dotbsp.terrain.WALK_RISE).

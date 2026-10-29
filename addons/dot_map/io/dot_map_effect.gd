@@ -2,11 +2,7 @@ class_name DotMapEffect
 extends DotMapEntity
 
 ## The env_* effects (sprite, trail, glow, spotlight, laser, beam, spark, steam, fire, smoke stack,
-## explosion, shake, fade, particle system). Nothing is drawn here: a state change goes to
-## [member DotMapIO.effect_fn] as [code](kind, entity, on)[/code] with the kind being the class
-## name without its prefix, and a one-shot (explode, shake, fade, spark) goes to
-## [member DotMapIO.event_fn]. An explosion or a fire also queues area damage in
-## [member DotMapIO.area_damage] for [DotMapVolumes] to apply to the bodies it knows.
+## explosion, shake, fade, particle system).
 
 const ONE_SHOT := ["env_explosion", "env_shake", "env_fade", "env_spark", "env_screenoverlay"]
 

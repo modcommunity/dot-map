@@ -1,13 +1,8 @@
 class_name DotMapBreakable
 extends DotMapEntity
 
-## func_breakable, func_breakable_surf and a breakable prop_physics: health, damage from the
-## game ([method DotMapIO.hurt]), and a break that fires OnBreak, hides the model and lets it go.
-##
-## Where a model's health comes from: the map's [code]health[/code] key, else the manifest record
-## given to [method set_record], else [member DotMapIO.propdata_fn] for a prop. No health means it
-## takes no damage and breaks only on [code]Break[/code]. Glass that the converter built as a
-## [DotMapGlass] is driven through it: shards, and see-through until it breaks.
+## func_breakable, func_breakable_surf and a breakable prop_physics: health, damage from the game ([method
+## DotMapIO.hurt]), and a break that fires OnBreak, hides the model and lets it go.
 
 const MATERIALS: PackedStringArray = ["glass", "wood", "metal", "flesh", "concrete", "tile", "computer",
 		"unbreakable_glass", "rock", "web"]

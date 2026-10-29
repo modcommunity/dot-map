@@ -1,11 +1,8 @@
 class_name DotOccluderBaker
 extends RefCounted
 
-## Bakes occluders from a scene's static meshes: large flat faces (walls, floors, ceilings) become quads of one [OccluderInstance3D].
-##
-## Triangles are grouped by plane within one mesh; a group is kept when its rectangle is big enough and mostly covered, so a wall with a
-## doorway cut in it is skipped rather than allowed to hide the next room. A quad is shrunk by [member inset] so it never
-## hides the face it lies on. Re-baking replaces [constant NODE_NAME]. Pure data, no autoload, runs headless.
+## Bakes occluders from a scene's static meshes: large flat faces (walls, floors, ceilings) become quads of
+## one [OccluderInstance3D].
 
 const NODE_NAME := "BakedOccluders"
 const SKIP_GROUP := &"dot_no_occluder"

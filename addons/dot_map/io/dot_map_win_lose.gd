@@ -1,11 +1,7 @@
 class_name DotMapWinLose
 extends DotMapEntity
 
-## logic_winlose: a map's own ending. Win and Lose ask the game to decide the round with the [code]round_decide[/code] event;
-## [method decided] (the game calls it once the round is decided, by this entity or anything else) fires OnWin or OnLose and
-## tells the game how to dress the ending with [code]round_end[/code]: a time scale and how long it lasts, and a camera point.
-## No music plays. The slow motion and camera come from [member slowmo_scale], [member slowmo_seconds] and the keys
-## [code]slowmo[/code], [code]slowmoseconds[/code]; a scale of 1 means none, the camera is the entity's origin when it has one.
+## logic_winlose: a map's own ending.
 
 var slowmo_scale := 1.0
 var slowmo_seconds := 2.0

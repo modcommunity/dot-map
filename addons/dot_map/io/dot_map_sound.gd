@@ -1,10 +1,8 @@
 class_name DotMapSound
 extends DotMapEntity
 
-## ambient_generic: PlaySound, StopSound, ToggleSound, Volume, Pitch and the fades, played through
-## [member DotMapIO.effect_fn] as [code]("sound", entity, on)[/code]. What plays is [member stand_in],
-## the free replacement the converter's sound rules chose ([method DotMapIO.attach_sounds]); a
-## sound with none stays silent, because music and voices are never replaced.
+## ambient_generic: PlaySound, StopSound, ToggleSound, Volume, Pitch and the fades, played through [member
+## DotMapIO.effect_fn] as [code]("sound", entity, on)[/code].
 
 ## Id of the free stand-in, or empty.
 var stand_in := ""

@@ -1,9 +1,8 @@
 extends Node3D
 
-## Frames of one prop_door_rotating of a converted map: closed, then half open for an opener on each side, from above and
-## from the opener's eye. Run under a display (tools/door_shot.sh).
-##
-##   godot --path . res://examples/door_shot.tscn -- --world=<prefix> --entity=<index> --out=<png prefix>
+## Frames of one prop_door_rotating of a converted map: closed, then half open for an opener on each side,
+## from above and from the opener's eye. Run under a display (tools/door_shot.sh). godot --path .
+## res://examples/door_shot.tscn -- --world=<prefix> --entity=<index> --out=<png prefix>
 
 
 func _ready() -> void:

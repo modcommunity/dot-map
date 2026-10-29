@@ -2,13 +2,6 @@ class_name DotMapStateSync
 extends RefCounted
 
 ## Carries a map's changing state from the server's [DotMapIO] to its clients, which run no logic.
-##
-## The host batches every [signal DotMapIO.state_changed] of a call into one message and sends it
-## per peer through [member send_fn]; a peer added mid-game first gets a full snapshot, so a joiner
-## sees the door where it is, the brush hidden and the glass broken. A client feeds each message to
-## [method apply]. Messages are plain dictionaries of numbers, strings, bools and arrays, so any
-## transport carries them. Motion needs no stream: a mover's message holds where it started and
-## when, and each end works out the pose for its own tick.
 
 const TYPE_STATE := "io_state"
 const TYPE_SNAPSHOT := "io_snapshot"

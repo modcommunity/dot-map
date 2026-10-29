@@ -1,10 +1,9 @@
 class_name DotMapDoorStandIn
 extends RefCounted
 
-## The drawn panel of a prop_door_rotating, which is a placed model with no brush: a node at the
-## hinge, yawed by the entity's [code]angles[/code], with a box panel that lies along the entity's
-## local +Y (source axes) and a body of its own. [DotMapMoverNode] swings the node, so the panel
-## and its collision turn with it. A door hung off an authored hinge ([code]panel_yaw[/code]) lies along the line from it. A real model replaces the panel through [code]door_fn[/code].
+## The drawn panel of a prop_door_rotating, which is a placed model with no brush: a node at the hinge, yawed
+## by the entity's [code]angles[/code], with a box panel that lies along the entity's local +Y (source axes)
+## and a body of its own. [DotMapMoverNode] swings the node, so the panel and its collision turn with it.
 
 ## Width, height, thickness in metres.
 const SIZE := Vector3(1.02, 2.13, 0.07)

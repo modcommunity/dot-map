@@ -1,15 +1,6 @@
 extends Node3D
 
 ## [DotMapBspMesh]: the converter's fixture read, built, and ray-cast.
-##
-## [codeblock]
-## godot --headless --path . res://examples/bsp_mesh_demo.tscn
-## [/codeblock]
-##
-## The fixture is [code]examples/bsp_mesh/fixture.{json,bin}[/code], written by
-## [code]tools/bsp/tests/mesh_fixture.py[/code] (whose test fails when it is stale): a 512-unit
-## floor slab 16 high, a wall along its far edge, and a door named [code]gate[/code] 8 units
-## thick at (256, 256, 16), at 0.01905 m per unit.
 
 const CHECKS := 138
 const SECTIONS := 11
@@ -164,36 +155,7 @@ func _test_environment(world: DotMapBspMesh) -> void:
 	_check(absf(fwd.x) < 0.01 and fwd.z < -0.5 and fwd.y < -0.5, "yaw 90 (source +y) shines towards -z: %s" % fwd)
 	_check(env.get_node("Probes").get_child_count() == 1, "max_probes limits the reflection probes")
 	env.free()
-	var snd := world.build_sounds()
-	_check(snd.get_child_count() == 1 and snd.get_child(0) is AudioStreamPlayer3D, "one sound: the others have no stand-in or no file")
-	var pl := snd.get_child(0) as AudioStreamPlayer3D
-	_check(pl.position == Vector3(1, 2, 3) and is_equal_approx(pl.max_distance, 20.0) and pl.stream != null, "placed with its radius and stream")
-	_check(absf(pl.volume_db - linear_to_db(0.5)) < 0.01, "volume carried")
-	var driver := DotMapSoundDriver.new()
-	driver.root = snd
-	_check(driver.handle("sound_fade", {"entity": 1, "name": "", "seconds": 0.0, "from": 0.0, "to": 1.0}) and absf(pl.volume_db) < 0.01, "sound_fade to 1 sets full volume by entity")
-	_check(driver.handle("sound_spin", {"entity": 1, "seconds": 0.0, "from": 100.0, "to": 200.0}) and is_equal_approx(pl.pitch_scale, 2.0), "sound_spin sets the pitch")
-	var _d := driver.handle("sound_spin", {"entity": 1, "seconds": 0.0, "from": 100.0, "to": 1.0e9})
-	_check(is_equal_approx(pl.pitch_scale, 4.0), "an absurd pitch is clamped")
-	_check(not driver.handle("sound_fade", {"entity": 99, "name": "nobody", "seconds": 1.0}) and not driver.handle("beat", {}), "an unknown player or event does nothing")
-	_d = driver.handle("sound_fade", {"entity": 1, "seconds": NAN, "from": NAN, "to": INF})
-	_check(is_finite(pl.volume_db) and is_finite(pl.pitch_scale), "NaN and infinite event values are replaced, never tweened")
-	add_child(snd)
-	_d = driver.handle("sound_fade", {"entity": 1, "seconds": 5.0, "from": 1.0, "to": 0.5})
-	_check(driver._tweens.size() == 1, "a timed fade keeps one tween")
-	pl.free()
-	_d = driver.handle("sound_fade", {"entity": 99, "seconds": 1.0})
-	driver._prune()
-	_check(driver._tweens.is_empty(), "the tween of a freed player is dropped")
-	snd.free()
-	driver.free()
-	var hooked := []
-	var snd2 := world.build_sounds(func(_id: String) -> AudioStream: return AudioStreamGenerator.new(),
-			func(rec: Dictionary, _s: AudioStream) -> Node:
-				hooked.append(rec["entity"])
-				return Node3D.new())
-	_check(hooked == [1, 3] and snd2.get_child_count() == 2, "stream and node hooks replace the defaults: %s" % [hooked])
-	snd2.free()
+	_test_env_sounds(world)
 	var props := world.build_props()
 	_check(props.get_child_count() == 1 and absf((props.get_child(0) as Node3D).rotation_degrees.y - 180.0) < 0.01, "the chair stand-in is placed and turned to face +X at yaw 90")
 	_check((props.get_child(0) as Node3D).position == Vector3(2, 0, -3), "at its place")
@@ -240,6 +202,39 @@ func _test_environment(world: DotMapBspMesh) -> void:
 	plain_props.free()
 	_check(world.is_free() == false, "a surface with no free key keeps the map from being called free")
 	_done()
+
+
+func _test_env_sounds(world: DotMapBspMesh) -> void:
+	var snd := world.build_sounds()
+	_check(snd.get_child_count() == 1 and snd.get_child(0) is AudioStreamPlayer3D, "one sound: the others have no stand-in or no file")
+	var pl := snd.get_child(0) as AudioStreamPlayer3D
+	_check(pl.position == Vector3(1, 2, 3) and is_equal_approx(pl.max_distance, 20.0) and pl.stream != null, "placed with its radius and stream")
+	_check(absf(pl.volume_db - linear_to_db(0.5)) < 0.01, "volume carried")
+	var driver := DotMapSoundDriver.new()
+	driver.root = snd
+	_check(driver.handle("sound_fade", {"entity": 1, "name": "", "seconds": 0.0, "from": 0.0, "to": 1.0}) and absf(pl.volume_db) < 0.01, "sound_fade to 1 sets full volume by entity")
+	_check(driver.handle("sound_spin", {"entity": 1, "seconds": 0.0, "from": 100.0, "to": 200.0}) and is_equal_approx(pl.pitch_scale, 2.0), "sound_spin sets the pitch")
+	var _d := driver.handle("sound_spin", {"entity": 1, "seconds": 0.0, "from": 100.0, "to": 1.0e9})
+	_check(is_equal_approx(pl.pitch_scale, 4.0), "an absurd pitch is clamped")
+	_check(not driver.handle("sound_fade", {"entity": 99, "name": "nobody", "seconds": 1.0}) and not driver.handle("beat", {}), "an unknown player or event does nothing")
+	_d = driver.handle("sound_fade", {"entity": 1, "seconds": NAN, "from": NAN, "to": INF})
+	_check(is_finite(pl.volume_db) and is_finite(pl.pitch_scale), "NaN and infinite event values are replaced, never tweened")
+	add_child(snd)
+	_d = driver.handle("sound_fade", {"entity": 1, "seconds": 5.0, "from": 1.0, "to": 0.5})
+	_check(driver._tweens.size() == 1, "a timed fade keeps one tween")
+	pl.free()
+	_d = driver.handle("sound_fade", {"entity": 99, "seconds": 1.0})
+	driver._prune()
+	_check(driver._tweens.is_empty(), "the tween of a freed player is dropped")
+	snd.free()
+	driver.free()
+	var hooked := []
+	var snd2 := world.build_sounds(func(_id: String) -> AudioStream: return AudioStreamGenerator.new(),
+			func(rec: Dictionary, _s: AudioStream) -> Node:
+				hooked.append(rec["entity"])
+				return Node3D.new())
+	_check(hooked == [1, 3] and snd2.get_child_count() == 2, "stream and node hooks replace the defaults: %s" % [hooked])
+	snd2.free()
 
 
 ## Every body's shapes under a world, as "kind:shape-class:points" strings in tree order.
@@ -372,31 +367,7 @@ func _test_glass() -> void:
 			"glass is alpha-blended and see-through")
 	_check(DotMapBspMesh.glass_material(&"glass_frosted").albedo_color.a > DotMapBspMesh.glass_material(&"glass").albedo_color.a,
 			"frosted is more opaque than clear")
-	var fence_tex := DotMapBspMesh.cutout_texture(&"diamond")
-	var fence_img := fence_tex.get_image()
-	var covered := func(level: int) -> float:
-		var lvl := Image.create_from_data(fence_img.get_width(), fence_img.get_height(), true, fence_img.get_format(), fence_img.get_data())
-		var n := 0
-		var w := maxi(fence_img.get_width() >> level, 1)
-		var off := lvl.get_mipmap_offset(level)
-		var d := lvl.get_data()
-		for i in w * w:
-			if d[off + i * 4 + 3] >= 128:
-				n += 1
-		return float(n) / float(w * w)
-	_check(absf(covered.call(1) - covered.call(0)) < 0.12 and covered.call(2) > 0.1,
-			"a thin cutout keeps its coverage in the mips, so a fence does not vanish at distance (%.2f, %.2f vs %.2f)" % [covered.call(1), covered.call(2), covered.call(0)])
-	var leaf_img := DotMapBspMesh.cutout_texture(&"leaves").get_image()
-	var leaf_solid := 0
-	for ly in leaf_img.get_height():
-		for lx in leaf_img.get_width():
-			if leaf_img.get_pixel(lx, ly).a >= 0.5:
-				leaf_solid += 1
-	var leaf_share := float(leaf_solid) / float(leaf_img.get_width() * leaf_img.get_height())
-	_check(leaf_share > 0.8 and leaf_share < 1.0, "a foliage card is mostly leaf, with small gaps and no black sky patches (%.2f)" % leaf_share)
-	_check(DotMapBspMesh.glass_material(&"fence").alpha_antialiasing_mode == BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE, "cutouts use alpha to coverage")
-	_check(DotMapBspMesh.glass_material(&"nonsense") == DotMapBspMesh.glass_material(&"glass"), "an unknown kind is clear glass, shared")
-	_check(world.breakables().size() == 1 and str(world.breakables()[0]["glass"]) == "glass", "one breakable glass model")
+	_test_cutouts(world)
 	var panes := world.build_breakables(root)
 	_check(panes.size() == 1 and panes[0].health == 20.0 and panes[0].model == 1, "a pane with the map's health")
 	var pane: DotMapGlass = panes[0]
@@ -424,6 +395,34 @@ func _test_glass() -> void:
 	twin.apply_broken(Vector3.ONE, &"host")
 	_check(twin.is_broken(), "the host's word breaks it on a client")
 	_done()
+
+
+func _test_cutouts(world: DotMapBspMesh) -> void:
+	var fence_tex := DotMapBspMesh.cutout_texture(&"diamond")
+	var fence_img := fence_tex.get_image()
+	var covered := func(level: int) -> float:
+		var lvl := Image.create_from_data(fence_img.get_width(), fence_img.get_height(), true, fence_img.get_format(), fence_img.get_data())
+		var n := 0
+		var w := maxi(fence_img.get_width() >> level, 1)
+		var off := lvl.get_mipmap_offset(level)
+		var d := lvl.get_data()
+		for i in w * w:
+			if d[off + i * 4 + 3] >= 128:
+				n += 1
+		return float(n) / float(w * w)
+	_check(absf(covered.call(1) - covered.call(0)) < 0.12 and covered.call(2) > 0.1,
+			"a thin cutout keeps its coverage in the mips, so a fence does not vanish at distance (%.2f, %.2f vs %.2f)" % [covered.call(1), covered.call(2), covered.call(0)])
+	var leaf_img := DotMapBspMesh.cutout_texture(&"leaves").get_image()
+	var leaf_solid := 0
+	for ly in leaf_img.get_height():
+		for lx in leaf_img.get_width():
+			if leaf_img.get_pixel(lx, ly).a >= 0.5:
+				leaf_solid += 1
+	var leaf_share := float(leaf_solid) / float(leaf_img.get_width() * leaf_img.get_height())
+	_check(leaf_share > 0.8 and leaf_share < 1.0, "a foliage card is mostly leaf, with small gaps and no black sky patches (%.2f)" % leaf_share)
+	_check(DotMapBspMesh.glass_material(&"fence").alpha_antialiasing_mode == BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE, "cutouts use alpha to coverage")
+	_check(DotMapBspMesh.glass_material(&"nonsense") == DotMapBspMesh.glass_material(&"glass"), "an unknown kind is clear glass, shared")
+	_check(world.breakables().size() == 1 and str(world.breakables()[0]["glass"]) == "glass", "one breakable glass model")
 
 
 func _test_mesh_lods() -> void:

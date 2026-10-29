@@ -1,14 +1,8 @@
 extends Node3D
 
-## [DotMapBrush]: every kind built, measured, ray-cast and (with --shot) drawn.
-##
-## [codeblock]
-## godot --headless --path . res://examples/brushes_demo.tscn
-## godot --path . res://examples/brushes_demo.tscn -- --shot=~/frames/brushes   # on a display
-## [/codeblock]
-##
-## The checks cannot see a face wound inside out or a texture stretched along a slope, so
-## the frame has to be looked at: the checker material below makes both obvious.
+## [DotMapBrush]: every kind built, measured, ray-cast and (with --shot) drawn. The checks cannot see a face
+## wound inside out or a texture stretched along a slope, so the frame has to be looked at: the checker
+## material below makes both obvious.
 
 const CHECKS := 62
 const SECTIONS := 4

@@ -1,12 +1,8 @@
 class_name DotMapBoxBake
 extends RefCounted
 
-## Baked light for a map a game draws from boxes in code: the half of dot-lighting's [code]DotLightBake[/code] every box-document game repeats.
-##
-## A game builds its opaque box batches with [method new_sheet] and [method add_faces] (a UV2 that is the same on every machine), names them
-## `Boxes_<n>` the same on every build, finishes each with [method commit], and marks the mesh [constant META_BAKEABLE]. Offline, [method bake_scene]
-## turns the built map into the scene the editor bakes; at runtime [method attach] lays the stored file over the same map.
-## dot-lighting's classes are reached by path, never by name: a shell with an older dot-lighting would fail to parse this whole script otherwise.
+## Baked light for a map a game draws from boxes in code: the half of dot-lighting's
+## [code]DotLightBake[/code] every box-document game repeats.
 
 const CHANNEL := "dot.map.box_bake"
 

@@ -1,10 +1,9 @@
 class_name DotMapTrigger
 extends DotMapEntity
 
-## trigger_multiple and trigger_once as logic: a body entering fires OnStartTouch, then OnTrigger
-## when enabled, then waits [code]wait[/code] seconds (once: never again). A body that stays in
-## fires OnTrigger again each time the wait is over. Where bodies are is [DotMapVolumes]'s;
-## [method DotMapIO.touch] is the same entry for a game with its own overlap test.
+## trigger_multiple and trigger_once as logic: a body entering fires OnStartTouch, then OnTrigger when
+## enabled, then waits [code]wait[/code] seconds (once: never again). A body that stays in fires OnTrigger
+## again each time the wait is over.
 
 var _blocked_until := 0
 var _wait := 1.0

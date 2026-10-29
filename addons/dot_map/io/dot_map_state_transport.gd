@@ -1,23 +1,9 @@
 class_name DotMapStateTransport
 extends RefCounted
 
-## The reference [member DotMapStateSync.send_fn] for a game: queues each peer's state messages and
-## sends them as few payloads as the game's own net channel allows, then unpacks them on the client.
-##
-## [codeblock]
-## # host
-## var t := DotMapStateTransport.new()
-## t.raw_send = func(peer, payload: Dictionary): my_channel.send(peer, payload)   # any reliable channel
-## var world := DotMapWorld.build(prefix, {"send_fn": t.send, ...}, {...}).value
-## t.flush_on(world.io)             # after the sync's own handler, so each tick's changes leave together
-## # client: my_channel's receive handler
-## if DotMapStateTransport.is_state_payload(payload):
-##     t.receive(client_io, client_sync, payload)
-## [/codeblock]
-##
-## Messages that fit [member max_bytes] together travel as one [code]io_batch[/code]; one that is bigger
-## alone (a snapshot of a large map) goes by itself, so the channel must handle payloads of that size.
-## Nothing here names a net addon: [member raw_send] is the only seam.
+## The reference [member DotMapStateSync.send_fn] for a game: queues each peer's state messages, sends them as few payloads as the game's channel allows ([member max_bytes]), and unpacks them on the client.
+## Set [member raw_send], pass [code]t.send[/code] as the world's send_fn, call [code]t.flush_on(world.io)[/code] after the sync's own handler, and feed incoming payloads to [code]t.receive[/code] when [method is_state_payload].
+## One message bigger than [member max_bytes] goes alone, so the channel must carry that size. Nothing here names a net addon.
 
 const TYPE_BATCH := "io_batch"
 

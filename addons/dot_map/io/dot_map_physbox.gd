@@ -1,14 +1,9 @@
 class_name DotMapPhysbox
 extends DotMapBreakable
 
-## func_physbox: a brush that is a physics object. [DotMapWorld] gives its model a [RigidBody3D]
-## (convex hulls, the drawn meshes riding on it) and binds it with [method bind_body]; the
-## authority simulates it and a client keeps it frozen. EnableMotion / DisableMotion freeze and
-## free it, Wake / Sleep put it to sleep, and [code]damagetoenablemotion[/code] /
-## [code]forcetoenablemotion[/code] above zero start it frozen until one hit of that size.
-## Breaking (health, Break) works as for any breakable. The authority reports the body's pose as the
-## [code]pose[/code] state ([code][x, y, z, qx, qy, qz, qw][/code], local to the model node) ten times a second
-## while it moves, and a client eases its frozen body toward the last one.
+## func_physbox: a brush that is a physics object. [DotMapWorld] gives its model a [RigidBody3D] (convex
+## hulls, the drawn meshes riding on it) and binds it with [method bind_body]; the authority simulates it and
+## a client keeps it frozen.
 
 var body: RigidBody3D = null
 var motion := true

@@ -1,11 +1,7 @@
 extends Node
 
-## [DotMapNavLinks] on a synthetic entity set: a button through a relay to a door, a shot button to a disabled
-## teleport, a walk-in pad to a door, and a closer that must not count.
-##
-## [codeblock]
-## godot --headless --path . res://examples/nav_links_demo.tscn
-## [/codeblock]
+## [DotMapNavLinks] on a synthetic entity set: a button through a relay to a door, a shot button to a
+## disabled teleport, a walk-in pad to a door, and a closer that must not count.
 
 const CHECKS := 24
 const SECTIONS := 3

@@ -1,10 +1,7 @@
 class_name DotMapGameUi
 extends DotMapEntity
 
-## game_ui: Activate hands one player's controls to the map. While active, [method feed] turns what that player holds into
-## the PressedX / UnpressedX outputs (forward, back, move left, move right, attack, attack2) and the axis outputs; Deactivate,
-## and the use or jump key when the spawnflags say so, give the controls back (PlayerOff). The game freezes the player and
-## hides their weapon when asked in the [code]ui_active[/code] event, and feeds the held buttons every tick.
+## game_ui: Activate hands one player's controls to the map.
 
 const BUTTONS := {"forward": "Forward", "back": "Back", "left": "MoveLeft", "right": "MoveRight", "attack": "Attack", "attack2": "Attack2"}
 const FREEZE := 32

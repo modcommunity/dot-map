@@ -1,11 +1,8 @@
 extends Node3D
 
-## Renders one frame of a converted map the way a game builds it, through [DotMapWorld]: free photo and generated
-## textures, the environment, the stand-in props, glass. Run it under a display (tools/screenshot.sh).
-##
-##   godot --path . res://examples/bsp_world_shot.tscn -- --world=<prefix> --out=<png> [--view=spawn|overview] [--cam=x,y,z --look=x,y,z] [--nolight] [--nomodels] [--aniso=0|2|4|8|16] [--list=<file>]
-##
-## `--list` is a file of lines `<png> <x,y,z cam> <x,y,z look>`: one load, a frame for each line (a map's props take minutes to parse).
+## Renders one frame of a converted map the way a game builds it, through [DotMapWorld]: free photo and
+## generated textures, the environment, the stand-in props, glass. Run it under a display
+## (tools/screenshot.sh). godot --path .
 
 var _out := "user://shot.png"
 
@@ -39,29 +36,9 @@ func _ready() -> void:
 		return
 	var dw: DotMapWorld = built.value
 	add_child(dw)
-	if str(args.get("view", "")) == "overview":
-		# a map's fog is set for play inside it: from outside the map it hides the whole thing
-		for we in dw.find_children("*", "WorldEnvironment", true, false):
-			var env := (we as WorldEnvironment).environment
-			env.fog_enabled = false
-			# a dark or black sky hides a map seen from outside
-			env.background_mode = Environment.BG_COLOR
-			env.background_color = Color(0.55, 0.62, 0.72)
-			env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-			env.ambient_light_color = Color(0.55, 0.55, 0.6)
+	_overview_sky(dw, args)
 	var node: Node3D = dw.visual
-	if world.build_environment() == null:
-		# A map with no environment of its own would be black: give the frame plain light.
-		var we := WorldEnvironment.new()
-		we.environment = Environment.new()
-		we.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-		we.environment.ambient_light_color = Color(0.8, 0.8, 0.85)
-		we.environment.background_mode = Environment.BG_COLOR
-		we.environment.background_color = Color(0.5, 0.6, 0.75)
-		add_child(we)
-		var sun := DirectionalLight3D.new()
-		sun.rotation_degrees = Vector3(-55, 30, 0)
-		add_child(sun)
+	_light_if_unlit(world)
 	if args.has("aniso"):
 		get_viewport().anisotropic_filtering_level = {0: Viewport.ANISOTROPY_DISABLED, 2: Viewport.ANISOTROPY_2X, 4: Viewport.ANISOTROPY_4X, 8: Viewport.ANISOTROPY_8X}.get(int(args["aniso"]), Viewport.ANISOTROPY_16X)
 	var cam := Camera3D.new()
@@ -101,6 +78,34 @@ func _ready() -> void:
 	err = img.save_png(_out)
 	print("saved %s (%s) from %s to %s" % [_out, error_string(err), from, look])
 	get_tree().quit(0 if err == OK else 1)
+
+
+func _light_if_unlit(world: DotMapBspMesh) -> void:
+	if world.build_environment() == null:
+		# A map with no environment of its own would be black: give the frame plain light.
+		var we := WorldEnvironment.new()
+		we.environment = Environment.new()
+		we.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+		we.environment.ambient_light_color = Color(0.8, 0.8, 0.85)
+		we.environment.background_mode = Environment.BG_COLOR
+		we.environment.background_color = Color(0.5, 0.6, 0.75)
+		add_child(we)
+		var sun := DirectionalLight3D.new()
+		sun.rotation_degrees = Vector3(-55, 30, 0)
+		add_child(sun)
+
+
+func _overview_sky(dw: DotMapWorld, args: Dictionary) -> void:
+	if str(args.get("view", "")) == "overview":
+		# a map's fog is set for play inside it: from outside the map it hides the whole thing
+		for we in dw.find_children("*", "WorldEnvironment", true, false):
+			var env := (we as WorldEnvironment).environment
+			env.fog_enabled = false
+			# a dark or black sky hides a map seen from outside
+			env.background_mode = Environment.BG_COLOR
+			env.background_color = Color(0.55, 0.62, 0.72)
+			env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+			env.ambient_light_color = Color(0.55, 0.55, 0.6)
 
 
 ## The camera when none is given: at the first player spawn looking at the map centre (the small sky model is not part of the map), or when the

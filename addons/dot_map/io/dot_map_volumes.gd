@@ -1,22 +1,9 @@
 class_name DotMapVolumes
 extends RefCounted
 
-## Every volume of a converted map, stepped from the game's tick. Build it from the manifest's
-## entities and the [DotMapIO] that runs the map's logic, then give it the bodies once a tick:
-##
-## [codeblock]
-## var vols := DotMapVolumes.build(DotMapEntities.from_manifest(world.manifest), io)
-## ladder.volumes = vols.ladder_boxes()      # dot-player-controller's DotFpsLadderMode
-## swim.volumes = vols.water_boxes()         # and DotFpsSwimMode
-## io.damage_fn = func(body, amount, kind, attacker): ...
-## # every tick, after io.advance(1):
-## vols.step([{"id": 1, "body": player, "position": feet, "kind": "player"}])
-## [/codeblock]
-##
-## Ladders and water are data for the controller (boxes), not areas, so a client replaying
-## prediction gets the answer the server had. Everything else reaches the game through the
-## callables on [DotMapIO]: [member DotMapIO.damage_fn] for a hurt volume, [member DotMapIO.move_fn]
-## for a push or teleport, [member DotMapIO.event_fn] for gravity.
+## Every volume of a converted map, stepped from the game's tick: [code]DotMapVolumes.build(entities, io)[/code], then [code]vols.step(bodies)[/code] each tick after [code]io.advance(1)[/code].
+## Ladders and water are boxes for the controller ([method ladder_boxes], [method water_boxes]), not areas, so a client replaying prediction gets the server's answer.
+## Everything else reaches the game through [DotMapIO]'s callables: [member DotMapIO.damage_fn], [member DotMapIO.move_fn], [member DotMapIO.event_fn].
 
 var io: DotMapIO
 var nodes: Array[DotMapVolumeNode] = []

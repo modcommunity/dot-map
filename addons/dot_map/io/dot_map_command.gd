@@ -1,10 +1,8 @@
 class_name DotMapCommand
 extends RefCounted
 
-## What a map may ask the server to do. A map's command entity never runs anything: its text is
-## split into single commands and each is judged here, then recorded by [DotMapIO]. Allowed is a
-## chat line or a cvar the operator listed, with a plain value; the names below are denied even
-## when a pattern would match, so a careless allow-list cannot hand a map the server.
+## What a map may ask the server to do. A map's command entity never runs anything: its text is split into
+## single commands and each is judged here, then recorded by [DotMapIO].
 
 ## A first word that is never allowed.
 const NEVER := ["quit", "exit", "exec", "alias", "bind", "unbind", "connect", "disconnect", "map", "changelevel",

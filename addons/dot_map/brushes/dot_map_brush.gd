@@ -1,30 +1,9 @@
 class_name DotMapBrush
 extends RefCounted
 
-## Map-building solids as data: a spec in, a mesh and collision out.
-##
-## [codeblock]
-## {"kind": "stairs", "size": [4, 3, 6], "params": {"steps": 6}, "uv_metres": 1.0}
-## [/codeblock]
-##
-## [b]Every brush is a set of convex pieces.[/b] The collision is one
-## [ConvexPolygonShape3D] per piece, never a trimesh: a concave solid (an arch, a
-## quarter-pipe, a slab with holes) is several convex ones, which the solver handles and a
-## character walks over without catching on an inside edge. The mesh is the pieces' faces,
-## minus the faces two pieces share (same corners) (they would be inside the solid).
-##
-## [b]UVs are in metres.[/b] Each face is laid out on its own plane (a horizontal face by
-## x and z; any other by its horizontal tangent and its slope), one UV unit per
-## [code]uv_metres[/code]. A brush twice as big shows twice the texture rather than a
-## stretched one, and a slope's texture is the size of a wall's. Pair it with a plain
-## tiling material; [DotMapSurfaces] is already triplanar and needs no UVs, either works.
-##
-## The brush is centred on its bounding box, like a box of the maps in this family, and
-## climbs, leans or opens toward +x where a direction matters (turn it with the node).
-## Kinds: box, wedge (alias ramp), stairs, cylinder, cone, spike, arch, quarter_pipe, slab_holes.
-## Params: [code]steps[/code] (stairs), [code]segments[/code] (cylinder, cone, spike, arch,
-## quarter_pipe), [code]thickness[/code] (arch, metres), [code]holes[/code] (slab_holes:
-## [code][[x, z, width, depth], ...][/code] from the slab's centre, metres).
+## Map-building solids as data: a spec in, a mesh and collision out, e.g. [code]{"kind": "stairs", "size": [4, 3, 6], "params": {"steps": 6}}[/code]. Kinds: box, wedge (ramp), stairs, cylinder, cone, spike, arch, quarter_pipe, slab_holes.
+## Every brush is a set of convex pieces (one [ConvexPolygonShape3D] each, never a trimesh) and UVs are in metres ([code]uv_metres[/code] per unit), so a bigger brush shows more texture, not a stretched one.
+## Centred on its bounding box; it climbs, leans or opens toward +x. Params: steps, segments, thickness (arch), holes (slab_holes: [code][[x, z, width, depth], ...][/code]).
 
 const META_KIND := &"dot_map_brush"
 

@@ -1,26 +1,9 @@
 class_name DotMapVisibility
 extends Node
 
-## Draws only what the camera could see, from a converted map's precomputed visibility.
-##
-## [codeblock]
-## var vis := DotMapVisibility.new()
-## add_child(vis)
-## vis.setup(world, world_node)          # a DotMapBspMesh and its build_node() tree, in the scene
-## vis.set_door_open("door_store", true) # every area portal that follows that door opens
-## [/codeblock]
-##
-## [b]The camera's cluster, not the frustum.[/b] The converter keeps the map's leaves, clusters and the
-## per-cluster set of clusters visible from it (the PVS, compressed as stored). Each frame the camera's
-## position walks the plane tree; only when it has moved [member move_step] are the clusters within
-## [member margin] of it looked up again, and only when that set changes are chunks shown or hidden.
-## A chunk is drawn when one of its clusters is in the union of their PVS rows and in an area reachable
-## through open portals. A camera in solid or outside the map draws everything.
-##
-## [b]Occluders[/b] are the map's large opaque brushes ([code]vis.occluder_*[/code]), one
-## [OccluderInstance3D]; they hide props and characters behind walls where the PVS cannot.
-##
-## Nothing runs on a headless host unless [member run_headless] is set: a dedicated server draws nothing.
+## Draws only what the camera could see, from a converted map's precomputed visibility: [code]vis.setup(world, world_node)[/code] in the scene, [code]vis.set_door_open(name, true)[/code] opens a door's area portals.
+## The camera's cluster, not the frustum: a chunk is drawn when one of its clusters is in the union of the PVS rows around the camera and in an area reachable through open portals; the set is looked up again every [member move_step]. Occluders hide props and characters behind walls.
+## Nothing runs on a headless host unless [member run_headless] is set.
 
 const CHANNEL := "dot_map.visibility"
 

@@ -1,19 +1,7 @@
 extends Node3D
 
-## Every surface kind of [DotMapSurfaces] on code-built boxes, and the suite that proves the
-## library hands back what a map generator expects.
-##
-## [codeblock]
-## godot --headless --path . res://examples/surfaces_demo.tscn
-## # Frames, on a display (xvfb-run, or a real GPU through gpu.sh):
-## godot --path . res://examples/surfaces_demo.tscn -- --shot=/tmp/frames
-## [/codeblock]
-##
-## Headless it only checks; with [code]--shot=<prefix>[/code] it renders three views to
-## [code]<prefix>_overview.png[/code], [code]_low.png[/code] and [code]_close.png[/code] and quits.
-## [b]An interface and a look are what no assertion reaches[/b]: the checks cannot tell a normal
-## map that is inside out, or a texture twice the size it should be, so the frames have to be
-## looked at.
+## Every surface kind of [DotMapSurfaces] on code-built boxes, and the suite that proves the library hands
+## back what a map generator expects.
 
 const CHECKS := 134
 const SECTIONS := 7
@@ -152,8 +140,6 @@ func _test_paths() -> void:
 	_check(seen.size() > 0 and String(seen[0]).begins_with("res://nowhere/asphalt/"), "it saw the unrebased path")
 	_done()
 
-
-# --- The gallery -------------------------------------------------------------------
 
 func _test_liquids() -> void:
 	_section("a world's water, slime and lava faces are the liquid shader")
@@ -297,8 +283,6 @@ func _build_gallery() -> void:
 	cam.fov = 60.0
 	add_child(cam)
 	_view(cam, Vector3(0.0, 16.0, depth + 10.0), Vector3(0.0, 0.0, depth * 0.4))
-
-
 
 
 func _view(cam: Camera3D, from: Vector3, at: Vector3) -> void:

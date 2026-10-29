@@ -1,22 +1,8 @@
 class_name DotMapMoverNode
 extends DotMapEntity
 
-## Doors, lifts, buttons, spinners and trains as entities of the I/O runtime, driving the
-## converter's [DotMapMover] record from inputs.
-##
-## [b]Motion is a function of the tick.[/b] Each move is stored as where it started, where it is
-## going and the tick it began; the pose at any tick is computed from those, so the server, a
-## client and a replay agree and a joiner needs only the stored numbers ([method state]). Arrival
-## (OnFullyOpen, an automatic close, a corner passed) is a self-scheduled event at the exact tick.
-## Without a record ([method set_mover]) the entity is inert and counted as unbound.
-##
-## A moving mover pushes the bodies [DotMapVolumes] gives it through [member DotMapIO.move_fn]
-## (the velocity that carries a body along); a body still inside after [constant BLOCK_TICKS]
-## ticks is blocked: the [code]dmg[/code] key hurts it, OnBlockedOpening / OnBlockedClosing fire,
-## and a door or lift with [code]wait[/code] of 0 or more reverses, as the original does.
-##
-## A func_rotating with a [code]fanfriction[/code] ramps to and from speed (see [method DotMapMover.spin_acceleration]).
-## Not done: a train's rotation to follow its path, tank trains.
+## Doors, lifts, buttons, spinners and trains as entities of the I/O runtime, driving the converter's
+## [DotMapMover] record from inputs. Motion is a function of the tick.
 
 ## Ticks a body may stay inside a moving mover before it counts as blocked.
 const BLOCK_TICKS := 3

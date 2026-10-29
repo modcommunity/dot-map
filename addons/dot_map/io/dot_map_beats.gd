@@ -1,10 +1,9 @@
 class_name DotMapBeats
 extends DotMapEntity
 
-## logic_beats: a map's music-beat cue as a plain beat signal, so no track has to ship. With a tempo it fires OnBeat and the
-## [code]beat[/code] event on the map's own tick (bar, beat in the bar, downbeat); without one it is silent. The tempo comes
-## from the key [code]bpm[/code], the input SetBPM or [member default_bpm]. [member announcer_off] is the map's DisableAnnoucner
-## (that key's own spelling) for a game that has a wave announcer.
+## logic_beats: a map's music-beat cue as a plain beat signal, so no track has to ship. With a tempo it fires
+## OnBeat and the [code]beat[/code] event on the map's own tick (bar, beat in the bar, downbeat); without one
+## it is silent. The tempo comes from the key [code]bpm[/code], the input SetBPM or [member default_bpm].
 
 ## Used when the map names no tempo; 0 leaves the beat off.
 var default_bpm := 0.0

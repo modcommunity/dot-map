@@ -1,28 +1,9 @@
 class_name DotMapWorld
 extends Node3D
 
-## A converted map's whole world from one call: the drawn mesh with its glass, the collision hulls,
-## the I/O runtime loaded from the stored source document, every entity class, the volumes,
-## effects, sounds, the map-command allow-list, per-map settings and server-authoritative state
-## replication. The game plugs its callables in once.
-##
-## [codeblock]
-## var res := DotMapWorld.build("res://worlds/wo_office_course", {
-##     "damage_fn": _damage, "move_fn": _move, "event_fn": _event, "effect_fn": _effect,
-##     "ladder_fn": func(boxes): ladder_mode.volumes = boxes,
-##     "swim_fn": func(boxes): swim_mode.volumes = boxes,
-##     "send_fn": _send_to_peer,
-## }, {"command_allow": ["sv_airaccelerate"]})
-## if res.ok:
-##     world = res.value
-##     add_child(world)
-## # every game tick, with the bodies volumes should test (see DotMapVolumeNode.step):
-## world.step(bodies)
-## [/codeblock]
-##
-## Nothing here names dot-player-controller: ladders and water reach it through [code]ladder_fn[/code]
-## and [code]swim_fn[/code], which get an [code]Array[AABB][/code] at build and whenever a ladder or
-## water volume is enabled or disabled.
+## A converted map's whole world from one call: [code]DotMapWorld.build(prefix, callables, options)[/code] gives the drawn mesh with its glass, the collision hulls, the I/O runtime, every entity class, volumes, effects, sounds, per-map settings and state replication; call [code]world.step(bodies)[/code] each tick.
+## The game plugs its callables in once ([code]damage_fn, move_fn, event_fn, effect_fn, send_fn[/code]).
+## Nothing here names dot-player-controller: ladders and water reach it through [code]ladder_fn[/code] and [code]swim_fn[/code], which get an [code]Array[AABB][/code].
 
 const CHANNEL := "map.world"
 const HOOKS := ["damage_fn", "move_fn", "event_fn", "effect_fn", "actor_fn", "propdata_fn", "player_fn"]
@@ -60,18 +41,9 @@ var _steps := 0
 var _touched: Dictionary = {}
 
 
-## Builds the world of the mesh at [param prefix] (the [code].json]/[code].bin[/code] pair) or from an already
-## loaded [DotMapBspMesh]. [param hooks]: [code]damage_fn, move_fn, event_fn, effect_fn, actor_fn, propdata_fn,
-## player_fn, send_fn, ladder_fn, swim_fn, material_for[/code] (callables). [param options]: [code]doc[/code]
-## (the source document), [code]doc_path[/code], [code]store[/code] (store root), [code]authoritative[/code]
-## (true), [code]rate[/code] (60), [code]seed[/code], [code]command_allow[/code], [code]map_id[/code],
-## [code]environment, props, sounds, collision[/code] (true), [code]draw[/code] (false builds the model nodes with no meshes; default off on the headless display, where nothing renders), [code]surfaces[/code] (a [DotMapSurfaces]; with no
-## [code]material_for[/code] hook the world is drawn through it, lightmapped, else through a default one), [code]lightmap[/code] (true), [code]layers[/code] ({solid, clip, glass} to
-## a collision layer, default 1), [code]config[/code] ({game, config_dir, allow, defaults, get_fn, set_fn};
-## the weakest layer is the manifest's [code]settings[/code], the cvars the map's own entities set, then
-## [code]defaults[/code]; a key the game did not [code]allow[/code] is still refused).
-## The source document is found beside the mesh as [code]<prefix>.doc.json[/code], else in the store by the
-## sha256 the manifest records.
+## Builds the world of the mesh at [param prefix] (the [code].json]/[code].bin[/code] pair) or from an
+## already loaded [DotMapBspMesh]. [param hooks]: [code]damage_fn, move_fn, event_fn, effect_fn, actor_fn,
+## propdata_fn, player_fn, send_fn, ladder_fn, swim_fn, material_for[/code] (callables).
 static func build(source: Variant, hooks: Dictionary = {}, options: Dictionary = {}) -> DotResult:
 	var m: DotMapBspMesh
 	if source is DotMapBspMesh:
@@ -117,10 +89,9 @@ func light_with(environment: Environment, lamps: Array = [], sun: DirectionalLig
 	return lit
 
 
-## A bullet along [param from] to [param to] against the map's own breakables, buttons and doors: the
-## first body on the ray (on [param mask]) that belongs to one takes [param amount] through [method DotMapIO.hurt].
-## Returns the entity index it hurt, or -1. Pass the nearest hit's distance in [param limit] (negative: none)
-## so a player in front of the panel is not shot through. Host only.
+## A bullet along [param from] to [param to] against the map's own breakables, buttons and doors: the first
+## body on the ray (on [param mask]) that belongs to one takes [param amount] through [method DotMapIO.hurt].
+## Returns the entity index it hurt, or -1.
 func shoot(space: PhysicsDirectSpaceState3D, from: Vector3, to: Vector3, amount: float, by: Variant = null,
 		mask: int = 0xFFFFFFFF, limit: float = -1.0) -> int:
 	if not io.authoritative or space == null or amount <= 0.0:

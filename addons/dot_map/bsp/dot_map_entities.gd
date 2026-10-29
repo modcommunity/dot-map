@@ -1,18 +1,9 @@
 class_name DotMapEntities
 extends RefCounted
 
-## Everything a converted map says about its brush entities and logic, read from a manifest:
-## movers, volumes, the link graph and the entities kept as plain data.
-##
-## [codeblock]
-## var ents := DotMapEntities.from_manifest(world.manifest)
-## var door := ents.mover_named("lift02_plate")
-## for link in ents.links.fired_by(button_entity, "OnPressed"):
-##     ents.mover_of(link["to"][0])   # then run link["input"] after link["delay"]
-## [/codeblock]
-##
-## A class the converter does not know arrives in [member generic] with every key it had, so a
-## game can read its own entities without the converter changing.
+## Everything a converted map says about its brush entities and logic, read from a manifest: movers, volumes, the link graph and the entities kept as plain data.
+## Start from [code]DotMapEntities.from_manifest(world.manifest)[/code], then [method mover_named], [member links].
+## A class the converter does not know arrives in [member generic] with every key it had, so a game can read its own entities.
 
 var movers: Array[DotMapMover] = []
 var volumes: Array[DotMapVolume] = []

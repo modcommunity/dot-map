@@ -2,56 +2,9 @@
 class_name DotMapSyncHost
 extends Node
 
-## Changes the map for everybody, rather than only for this process.
-##
-## [b]This is the piece dot-map was missing, and its absence is the difference between
-## switching games and switching maps.[/b] dot-server has the whole announce → download →
-## wait → swap → reload protocol for a [i]game[/i]. A map change had nothing: a
-## [DotMapSession] freed its world and loaded the next one, and every connected client
-## carried on playing the map that no longer existed. Games that networked at all — and
-## only one did — broadcast a map id and hoped every client already had the scene in its
-## build, which works exactly until the first map that is delivered rather than shipped.
-##
-## The two are deliberately different operations and both are worth having:
-##
-## [codeblock]
-## changing a GAME    the module, the netcode and the client scene are replaced;
-##                    every player goes back through DOWNLOADING -> LOADING -> SPAWNED.
-##                    dot-server owns it. Heavy, and rare.
-##
-## changing a MAP     the game stays loaded, the netcode stays up, the players stay
-##                    spawned; only the world is replaced. This owns it. Light, and
-##                    every few minutes.
-## [/codeblock]
-##
-## [b]Transport-agnostic on purpose.[/b] dot-map depends on nothing but dot-core, so this
-## does not know what carries its messages: set [member send_fn] to anything that can put
-## a [Dictionary] in front of one peer. That is the same shape [code]DotNetManager.send_fn[/code]
-## takes, and for the same reason.
-##
-## [codeblock]
-## var host := DotMapSyncHost.new()
-## host.session = map_session
-## host.send_fn = func(peer: int, payload: Dictionary) -> void:
-##     link.send_to(peer, payload)
-## add_child(host)
-##
-## host.admit_peer(peer_id)               # as clients join
-## await host.change_to(&"surf_tidewater")  # instead of session.change_to
-## [/codeblock]
-##
-## [b]A peer that joins between changes is announced the current map and then told to
-## load it[/b], by the same announce -> ready -> load a change uses. The host answers a
-## [code]ready[/code] for the map it is on, while no change is running, with a
-## [code]load[/code] — once per peer per map. That is the one moment the host knows the
-## peer has the content, and it is the host that knows whether it has already told that
-## peer to load: so it works for [method admit_peer], for a host that calls
-## [method add_peer] and sends [method join_payload] itself, and for a straggler whose
-## download finished after the change went ahead without it.
-##
-## [b]A peer that joins during a change is not part of it.[/b] The peers a change waits on
-## are the ones registered when it began; one added later is announced whatever map the
-## host ends up on once the change settles, finished or abandoned.
+## Changes the map for everybody, not only this process: announce, wait for each peer's download, swap, then tell all to load.
+## Transport-agnostic: set [member send_fn] to anything that puts a [Dictionary] in front of one peer.
+## A peer joining between changes is announced the map and told to load it once; one joining during a change is not part of it.
 
 const CHANNEL := "map.sync"
 
@@ -70,11 +23,9 @@ signal peer_progress(peer_id: int, fraction: float)
 ## Readiness during a change, for a progress display.
 signal sync_progress(ready_count: int, total: int)
 
-## A peer did not get the content in time. The host decides what to do about it.
-##
-## [b]This addon does not disconnect anybody[/b] — it has no transport and no session
-## list, and a game may perfectly well want to leave a slow client downloading. Connect
-## [member on_timeout_fn] or this signal to whatever does the dropping.
+## A peer did not get the content in time. The host decides what to do about it. This addon does not
+## disconnect anybody — it has no transport and no session list, and a game may perfectly well want to leave
+## a slow client downloading. Connect [member on_timeout_fn] or this signal to whatever does the dropping.
 signal peer_timed_out(peer_id: int)
 
 ## The map is live here and every peer has been told to show it.
@@ -90,37 +41,28 @@ signal change_failed(map: DotMapDef, reason: String)
 
 @export_group("Waiting")
 
-## Seconds to wait for every peer to have the new map's content.
-##
-## Generous, because it covers a download. Shorter than dot-server's equivalent because
-## a map is one world, not a whole game.
+## Seconds to wait for every peer to have the new map's content. Generous, because it covers a download.
+## Shorter than dot-server's equivalent because a map is one world, not a whole game.
 @export_range(5.0, 3600.0, 5.0) var sync_timeout_sec: float = 300.0
 
 ## Swap as soon as everyone is ready rather than waiting out the timeout.
 @export var swap_when_all_ready: bool = true
 
-## Change the map even though some peers never got the content.
-##
-## On, and the reason is the one dot-server gives: the players who did get the map should
-## not be denied the change by the ones who could not. Off holds the whole server on the
-## current map for one client with a bad connection.
+## Change the map even though some peers never got the content. On, and the reason is the one dot-server
+## gives: the players who did get the map should not be denied the change by the ones who could not. Off
+## holds the whole server on the current map for one client with a bad connection.
 @export var swap_without_stragglers: bool = true
 
-## Seconds between polls of the readiness set.
-##
-## Not a frame: a map change is a once-every-few-minutes event and a peer answering
-## 200 ms later than it might costs nothing anybody can perceive.
+## Seconds between polls of the readiness set. Not a frame: a map change is a once-every-few-minutes event
+## and a peer answering 200 ms later than it might costs nothing anybody can perceive.
 @export_range(0.05, 2.0, 0.05) var poll_interval_sec: float = 0.25
 
 ## The session this drives, assigned directly when there is no [member session_ref].
 var session: DotMapSession = null
 
-## Sends one payload to one peer. Set by the host.
-##
-## [b]One peer, never a broadcast address.[/b] A [code]send(payload, 0)[/code] convention
-## is how this family last shipped a private per-player message to every client at once,
-## and the peer that caused it was a bot registered with id 0. So this takes a peer and
-## the loop over them is here, in the open.
+## Sends one payload to one peer. Set by the host. One peer, never a broadcast address. A [code]send(payload,
+## 0)[/code] convention is how this family last shipped a private per-player message to every client at once,
+## and the peer that caused it was a bot registered with id 0.
 var send_fn: Callable = Callable()
 
 ## Called with a peer id that ran out of time. Optional; the signal carries the same.
@@ -131,12 +73,9 @@ var phase: Phase = Phase.IDLE
 ## Peers expected to follow a map change, in the order they were added.
 var peers: PackedInt64Array = PackedInt64Array()
 
-## The peers the change in flight was announced to, fixed when it began.
-##
-## [b]Snapshotted, not read live.[/b] The wait counted [member peers] on every poll, so a
-## peer admitted mid-change was waited on for a map it had never been announced — which
-## held the change to its timeout and then reported the joiner as a straggler. Only the
-## peers that were told are waited on, told to load, or told it was abandoned.
+## The peers the change in flight was announced to, fixed when it began. Snapshotted, not read live. The wait
+## counted [member peers] on every poll, so a peer admitted mid-change was waited on for a map it had never
+## been announced — which held the change to its timeout and then reported the joiner as a straggler.
 var _participants: PackedInt64Array = PackedInt64Array()
 ## Peers added while a change was in flight, announced the current map once it settles.
 var _joined_mid_change: PackedInt64Array = PackedInt64Array()
@@ -161,13 +100,9 @@ func _ready() -> void:
 			session = resolved.value as DotMapSession
 
 
-# --- Peers -----------------------------------------------------------------
-
-## Registers a peer that must follow map changes.
-##
-## Sends nothing on its own; [method admit_peer] is the one-call join. A peer added while
-## a change is in flight is not waited on by it (see [member _participants]) and is
-## announced the current map once that change settles, whoever added it.
+## Registers a peer that must follow map changes. Sends nothing on its own; [method admit_peer] is the one-
+## call join. A peer added while a change is in flight is not waited on by it (see [member _participants])
+## and is announced the current map once that change settles, whoever added it.
 func add_peer(peer_id: int) -> void:
 	if peers.has(peer_id):
 		return
@@ -180,11 +115,9 @@ func add_peer(peer_id: int) -> void:
 		})
 
 
-## Registers a peer and tells it the map the host is on.
-##
-## Announced now when no change is running, and once the change settles when one is. The
-## [code]load[/code] follows the peer's [code]ready[/code] — see the class note — so a
-## joiner goes through the same fetch, and the same trust rules, as everybody else.
+## Registers a peer and tells it the map the host is on. Announced now when no change is running, and once
+## the change settles when one is. The [code]load[/code] follows the peer's [code]ready[/code] — see the
+## class note — so a joiner goes through the same fetch, and the same trust rules, as everybody else.
 func admit_peer(peer_id: int) -> void:
 	if peers.has(peer_id):
 		return
@@ -205,23 +138,17 @@ func remove_peer(peer_id: int) -> void:
 	_told_to_load.erase(peer_id)
 
 
-## What a joining peer should be told, or an empty dictionary when there is no map.
-##
-## [b]A peer admitted mid-session needs the same announce everybody else got.[/b]
-## Without it a client joins into a host that is on its fourth map and is never told
-## which one — the announce it needed happened before it existed.
+## What a joining peer should be told, or an empty dictionary when there is no map. A peer admitted mid-
+## session needs the same announce everybody else got. Without it a client joins into a host that is on its
+## fourth map and is never told which one — the announce it needed happened before it existed.
 func join_payload() -> Dictionary:
 	if session == null or session.current == null:
 		return {}
 	return DotMapMessage.announce(session.current)
 
 
-# --- Changing --------------------------------------------------------------
-
-## Changes the map for the host and every peer.
-##
-## Returns when the new map is live here and every peer has been told to show it, or
-## with a failure that leaves the current map running.
+## Changes the map for the host and every peer. Returns when the new map is live here and every peer has been
+## told to show it, or with a failure that leaves the current map running.
 func change_to(id: StringName) -> DotResult:
 	if session == null:
 		return DotResult.fail(DotError.CODE_STATE, "No map session.")
@@ -254,7 +181,8 @@ func change_to_next(players: int = 0) -> DotResult:
 	return await change_to_map(next)
 
 
-func change_to_map(map: DotMapDef) -> DotResult:
+## Refuses a change that cannot start (no session, a change running, an invalid map); otherwise records it and counts the peers it waits on.
+func _begin_change(map: DotMapDef) -> DotResult:
 	if session == null:
 		return DotResult.fail(DotError.CODE_STATE, "No map session.")
 
@@ -284,24 +212,27 @@ func change_to_map(map: DotMapDef) -> DotResult:
 	DotLog.info(CHANNEL, "changing map", {
 		"to": String(map.id), "version": map.version, "peers": peers.size()
 	})
+	return DotResult.success()
 
-	# [b]Announced before anything is fetched, by the host or by anybody.[/b] The peers
-	# have the furthest to go, so they are told first and the host's own fetch overlaps
-	# with theirs. dot-server does the opposite for a GAME change and is right to — a
-	# game change replaces the module, so a server that cannot load the new game must
-	# not have sent every client to download it. A map is only a world: the host
-	# failing here aborts a change that has cost the peers a download they will use the
-	# next time the map comes round.
+
+## Announces, waits for the peers, swaps the host's own world, then tells everyone to load.
+func change_to_map(map: DotMapDef) -> DotResult:
+	var begun := _begin_change(map)
+	if not begun.ok:
+		return begun
+
+	# Announced before any fetch: the peers have the furthest to go, so the host's own fetch
+	# overlaps theirs. A map is only a world, unlike a game change, so a host that then fails
+	# costs the peers a download they reuse when the map comes round.
 	_broadcast(DotMapMessage.announce(map))
 
 	if not _participants.is_empty():
 		var proceed: bool = await _wait_for_peers(map)
 
 		if not proceed:
-			# `swap_without_stragglers` is off and somebody did not make it. Nothing
-			# has been torn down, so this is a change that did not happen rather than
-			# a half-done one — the same property [method DotMapSession.change_to_map]
-			# gets from loading before it frees.
+			# `swap_without_stragglers` is off and somebody did not make it. Nothing has been torn down, so this is a
+			# change that did not happen rather than a half-done one — the same property [method
+			# DotMapSession.change_to_map] gets from loading before it frees.
 			var why := "Not every peer could get the map in time."
 			_broadcast(DotMapMessage.abort(map.id, why))
 			_settle()
@@ -333,12 +264,7 @@ func change_to_map(map: DotMapDef) -> DotResult:
 	return changed
 
 
-## Waits for every peer to report the new map. Returns whether to go ahead.
-##
-## [b]The return value is the point.[/b] It was written as a `void` first, with
-## `swap_without_stragglers` tested inside and both branches falling out of the same
-## bottom — so the setting read exactly as it does now and decided nothing, which is
-## this family's single most repeated bug. Answering the caller is what makes it real.
+## Waits for every peer to report the new map. Returns whether to go ahead. The return value is the point.
 func _wait_for_peers(map: DotMapDef) -> bool:
 	phase = Phase.SYNCING
 	_deadline_ms = Time.get_ticks_msec() + int(sync_timeout_sec * 1000.0)
@@ -388,12 +314,8 @@ func _wait_for_peers(map: DotMapDef) -> bool:
 	return false
 
 
-# --- Receiving -------------------------------------------------------------
-
-## Feeds one payload from one peer in.
-##
-## Returns whether it was a map message. A host sharing a channel with its own traffic
-## uses that to decide whether to keep looking.
+## Feeds one payload from one peer in. Returns whether it was a map message. A host sharing a channel with
+## its own traffic uses that to decide whether to keep looking.
 func handle(peer_id: int, payload: Dictionary) -> bool:
 	if not DotMapMessage.is_map_message(payload):
 		return false
@@ -424,14 +346,8 @@ func handle(peer_id: int, payload: Dictionary) -> bool:
 	return true
 
 
-## Answers a peer that has the map the host is on, between changes, with a load.
-##
-## [b]This is the half of a join that was missing.[/b] [method join_payload] was an
-## announce and a load was only ever sent at the end of a change, so a peer that joined
-## between two changes fetched the map, said it was ready, and was never told to show it.
-## Answered here rather than by whatever admitted the peer, because the host is the only
-## end that knows whether this peer has already been told to load this map — a straggler
-## whose change went ahead without it was, and a second load would rebuild its world.
+## Answers a peer that has the map the host is on, between changes, with a load. This is the half of a join
+## that was missing.
 func _load_if_joining(peer_id: int, key: String) -> void:
 	if phase != Phase.IDLE or session == null or session.current == null:
 		return                                # a change's own load is on its way
@@ -448,10 +364,9 @@ func _load_if_joining(peer_id: int, key: String) -> void:
 	_send_to(peer_id, DotMapMessage.load_now(current.id, current.version))
 
 
-## A change finished or was abandoned: back to idle, and announce to the joiners.
-##
-## [b]Whichever way it ended.[/b] An abandoned change leaves the host on the map it was
-## running, and a peer that joined during it still needs to be told that one.
+## A change finished or was abandoned: back to idle, and announce to the joiners. Whichever way it ended. An
+## abandoned change leaves the host on the map it was running, and a peer that joined during it still needs
+## to be told that one.
 func _settle() -> void:
 	phase = Phase.IDLE
 	_pending = null
@@ -481,11 +396,9 @@ func _live_participants() -> PackedInt64Array:
 	return out
 
 
-## Sends a change's message to the peers taking part in it — not to every peer.
-##
-## A peer admitted after the announce went out has not been told this map, so its
-## [code]load[/code] or [code]abort[/code] means nothing to it; it gets the post-change
-## join instead (see [method _settle]).
+## Sends a change's message to the peers taking part in it — not to every peer. A peer admitted after the
+## announce went out has not been told this map, so its [code]load[/code] or [code]abort[/code] means nothing
+## to it; it gets the post-change join instead (see [method _settle]).
 func _broadcast(payload: Dictionary) -> void:
 	if not send_fn.is_valid():
 		DotLog.warn(CHANNEL, "no send_fn; peers will not hear about this change")
@@ -505,8 +418,6 @@ func _send_to(peer_id: int, payload: Dictionary) -> void:
 static func _key_of(map: DotMapDef) -> String:
 	return "%s@%s" % [String(map.id), map.version]
 
-
-# --- Queries ---------------------------------------------------------------
 
 ## How far a peer is through its fetch, 0..1.
 func progress_of(peer_id: int) -> float:

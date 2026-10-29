@@ -1,12 +1,8 @@
 extends Node
 
-## The volumes a converted map's brush entities become ([DotMapVolumes] on [DotMapIO]): hurt,
-## push, teleport, gravity, trigger, ladder and water, the effects and sounds, the command
-## allow-list, and Office's timed hurt reproduced from its own links.
-##
-## [codeblock]
-## godot --headless --path . res://examples/volumes_demo.tscn
-## [/codeblock]
+## The volumes a converted map's brush entities become ([DotMapVolumes] on [DotMapIO]): hurt, push, teleport,
+## gravity, trigger, ladder and water, the effects and sounds, the command allow-list, and Office's timed
+## hurt reproduced from its own links.
 
 const CHECKS := 128
 const SECTIONS := 13

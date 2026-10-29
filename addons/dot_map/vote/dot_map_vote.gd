@@ -1,20 +1,9 @@
 class_name DotMapVote
 extends RefCounted
 
-## A map vote: nominations, a ballot, and a winner.
-##
-## [b]One player, one vote, changeable until the ballot closes.[/b] Changeable because
-## the alternative is a player who misclicks being stuck with it for the rest of the
-## round, and because letting somebody change their mind is what makes a live tally
-## worth showing.
-##
-## [b]The tie-break is deterministic and is not random.[/b] Two maps on four votes each
-## resolved by a coin flip means a client's live tally and the server's result can
-## disagree, and the players who watched it read that as the vote being rigged. Ties
-## go to the map that was nominated first, which everybody watching can see coming.
-##
-## Nothing here draws a menu, sends a chat message or counts down. A vote is a tally
-## and a rule; how it is presented is the game's.
+## A map vote: nominations, a ballot, and a winner. One player, one vote, changeable until the ballot closes.
+## Changeable because the alternative is a player who misclicks being stuck with it for the rest of the
+## round, and because letting somebody change their mind is what makes a live tally worth showing.
 
 # No log channel: a tally. begin() returns a DotResult and finish() returns the winner;
 # the map change that follows is logged by what makes it (DotMapTimelimit, or
@@ -35,17 +24,13 @@ var nominations: Array[StringName] = []
 
 var open: bool = false
 
-## Most options a ballot may carry.
-##
-## Bounded because a vote with thirty entries is one nobody reads: everybody picks
-## from the first five they can see, which is a worse outcome than a smaller ballot
-## chosen properly.
+## Most options a ballot may carry. Bounded because a vote with thirty entries is one nobody reads: everybody
+## picks from the first five they can see, which is a worse outcome than a smaller ballot chosen properly.
 var max_options: int = 6
 
-## How many of the ballot's places are reserved for nominations.
-##
-## The rest are filled from the rotation. Reserving some rather than all is what stops
-## one organised group of three deciding every map on a twenty-player server.
+## How many of the ballot's places are reserved for nominations. The rest are filled from the rotation.
+## Reserving some rather than all is what stops one organised group of three deciding every map on a twenty-
+## player server.
 var reserved_for_nominations: int = 4
 
 ## Whether "extend the current map" is on the ballot.
@@ -74,10 +59,8 @@ func withdraw(id: StringName) -> bool:
 	return true
 
 
-## Opens a ballot: nominations first, then the rotation fills the rest.
-##
-## [param extra] is where the non-nominated options come from — usually
-## [method DotMapRotation.pool] minus what is on cooldown.
+## Opens a ballot: nominations first, then the rotation fills the rest. [param extra] is where the non-
+## nominated options come from — usually [method DotMapRotation.pool] minus what is on cooldown.
 func begin(
 	catalogue: DotMapCatalogue,
 	extra: Array[DotMapDef],
@@ -177,10 +160,9 @@ func tally() -> Dictionary:
 	return counts
 
 
-## Closes the ballot and returns the winner, or null for extend / nothing.
-##
-## Ties go to whichever option is earlier in [member options], which is nomination
-## order. Deterministic on purpose — see the class documentation.
+## Closes the ballot and returns the winner, or null for extend / nothing. Ties go to whichever option is
+## earlier in [member options], which is nomination order. Deterministic on purpose — see the class
+## documentation.
 func finish() -> DotMapDef:
 	if not open:
 		return null

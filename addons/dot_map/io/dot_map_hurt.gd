@@ -1,13 +1,9 @@
 class_name DotMapHurt
 extends DotMapEntity
 
-## trigger_hurt: while a body is inside an enabled volume, every [code]hurtrate[/code] seconds (0.5)
-## it takes [code]damage[/code] a second times that, through [member DotMapIO.damage_fn]. The first
-## hit lands on entry. Disabling clears everyone; enabling with somebody still inside hurts them
-## again (they "enter" anew), which is how a timed hazard in a map catches a player who waits.
-## [code]damagemodel[/code] 1 doubles each hit up to [code]damagecap[/code]. Damage once hurts each
-## body a single time per entry. [code]damageforce[/code] (unless [code]nodmgforce[/code]) goes to
-## the game as a [code]damage_force[/code] event with each hit.
+## trigger_hurt: while a body is inside an enabled volume, every [code]hurtrate[/code] seconds (0.5) it takes
+## [code]damage[/code] a second times that, through [member DotMapIO.damage_fn]. The first hit lands on
+## entry.
 
 ## Damage type bit (source engine values) to the kind passed to the game.
 const KINDS := {1: "crush", 2: "bullet", 4: "slash", 8: "burn", 16: "vehicle", 32: "fall", 64: "blast",

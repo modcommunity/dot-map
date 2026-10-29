@@ -1,10 +1,8 @@
 extends Node3D
 
 ## Measures and compares DotMapVisibility on a real converted map, on a real GPU: draw calls, primitives and
-## frame time with vis_mode off / pvs / occluders / both from characteristic spots, and every frame against the
-## `off` frame pixel for pixel from random spots (a pixel that differs is a hole or a pop-in).
-## Run under a display (../gpu.sh shot dot-map examples/vis_proof.sh ...):
-##   godot --path . res://examples/vis_proof.tscn -- --world=<prefix> [--spots=6] [--diffs=24] [--out=<dir>] [--size=640x360]
+## frame time with vis_mode off / pvs / occluders / both from characteristic spots, and every frame against
+## the `off` frame pixel for pixel from random spots (a pixel that differs is a hole or a pop-in).
 
 const MODES := ["off", "pvs", "occluders", "both"]
 

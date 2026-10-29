@@ -1,15 +1,7 @@
 extends Node
 
-## [DotMapIO] on synthetic maps (delays, fire-once counts, cycles, logic classes, the extension
-## points) and on the Office course's real timed hazards.
-##
-## [codeblock]
-## godot --headless --path . res://examples/io_demo.tscn
-## [/codeblock]
-##
-## [code]examples/io/office_io.doc.json[/code] is the part of that map's source document reachable
-## from its map-start logic and its timed trigger (Obstacle2): the expected times are read from
-## the map's own links, then compared with the simulation.
+## [DotMapIO] on synthetic maps (delays, fire-once counts, cycles, logic classes, the extension points) and
+## on the Office course's real timed hazards.
 
 const CHECKS := 184
 const SECTIONS := 14

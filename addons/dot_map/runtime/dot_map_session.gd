@@ -2,32 +2,9 @@
 class_name DotMapSession
 extends Node
 
-## The node a game adds: which map is loaded, what plays next, and the switch between
-## them.
-##
-## [codeblock]
-## var session := DotMapSession.new()
-## session.world_ref = DotNodeRef.of_path(^"../World")
-## add_child(session)
-## session.load_catalogue("res://maps/catalogue.json")
-## await session.change_to(&"surf_beginner")
-## [/codeblock]
-##
-## [b]A map change is the most dangerous thing a server does.[/b] Everything is
-## mid-flight at once: players are in runs, entities are replicated, content may still
-## be downloading, and the scene about to be freed is the one everything holds a
-## reference to. The order here is the one that survives all of it, and each step is
-## in it because leaving it out breaks something specific:
-##
-## 1. announce the change [i]before[/i] anything is torn down, so a timer can abandon
-##    its runs and a netcode can stop replicating entities that are about to vanish;
-## 2. fetch and load the new scene [i]before[/i] freeing the old one, so a failed
-##    download leaves the server on a working map rather than on nothing;
-## 3. free the old world and add the new one in the same frame;
-## 4. announce that it is done, so listeners can rebuild.
-##
-## Step 2 is the one people skip. Freeing first is simpler, uses less memory, and
-## turns a CDN having a bad day into a server with no map and no way back.
+## The node a game adds: which map is loaded, what plays next, and the switch between them ([code]await session.change_to(&"surf_beginner")[/code], after [code]load_catalogue[/code]).
+## Order of a change, each step because leaving it out breaks something: announce before teardown; fetch and load the new scene before freeing the old, so a failed download leaves a working map; free the old world and add the new in one frame; announce done.
+## Freeing first is simpler and turns a CDN having a bad day into a server with no map.
 
 const CHANNEL := "map.session"
 
@@ -40,12 +17,9 @@ signal changed(map: DotMapDef, world: Node)
 ## A change failed. The session is still on the map named by [member current].
 signal change_failed(map: DotMapDef, reason: String)
 
-## The map is over — its time ran out, or enough players rocked the vote.
-##
-## [b]The session does NOT change the map itself here.[/b] What happens when a map
-## ends is a game's decision: run a vote, go to the next in the rotation, end the
-## round first, or show a scoreboard for ten seconds. A session that changed the map
-## on its own would have to be fought by every game that wanted any of those.
+## The map is over — its time ran out, or enough players rocked the vote. The session does NOT change the map
+## itself here. What happens when a map ends is a game's decision: run a vote, go to the next in the
+## rotation, end the round first, or show a scoreboard for ten seconds.
 signal map_over(map: DotMapDef, reason: StringName)
 
 ## The map is nearly over. For a chat message or a HUD.
@@ -65,11 +39,6 @@ signal fetching(map: DotMapDef)
 @export_group("Wiring")
 
 ## Where the loaded map's root node is added.
-##
-## [b]A [DotNodeRef], not a hardcoded path[/b] — the family rule, and here it earns
-## its keep immediately: a dedicated server puts the world under its game root, a
-## client puts it under a scene that also holds the camera and the HUD, and a replay
-## viewer puts two of them side by side.
 @export var world_ref: DotNodeRef = null
 
 @export_group("Rotation")
@@ -80,31 +49,25 @@ signal fetching(map: DotMapDef)
 
 @export_group("Time limit")
 
-## Seconds a map runs before the session asks for the next one. 0 disables it.
-##
-## A server that never changes map is not a server: somebody joins, plays the map
-## they arrived on and leaves, and the rotation, the catalogue and the vote all exist
-## and are never reached.
+## Seconds a map runs before the session asks for the next one. 0 disables it. A server that never changes
+## map is not a server: somebody joins, plays the map they arrived on and leaves, and the rotation, the
+## catalogue and the vote all exist and are never reached.
 @export_range(0.0, 86400.0, 30.0) var map_seconds: float = 1800.0
 
 ## Seconds left when [signal time_warning] fires. 0 disables it.
 @export_range(0.0, 3600.0, 10.0) var warn_seconds: float = 120.0
 
-## Whether waking from hibernation starts the map's time limit again from the top.
-##
-## On: the first player into an empty server gets the whole limit, every extend and nobody
-## else's rock-the-vote. Off resumes where hibernation froze it. See
-## [method set_hibernating].
+## Whether waking from hibernation starts the map's time limit again from the top. On: the first player into
+## an empty server gets the whole limit, every extend and nobody else's rock-the-vote. Off resumes where
+## hibernation froze it. See [method set_hibernating].
 @export var restart_on_wake: bool = true
 
 var catalogue: DotMapCatalogue = null
 var rotation: DotMapRotation = null
 var loader: DotMapLoader = null
 
-## The map clock, rock-the-vote tally and extensions.
-##
-## Advanced by the host with [method advance], never by a wall clock — a server that
-## stalls should not lose that time off its map, and a test must be able to run an
+## The map clock, rock-the-vote tally and extensions. Advanced by the host with [method advance], never by a
+## wall clock — a server that stalls should not lose that time off its map, and a test must be able to run an
 ## hour of it in a millisecond.
 var time_limit := DotMapTimeLimit.new()
 
@@ -114,11 +77,9 @@ var current: DotMapDef = null
 ## The root node of the loaded map, or null.
 var world: Node = null
 
-## The zone file's text for the current map, for a host that has dot-timer.
-##
-## Text rather than a parsed `DotTimerZoneSet`, because dot-timer is optional and
-## naming the class here would make every map load in a game without a timer fail to
-## parse. The host parses it.
+## The zone file's text for the current map, for a host that has dot-timer. Text rather than a parsed
+## `DotTimerZoneSet`, because dot-timer is optional and naming the class here would make every map load in a
+## game without a timer fail to parse. The host parses it.
 var zones_json: String = ""
 
 ## Whether a change is in progress. A second one is refused while it is.
@@ -256,28 +217,7 @@ func change_to_map(map: DotMapDef) -> DotResult:
 
 	var parent: Node = resolved.value
 
-	if world != null and is_instance_valid(world):
-		# free() rather than queue_free(): the new world is added in this same call,
-		# and a deferred free would leave both in the tree for a frame — two maps'
-		# worth of collision geometry, and any group lookup finding the old one.
-		world.get_parent().remove_child(world)
-		world.free()
-
-	world = (loaded.value as PackedScene).instantiate()
-	world.name = "Map_" + String(map.id)
-	parent.add_child(world)
-
-	current = map
-	zones_json = str(zones.value) if zones.value != null else ""
-
-	rotation.note_played(map.id)
-
-	# The clock restarts on every map, with the map's own length when it has one.
-	# A long map deserves a longer limit and that is a property of the map rather
-	# than of the server, which is why `expected_seconds` is on `DotMapDef`.
-	time_limit.start(
-		float(map.expected_seconds) * 3.0 if map.expected_seconds > 0 else -1.0
-	)
+	_install(map, loaded.value as PackedScene, zones.value, parent)
 
 	changing_now = false
 
@@ -290,11 +230,35 @@ func change_to_map(map: DotMapDef) -> DotResult:
 	return DotResult.success(world)
 
 
-## Advances the map clock. Call once per simulated tick.
-##
-## Separate from a timer inside this node because the host owns the tick — the same
-## reason [DotPropSpawner.advance] takes one. A node that ran its own [Timer] would
-## count wall-clock seconds, and a server that stalled would lose them off its map.
+## Frees the old world, adds the new one in the same call, and restarts the rotation note and the clock.
+func _install(map: DotMapDef, scene: PackedScene, zones_value: Variant, parent: Node) -> void:
+	if world != null and is_instance_valid(world):
+		# free() rather than queue_free(): the new world is added in this same call,
+		# and a deferred free would leave both in the tree for a frame — two maps'
+		# worth of collision geometry, and any group lookup finding the old one.
+		world.get_parent().remove_child(world)
+		world.free()
+
+	world = scene.instantiate()
+	world.name = "Map_" + String(map.id)
+	parent.add_child(world)
+
+	current = map
+	zones_json = str(zones_value) if zones_value != null else ""
+
+	rotation.note_played(map.id)
+
+	# The clock restarts on every map, with the map's own length when it has one.
+	# A long map deserves a longer limit and that is a property of the map rather
+	# than of the server, which is why `expected_seconds` is on `DotMapDef`.
+	time_limit.start(
+		float(map.expected_seconds) * 3.0 if map.expected_seconds > 0 else -1.0
+	)
+
+
+## Advances the map clock. Call once per simulated tick. Separate from a timer inside this node because the
+## host owns the tick — the same reason [DotPropSpawner.advance] takes one. A node that ran its own [Timer]
+## would count wall-clock seconds, and a server that stalled would lose them off its map.
 func advance(delta: float) -> void:
 	if hibernating:
 		return
@@ -302,14 +266,8 @@ func advance(delta: float) -> void:
 	time_limit.advance(delta)
 
 
-## Stops (true) or starts (false) the map's time limit, for a server that hibernates while
-## it is empty.
-##
-## [b]An empty room's time is not the map's.[/b] A hibernating server still ticks, only
-## slower, and a host that advances this from its tick used to run the limit out to nobody —
-## the first player in arrived at a map with a minute left. Waking starts it again from the
-## map's own limit when [member restart_on_wake] is on (the default), and resumes it
-## otherwise.
+## Stops (true) or starts (false) the map's time limit, for a server that hibernates while it is empty. An
+## empty room's time is not the map's.
 func set_hibernating(on: bool) -> void:
 	if on == hibernating:
 		return

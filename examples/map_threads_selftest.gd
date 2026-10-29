@@ -1,10 +1,6 @@
 extends Node
 
 ## [DotMapParallelBuild]: the threaded load stages give byte-identical output to the inline ones.
-##
-## [codeblock]
-## godot --headless --path . res://examples/map_threads_selftest.tscn
-## [/codeblock]
 
 const CHECKS := 40
 const SECTIONS := 6

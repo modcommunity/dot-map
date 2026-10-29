@@ -1,11 +1,9 @@
 class_name DotMapFx
 extends RefCounted
 
-## Draws a converted map's sprite-like entities cheaply: [code]env_sprite[/code] and [code]env_lightglow[/code]
-## as additive billboards, [code]point_spotlight[/code] as a faint additive cone (a few also a real SpotLight3D),
-## [code]infodecal[/code] as Decal nodes laid on the nearest surface. Textures are generated here, so no art ships.
-## Every kind has a per-map cap, spread evenly over the entities when the map has more, and a view range.
-## Input is the source document's entity records ([code]classname[/code], [code]pairs[/code]); nothing is gameplay.
+## Draws a converted map's sprite-like entities cheaply: [code]env_sprite[/code] and
+## [code]env_lightglow[/code] as additive billboards, [code]point_spotlight[/code] as a faint additive cone
+## (a few also a real SpotLight3D), [code]infodecal[/code] as Decal nodes laid on the nearest surface.
 
 const CHANNEL := "dot_map.fx"
 
@@ -95,8 +93,6 @@ static func _spread(items: Array, cap: int) -> Array:
 		out.append(items[int(i * step)])
 	return out
 
-
-# --- sprites -----------------------------------------------------------------------------------
 
 func _sprites(root: Node3D, recs: Array) -> void:
 	var keep: Array = []
@@ -214,8 +210,6 @@ func _trails(root: Node3D, recs: Array) -> void:
 		stats["trails"] += 1
 
 
-# --- spotlights --------------------------------------------------------------------------------
-
 func _cones(root: Node3D, recs: Array) -> void:
 	var keep: Array = []
 	for rec: Dictionary in recs:
@@ -316,8 +310,6 @@ func _spot(at: Vector3, dir: Vector3, length: float, col: Color) -> SpotLight3D:
 	l.basis = Basis.looking_at(dir, up)
 	return l
 
-
-# --- decals ------------------------------------------------------------------------------------
 
 const DIRS := [Vector3.DOWN, Vector3.LEFT, Vector3.RIGHT, Vector3.FORWARD, Vector3.BACK, Vector3.UP]
 

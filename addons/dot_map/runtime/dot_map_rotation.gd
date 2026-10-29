@@ -1,17 +1,9 @@
 class_name DotMapRotation
 extends RefCounted
 
-## What plays next, and what may not play again yet.
-##
-## [b]The cooldown is the whole design.[/b] A rotation without one plays the same
-## three popular maps for ever, because a vote is a popularity contest and popularity
-## does not change between rounds. Every server in this genre ends up with a
-## "recently played" exclusion, and the number that matters is how many maps back it
-## remembers — too few and the map you just played is on the menu again, too many and
-## a small server has nothing to offer.
-##
-## Deterministic given the same history and the same seed, so a client can show the
-## same "next map" the server will pick without asking.
+## What plays next, and what may not play again yet. The cooldown is the whole design. A rotation without one
+## plays the same three popular maps for ever, because a vote is a popularity contest and popularity does not
+## change between rounds.
 
 const CHANNEL := "map.rotation"
 
@@ -27,10 +19,9 @@ enum Mode {
 
 var catalogue: DotMapCatalogue = null
 
-## Ids in rotation order. Empty means "every enabled map in the catalogue", sorted by id (see [member sort_unordered]).
-##
-## Separate from the catalogue for the reason in [DotMapCatalogue]: a server knows
-## about two hundred maps and rotates twelve.
+## Ids in rotation order. Empty means "every enabled map in the catalogue", sorted by id (see [member
+## sort_unordered]). Separate from the catalogue for the reason in [DotMapCatalogue]: a server knows about
+## two hundred maps and rotates twelve.
 var order: Array[StringName] = []
 
 var mode: Mode = Mode.RANDOM
@@ -38,12 +29,8 @@ var mode: Mode = Mode.RANDOM
 ## With no [member order] (no rotation file) the pool is every installed map sorted by id, so a cycle is the same on every server; false keeps the catalogue's own order.
 var sort_unordered: bool = true
 
-## How many recently played maps are excluded from a choice.
-##
-## [b]Clamped against the pool size at choosing time, not here.[/b] A cooldown of
-## eight on a server with six maps in rotation excludes everything, and the honest
-## behaviour is to shorten the memory rather than to return nothing — which would
-## leave the server on its current map for ever with no error anywhere.
+## How many recently played maps are excluded from a choice. Clamped against the pool size at choosing time,
+## not here.
 var cooldown: int = 5
 
 ## Most recently played first.
@@ -52,10 +39,8 @@ var history: Array[StringName] = []
 ## Longest history kept. Bounds the memory on a server that has been up for months.
 var history_limit: int = 64
 
-## Seed for [constant Mode.RANDOM].
-##
-## Explicit so a client and a server pick the same next map, and so a test is
-## reproducible. Advanced on every choice.
+## Seed for [constant Mode.RANDOM]. Explicit so a client and a server pick the same next map, and so a test
+## is reproducible. Advanced on every choice.
 var seed_value: int = 0
 
 ## What [method choose] will return, when something has set it.
@@ -111,11 +96,9 @@ func on_cooldown(id: StringName, pool_size: int = 0) -> bool:
 	return false
 
 
-## The next map, or null when the rotation cannot offer one.
-##
-## Does not record it as played — [method note_played] does that, when the map has
-## actually been loaded. Two calls in a row give the same answer, which is what lets a
-## HUD show "next map" without changing it.
+## The next map, or null when the rotation cannot offer one. Does not record it as played — [method
+## note_played] does that, when the map has actually been loaded. Two calls in a row give the same answer,
+## which is what lets a HUD show "next map" without changing it.
 func choose(players: int = 0) -> DotMapDef:
 	if _forced != &"" and catalogue != null:
 		var forced := catalogue.get_map(_forced)
@@ -143,10 +126,9 @@ func choose(players: int = 0) -> DotMapDef:
 
 	match mode:
 		Mode.SEQUENTIAL:
-			# The whole pool, not the cooldown's remainder: a fixed cycle is the written
-			# order, and skipping the maps just played would turn a three-map cycle into two.
-			# But never the map just played: a forced or voted map moves the cursor under the
-			# cycle, and the cycle can land on it again. Walk on to the next one instead.
+			# The whole pool, not the cooldown's remainder: a fixed cycle is the written order, and skipping the maps
+			# just played would turn a three-map cycle into two. But never the map just played: a forced or voted map
+			# moves the cursor under the cycle, and the cycle can land on it again. Walk on to the next one instead.
 			var n := candidates.size()
 			for i in n:
 				var pick := candidates[(_cursor + i) % n]

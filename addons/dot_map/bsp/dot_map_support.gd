@@ -1,13 +1,8 @@
 class_name DotMapSupport
 extends StaticBody3D
 
-## A breakable that holds something up (the importer's `holds` on a manifest breakable): a frame, a pillar or a ledge
-## with a barrel on it. It is a box on the layer the game's loose bodies rest on and people walk through, so the
-## server needs no world to have it; shoot it until [member health] runs out and it is gone, and [signal broken] says
-## which loose bodies stood on it ([member holds]) so the game can wake them: they fall, and a barrel rolls.
-##
-## Server decides, clients follow, as [DotMapGlass]: [method hurt] does nothing unless [member authoritative]; the host
-## tells clients with [method apply_broken] (the [member index] is the id on the wire).
+## A breakable that holds something up (the importer's `holds` on a manifest breakable): a frame, a pillar or
+## a ledge with a barrel on it.
 
 ## [param held] are the loose bodies that stood on it (the indexes in [member holds]); [param at] the hit point.
 signal broken(held: PackedInt32Array, at: Vector3)

@@ -1,20 +1,9 @@
 class_name DotMapConfig
 extends RefCounted
 
-## Per-map settings: the merged `{cvar: value}` a map asks for, resolved from `map/<name>.yml` files, whitelisted, applied on load and put back on the next map.
-##
-## Files are `map/<name>.yml` inside each [DotAddonConfig] tier of `dot-map` (`cfg/addons/dot_map/`, `cfg/game/<game>/dot_map/`, then the operator's `cfg/server/addons/dot_map/` and `cfg/server/game/<game>/dot_map/`), in every root. [code]<name>[/code] is the map id or a glob (`surf_%` or `surf_*`; `%` is `*`, `@` is `?`, case-insensitive), the content a flat mapping of key to scalar.
-##
-## [b]Order, strongest first[/b]: command line `--dot-map.map.<key>=v` / environment `DOT_MAP_MAP_<KEY>` (a key some file or [member defaults] already holds, as [DotAddonConfig] does everywhere), then the operator's tiers (exact file over wildcards), then the shipped tiers (exact over wildcards), then [member defaults] (the converter's values). Among wildcards the more specific wins: most literal characters, then the longer pattern, then the later name alphabetically; at equal specificity the stronger tier (game over addon, per-game over shared) and the later root win. Nothing is executed: a value is only ever handed to [member set_fn] for a key in [member schema].
-##
-## [codeblock]
-## var cfg := DotMapConfig.new()
-## cfg.game = "game-arena"
-## cfg.allow("arena_surf_airaccelerate", {"type": "float", "min": 0.0})
-## cfg.get_fn = func(k: String) -> Variant: return console.get_cvar_string(k)
-## cfg.set_fn = func(k: String, v: Variant) -> bool: return console.set_cvar(k, str(v)).ok
-## cfg.apply(String(map.id))   # on every map load; restores the last map's keys first
-## [/codeblock]
+## Per-map settings: the merged `{cvar: value}` a map asks for, resolved from `map/<name>.yml` files, whitelisted, applied on load and put back on the next map. `<name>` is the map id or a glob (`%` is `*`, `@` is `?`); a value only reaches [member set_fn] for a key in [member schema].
+## Order, strongest first: command line `--dot-map.map.<key>=v` / environment `DOT_MAP_MAP_<KEY>`, the operator's tiers (exact over wildcards), the shipped tiers, then [member defaults]; among wildcards the more specific wins, then the stronger tier.
+## Use: set [member game], [code]allow(key, {"type": "float"})[/code], [member get_fn] and [member set_fn], then [code]apply(map_id)[/code] on every load.
 
 const CHANNEL := "map.config"
 const ADDON := "dot-map"

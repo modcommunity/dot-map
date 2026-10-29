@@ -1,11 +1,8 @@
 class_name DotMapMover
 extends RefCounted
 
-## A brush entity that moves, from the converter's mover record: duck-typed data a game animates.
-##
-## It owns no node and moves nothing. The game puts the model's node (see
-## [method DotMapBspMesh.build_node]) at [member origin] and sets its transform to
-## [method transform_at] each frame; [member travel_time] and [member wait] say how long.
+## A brush entity that moves, from the converter's mover record: duck-typed data a game animates. It owns no
+## node and moves nothing.
 
 const KIND_SLIDE := "slide"
 const KIND_BUTTON := "button"

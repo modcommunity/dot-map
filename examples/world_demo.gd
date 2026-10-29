@@ -1,12 +1,8 @@
 extends Node
 
-## DotMapWorld on the real converted Office and Dan's course: one call builds the world from the
-## mesh manifest and the stored source document, and Office's timed hurt room behaves per its own links.
-##
-## [codeblock]
-## godot --headless --path . res://examples/world_demo.tscn [-- --worlds=<dir with wo_office_course.json>]
-## [/codeblock]
-## Without the converted worlds (or the store holding their source documents) it prints SKIP and exits 0.
+## DotMapWorld on the real converted Office and Dan's course: one call builds the world from the mesh
+## manifest and the stored source document, and Office's timed hurt room behaves per its own links. Without
+## the converted worlds (or the store holding their source documents) it prints SKIP and exits 0.
 
 const CHECKS := 34
 const SECTIONS := 5

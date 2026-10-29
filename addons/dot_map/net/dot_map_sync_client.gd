@@ -2,38 +2,15 @@
 class_name DotMapSyncClient
 extends Node
 
-## A peer's half of a map change: fetch what the host named, say so, then show it.
-##
-## The counterpart to [DotMapSyncHost]. Transport-agnostic for the same reason — set
-## [member send_fn] to anything that can put a [Dictionary] in front of the host, and
-## feed whatever arrives into [method handle].
-##
-## [codeblock]
-## var sync := DotMapSyncClient.new()
-## sync.session = map_session
-## sync.send_fn = func(payload: Dictionary) -> void: link.send(payload)
-## add_child(sync)
-##
-## link.message_received.connect(func(p): sync.handle(p))
-## [/codeblock]
-##
-## [b]A host does not get to name a scene path.[/b] This is the same rule
-## [code]DotClientLink._resolve_scene[/code] enforces and it is here for the same reason:
-## a client that loads whatever absolute [code]res://[/code] path it is sent will load
-## anything in its own build if a hostile server asks. So by default the map is taken
-## from this client's [b]own catalogue[/b] by id, and the announced definition is used
-## only for the fields that cannot be spoofed into something dangerous. See
-## [member accept_unknown_maps], which is what a records server with two hundred maps and
-## a client that ships none of them needs, and which is safe only because a map accepted
-## that way must live inside dot-cloud's mount.
+## A peer's half of a map change: fetch what the host named, say so, then show it; the counterpart to [DotMapSyncHost].
+## Transport-agnostic: set [member send_fn] to reach the host and feed what arrives into [method handle].
+## A host never names a scene path: the map comes from this client's own catalogue by id unless [member accept_unknown_maps], which is safe only inside dot-cloud's mount.
 
 const CHANNEL := "map.sync.client"
 
-## The mount prefix a delivered map's scene must be under to be accepted from a host.
-##
-## Duplicated from dot-cloud rather than read from it: this addon must compile in a
-## project that does not have dot-cloud, and a constant that disagreed with dot-cloud
-## would fail closed — a refused map, not a loaded wrong one.
+## The mount prefix a delivered map's scene must be under to be accepted from a host. Duplicated from dot-
+## cloud rather than read from it: this addon must compile in a project that does not have dot-cloud, and a
+## constant that disagreed with dot-cloud would fail closed — a refused map, not a loaded wrong one.
 const MOUNT_ROOT := "res://dot_cloud/"
 
 ## The registry name dot-cloud publishes its client under.
@@ -64,74 +41,29 @@ signal change_aborted(map_id: StringName, reason: String)
 
 @export_group("Trust")
 
-## Accept a map definition the host sent that this client's catalogue does not have.
-##
-## [b]On, and the refusal below is what makes that safe.[/b] A records server carries
-## two hundred maps and a client ships none of them, so a client that only knew its own
-## catalogue could join such a server and never load a single map. What keeps it honest
-## is [method _accept]: an unknown map must be [i]delivered[/i] — it must name a content
-## id, and its scene must resolve inside [constant MOUNT_ROOT] — so the worst a hostile
-## host can do is make this client download and mount its own content, which is what
-## joining a server already means.
-##
-## Off is for a client that ships every map it will ever play and should refuse to be
-## sent anywhere else.
+## Accept a map definition the host sent that this client's catalogue does not have. On, and the refusal
+## below is what makes that safe. A records server carries two hundred maps and a client ships none of them,
+## so a client that only knew its own catalogue could join such a server and never load a single map.
 @export var accept_unknown_maps: bool = true
 
-## Add maps accepted from a host to this client's catalogue.
-##
-## So the second time round is a catalogue hit rather than a re-negotiation, and so a
-## client can list where it has been.
+## Add maps accepted from a host to this client's catalogue. So the second time round is a catalogue hit
+## rather than a re-negotiation, and so a client can list where it has been.
 @export var remember_accepted_maps: bool = true
 
-## Scenes in THIS build a host may name for a delivered map, when the map's data — not
-## its scene — is what is delivered. Empty by default, which is the strict rule: a map
-## this client does not have must be a scene inside its own pack.
-##
-## [b]The shape this exists for is one built-in scene that reads a delivered document.[/b]
-## A pack's script cannot extend a class of the build it is mounted into (the family's
-## mount constraint), so a game whose maps are data — a manifest and a mesh, turned into
-## a world by one scene the game ships — can never put that scene inside the pack, and
-## the strict rule refuses every map it has. Listing the scene here moves the delivered
-## requirement from the scene to the data: an announce naming a listed scene is accepted
-## only if it names a [member DotMapDef.content_id], and its [member DotMapDef.zones_path],
-## every key in [member template_path_keys] and every other path-shaped string in its
-## [member DotMapDef.meta] resolve inside [code]res://dot_cloud/<content_id>/<version>/[/code]
-## after [method String.simplify_path].
-##
-## [b]What a hostile host can do with a listed scene, and what it cannot.[/b] It controls
-## every field of the announce. It can make this client fetch any content id and version
-## from this client's own origin (or from the announce's [member DotMapDef.manifest_url] —
-## signed manifests are what stop that from mounting anything, exactly as for any
-## delivered map), and then instantiate one of the listed scenes with data read out of
-## that mount. It cannot name a scene that is not listed, and it cannot point the listed
-## scene at a file outside the mount: not another map's data, not [code]user://[/code],
-## not a path in the build. The check is on the scene path exactly, after simplification,
-## so list the path the build actually loads. [b]What is left is the template itself[/b]:
-## it parses whatever the pack contains, so it must treat that as untrusted input, and it
-## must read paths only from keys this check covers — a template that reads a path out of
-## a meta key that is not path-shaped (a bare relative name joined onto something of its
-## own choosing) is outside this rule and is the template's to validate.
+## Scenes in THIS build a host may name for a delivered map, when the map's data — not its scene — is what is
+## delivered. Empty by default, which is the strict rule: a map this client does not have must be a scene
+## inside its own pack. The shape this exists for is one built-in scene that reads a delivered document.
 @export var trusted_template_scenes: PackedStringArray = PackedStringArray()
 
-## The [member DotMapDef.meta] keys a listed template reads its data from.
-##
-## Each must be present and inside the mount; a templated map naming none of them is
-## refused, because a template with no data to read is not a delivered map. Path-shaped
-## values under any OTHER key are held to the same rule regardless — see
-## [member trusted_template_scenes].
+## The [member DotMapDef.meta] keys a listed template reads its data from. Each must be present and inside
+## the mount; a templated map naming none of them is refused, because a template with no data to read is not
+## a delivered map.
 @export var template_path_keys: PackedStringArray = PackedStringArray(["manifest"])
 
 @export_group("Reporting")
 
-## Least seconds between two progress reports sent to the host. 0 sends every one.
-##
-## [b]Throttled because the transport under this may not be.[/b] dot-cloud emits progress
-## for every chunk it writes, and a server that rate-limits a client's messages drops the
-## excess without choosing — so an unthrottled burst of progress can cost the
-## [code]ready[/code] behind it, and a peer that said it was ready is timed out as one that
-## never did. The first report of a fetch and a report of 1.0 always go; a
-## [code]ready[/code] is never throttled. [signal fetch_progress] is local and is not.
+## Least seconds between two progress reports sent to the host. 0 sends every one. Throttled because the
+## transport under this may not be.
 @export_range(0.0, 5.0, 0.05) var progress_interval_sec: float = 0.25
 
 ## The session this drives, assigned directly when there is no [member session_ref].
@@ -171,13 +103,9 @@ func _ready() -> void:
 			session = resolved.value as DotMapSession
 
 
-# --- Receiving -------------------------------------------------------------
-
-## Feeds one payload from the host in.
-##
-## Returns whether it was a map message, so a game sharing a channel can keep looking.
-## [b]Not awaited by the caller[/b] — an announce starts a fetch that can take minutes,
-## and a transport's receive path must not be suspended for it.
+## Feeds one payload from the host in. Returns whether it was a map message, so a game sharing a channel can
+## keep looking. Not awaited by the caller — an announce starts a fetch that can take minutes, and a
+## transport's receive path must not be suspended for it.
 func handle(payload: Dictionary) -> bool:
 	if not DotMapMessage.is_map_message(payload):
 		return false
@@ -237,16 +165,13 @@ func _on_announce(dict: Dictionary) -> void:
 	_fetch(map)
 
 
-## Fetches the announced map's content and reports readiness.
-##
-## Its own coroutine rather than an awaited call from [method handle], so a transport's
-## receive path is never suspended for the length of a download.
+## Fetches the announced map's content and reports readiness. Its own coroutine rather than an awaited call
+## from [method handle], so a transport's receive path is never suspended for the length of a download.
 func _fetch(map: DotMapDef) -> void:
 	if _fetching:
-		# A second announce while the first is in flight is a host that changed its
-		# mind. The first fetch finishes and reports against the map it was for; the
-		# host compares ids and versions, so a stale report cannot be mistaken for a
-		# current one.
+		# A second announce while the first is in flight is a host that changed its mind. The first fetch finishes
+		# and reports against the map it was for; the host compares ids and versions, so a stale report cannot be
+		# mistaken for a current one.
 		DotLog.debug(CHANNEL, "already fetching; the newer announce will follow")
 
 	if session == null or session.loader == null:
@@ -313,10 +238,9 @@ func _on_load(id: StringName, version: String) -> void:
 			})
 			return
 
-	# [b]Checked before anything is adopted.[/b] This assigned the catalogue's map to
-	# `announced` first and checked its version second, so a refused load left
-	# `announced` naming the map it had just refused — and the next load for that id
-	# found it there and skipped the catalogue lookup that would have been asked.
+	# Checked before anything is adopted. This assigned the catalogue's map to `announced` first and checked its
+	# version second, so a refused load left `announced` naming the map it had just refused — and the next load
+	# for that id found it there and skipped the catalogue lookup that would have been asked.
 	if version != "" and target.version != version:
 		DotLog.warn(CHANNEL, "told to load a different version than announced", {
 			"map": String(id), "announced": target.version, "asked": version
@@ -325,10 +249,8 @@ func _on_load(id: StringName, version: String) -> void:
 
 	announced = target
 
-	# [b]A load that overtakes its own fetch waits for it.[/b] A straggler — a peer the
-	# host changed without — is sent its load while its download is still running.
-	# Loading now asks the content client for the same pack a second time, concurrently,
-	# and what that does is the content client's business rather than this protocol's.
+	# A load that overtakes its own fetch waits for it. A straggler — a peer the host changed without — is sent
+	# its load while its download is still running.
 	if _in_flight.has(_key_of(target)):
 		_load_after_fetch = _key_of(target)
 		DotLog.debug(CHANNEL, "told to load a map still downloading; loading when it lands", {
@@ -352,12 +274,9 @@ func _load(map: DotMapDef) -> void:
 	changed.emit(map)
 
 
-# --- Trust -----------------------------------------------------------------
-
-## Turns an announced definition into a map this client is willing to load.
-##
-## The client's own catalogue wins outright when it has the id: a host may tell this
-## client [i]which[/i] map, never [i]what[/i] the map is made of.
+## Turns an announced definition into a map this client is willing to load. The client's own catalogue wins
+## outright when it has the id: a host may tell this client [i]which[/i] map, never [i]what[/i] the map is
+## made of.
 func _accept(dict: Dictionary) -> DotResult:
 	var id := StringName(str(dict.get("id", "")))
 
@@ -368,10 +287,9 @@ func _accept(dict: Dictionary) -> DotResult:
 		var known := session.catalogue.get_map(id)
 
 		if known != null:
-			# The version still has to agree. A host on a republished map is asking
-			# for geometry this client does not have, and loading the old one puts a
-			# player in a world that is subtly not everybody else's — which on a timer
-			# server is a record set on a map that no longer exists.
+			# The version still has to agree. A host on a republished map is asking for geometry this client does not
+			# have, and loading the old one puts a player in a world that is subtly not everybody else's — which on a
+			# timer server is a record set on a map that no longer exists.
 			var wanted := str(dict.get("version", known.version))
 
 			if wanted != known.version and known.is_local():
@@ -386,13 +304,7 @@ func _accept(dict: Dictionary) -> DotResult:
 				# definition here is safe by the same rule the unknown case uses.
 				return _accept_delivered(dict, id)
 
-			# [b]And so does the PACK's version, which is a different field.[/b] A
-			# republished delivered map keeps its own `version` and changes its
-			# `content_version`, and only the second was compared nowhere: a client
-			# that had mounted the old pack answered the new announce with the map it
-			# already had and played the old geometry (game-g2gfast's headless_net,
-			# "a map republished with different files"). Delivered only -- a map in
-			# this build has no pack to differ.
+			# And so does the PACK's version, which is a different field.
 			var wanted_pack := str(dict.get("content_version", ""))
 
 			if not known.is_local() and wanted_pack != "" \
@@ -411,13 +323,9 @@ func _accept(dict: Dictionary) -> DotResult:
 	return _accept_delivered(dict, id)
 
 
-## Accepts a map this client did not already know, if and only if it is delivered.
-##
-## [b]The refusal is the whole control.[/b] A definition from a host may name any scene
-## path it likes, and a client that loaded one would load anything in its own build. A
-## delivered map cannot: its scene lives inside dot-cloud's version-namespaced mount, so
-## the worst a hostile host achieves is making this client download its content — which
-## is what connecting to it already means.
+## Accepts a map this client did not already know, if and only if it is delivered. The refusal is the whole
+## control. A definition from a host may name any scene path it likes, and a client that loaded one would
+## load anything in its own build.
 func _accept_delivered(dict: Dictionary, id: StringName) -> DotResult:
 	var map := DotMapDef.from_dictionary(dict)
 
@@ -438,13 +346,8 @@ func _accept_delivered(dict: Dictionary, id: StringName) -> DotResult:
 		MOUNT_ROOT, String(map.content_id), map.effective_content_version()
 	]
 
-	# The id and version are the host's, and a version of ".." names a prefix that
-	# simplifies to "res://dot_cloud/", which every pack's files begin with. The checks
-	# below compare a SIMPLIFIED path with this prefix as written, so such a prefix can
-	# never match and they would refuse it anyway — this is here so the refusal names the
-	# actual problem rather than blaming whichever path was checked first, and so the next
-	# person to "tidy" those checks into comparing simplified with simplified does not open
-	# every pack to every host.
+	# The id and version are the host's, and a version of ".." names a prefix that simplifies to
+	# "res://dot_cloud/", which every pack's files begin with.
 	if prefix.simplify_path() + "/" != prefix:
 		return DotResult.fail(
 			DotError.CODE_FORBIDDEN,
@@ -582,19 +485,7 @@ func _send(payload: Dictionary) -> void:
 	send_fn.call(payload)
 
 
-## Subscribes to dot-cloud's download progress, once.
-##
-## [b]Wired here rather than left to the game.[/b] `report_progress` was public and
-## called by nobody, which is this family's most repeated bug — a value produced
-## correctly and consumed by nothing looks exactly like a value produced wrongly, and the
-## symptom is a progress bar that never moves on the one screen a player stares at.
-##
-## The [Callable] is a member and not a fresh lambda, because [method Object.is_connected]
-## compares Callables and a lambda written at the call site is a new one every time — so
-## the guard would never match its own handler and every map change would add another
-## subscriber. dot-server's client link shipped exactly that bug.
-##
-## Duck-typed through [DotRegistry], because this addon must compile without dot-cloud.
+## Subscribes to dot-cloud's download progress, once. Wired here rather than left to the game.
 func _subscribe_to_progress() -> void:
 	var cloud := DotRegistry.get_service(CLOUD_SERVICE)
 
@@ -612,13 +503,9 @@ func _on_cloud_progress(p: Dictionary) -> void:
 	report_progress(float(p.get("fraction", 0.0)))
 
 
-## Reports fetch progress to the host.
-##
-## Called automatically while a fetch is running; public so a game whose content does not
-## come through dot-cloud can drive it itself.
-##
-## Throttled to one report per [member progress_interval_sec] on the way to the host; the
-## [signal fetch_progress] signal is not.
+## Reports fetch progress to the host. Called automatically while a fetch is running; public so a game whose
+## content does not come through dot-cloud can drive it itself. Throttled to one report per [member
+## progress_interval_sec] on the way to the host; the [signal fetch_progress] signal is not.
 func report_progress(fraction: float) -> void:
 	if announced == null:
 		return

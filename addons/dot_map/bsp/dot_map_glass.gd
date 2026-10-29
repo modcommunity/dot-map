@@ -1,14 +1,8 @@
 class_name DotMapGlass
 extends StaticBody3D
 
-## A breakable glass brush entity from a converted map: solid until its health runs out, then
-## gone with a burst of shards. Built by [method DotMapBspMesh.build_breakables].
-##
-## [b]Server decides, clients follow.[/b] [method hurt] does nothing unless [member authoritative];
-## the host tells clients with [method apply_broken] (the entity [member model] is the id), and a
-## joiner is told the same for every pane already broken. Both ends emit [signal broken], which
-## is where a game plays a sound or spawns its own effect; damage itself is the game's (wire
-## [code]DotCombat[/code] or a hit scan to [method hurt]), so this needs nothing but dot-core.
+## A breakable glass brush entity from a converted map: solid until its health runs out, then gone with a
+## burst of shards. Built by [method DotMapBspMesh.build_breakables]. Server decides, clients follow.
 
 ## Health reached zero (or [method apply_broken] came from the host). [param at] is the hit point.
 signal broken(at: Vector3, by: StringName)

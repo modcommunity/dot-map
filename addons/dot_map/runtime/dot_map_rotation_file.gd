@@ -1,33 +1,9 @@
 class_name DotMapRotationFile
 extends RefCounted
 
-## The maps a server PLAYS, read from `cfg/addons/dot_map/maps.yml` and its tiers; the catalogue is what is merely installed.
-##
-## An operator keeping forty maps installed and rotating twelve should not have to delete
-## twenty-eight to say so. A map the active rotation does not list stays installed and
-## loadable by `map <id>`, shows in the map list as "not in rotation", and is left out of
-## the rotation's pool, every ballot, every nomination and every next-map choice: all of
-## those read [member DotMapDef.available_for], which this class drives through
-## [member DotMapDef.in_rotation].
-##
-## [codeblock]
-## defaults:
-##   rotation: main            # which named list plays; `sv_map_rotation <name>` switches live
-##   mode: random              # random (cooldown) or cycle (written order, wraps)
-##   cooldown: 5
-##   maps: [owner/collection/*]   # shorthand for a rotation named main
-## games:
-##   game-g2gfast:
-##     rotations:
-##       main: {maps: ...}     # written as block lists in a real file
-## [/codeblock]
-##
-## No file at all is fine: every installed map rotates, sorted by id ([member DotMapRotation.sort_unordered]). An operator file replaces the shipped one, `merge: true` at its top adds to it, `remove: [ids]` drops maps.
-## Layers, weakest first: the game's shipped file, the server's `defaults:`, the server's
-## `games: <game>`. The parsing, layering and matching are dot-core's [DotRotationSpec],
-## which games.yml uses too; this class only supplies the catalogue as the candidates.
-## Patterns are expanded at [method apply], and the game calls it again on every map change
-## and rescan, so a newly installed map that matches joins without a restart.
+## The maps a server PLAYS, read from `cfg/addons/dot_map/maps.yml` and its tiers; the catalogue is what is merely installed. A map not in the rotation stays loadable by `map <id>` but is left out of the pool, ballots and nominations ([member DotMapDef.in_rotation]).
+## Keys: `defaults:` and `games: <game>:` with `rotation`, `mode` (random with `cooldown`, or cycle), `maps` (patterns), `rotations: {name: {maps}}`. No file means every installed map rotates, sorted by id; `merge: true` adds to the shipped file, `remove: [ids]` drops maps.
+## Layers, weakest first: shipped file, server `defaults:`, server `games:`. Parsing and matching are dot-core's [DotRotationSpec]; patterns expand at [method apply], called on every map change and rescan.
 
 const CHANNEL := "map.rotation_file"
 const EXTENSIONS := ["yml", "yaml"]
@@ -56,10 +32,9 @@ var _warned: Dictionary = {}
 var _last: PackedStringArray = PackedStringArray()
 var _last_name: String = ""
 
-## `(DotMapDef) -> bool`, asked per map when a rotation is empty and so nothing is listed. The
-## default is every map; a game that keeps some out when there is no file gives the same rule
-## here, so an empty rotation and an absent file mean the same thing. Applies on every
-## [method apply], including the re-apply after a map change and [method switch].
+## `(DotMapDef) -> bool`, asked per map when a rotation is empty and so nothing is listed. The default is
+## every map; a game that keeps some out when there is no file gives the same rule here, so an empty rotation
+## and an absent file mean the same thing.
 var fallback_in: Callable = Callable()
 var _fell_back: bool = false
 
@@ -73,12 +48,9 @@ var _bound_catalogue: DotMapCatalogue = null
 const DEFAULT_STEM := "cfg/maps.yml"
 
 
-## Where a path given as [param stem] (with or without extension) is: in [param config_dir]
-## first when one is given (the directory the host was started with, a plain filesystem path),
-## then beside the project, in `user://`, beside the executable. "" when there is none.
-##
-## [param config_dir] exists because a server started with `--config /etc/x` keeps its files
-## there, and a lookup that only tried the project's own `cfg/` skipped them without a word.
+## Where a path given as [param stem] (with or without extension) is: in [param config_dir] first when one is
+## given (the directory the host was started with, a plain filesystem path), then beside the project, in
+## `user://`, beside the executable. "" when there is none.
 static func find(stem: String, config_dir: String = "") -> String:
 	if stem.strip_edges().is_empty():
 		return ""

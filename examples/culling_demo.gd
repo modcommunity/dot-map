@@ -1,11 +1,6 @@
 extends Node3D
 
 ## Culling without BSP: [DotOccluderBaker] and [DotAreaPortal] on a hand-made level of eight rooms in a row.
-##
-## [codeblock]
-## godot --headless --path . res://examples/culling_demo.tscn
-## godot --path . res://examples/culling_demo.tscn -- --shot=<dir> [--size=1280x720]   # under a display: frames and draw calls
-## [/codeblock]
 
 const CHECKS := 28
 const ROOMS := 8

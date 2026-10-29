@@ -1,29 +1,9 @@
 class_name DotMapNavLinks
 extends RefCounted
 
-## What a converted map's own logic adds to a navigation mesh: the doors and teleports a body cannot just walk
-## through, and for each the buttons, triggers and shots that make it usable.
-##
-## [b]Data, not behaviour.[/b] [method read] takes a built map world by duck typing (`io.entities`,
-## `io.destinations`, `io.resolve`, `volumes.nodes`, as [DotMapWorld] has them) and returns plain
-## dictionaries a bake or an AI reads; nothing here moves a body or runs an input. A baked mesh only
-## sees static colliders, so a door shut at the bake is a wall and a teleport is a box in the floor; this
-## says which ones a path may cross and what to do first.
-##
-## [codeblock]
-## var links := DotMapNavLinks.read(world)
-## links["teleports"]   # [{entity, name, box: AABB, to: Vector3, enabled: bool, opened_by: [opener]}]
-## links["doors"]       # [{entity, name, classname, box: AABB, opens: "touch"|"use"|"output", locked: bool, opened_by: [opener]}]
-## links["openers"]     # {entity index: {index, name, kind: "walk"|"use"|"shoot", box: AABB}}
-## [/codeblock]
-##
-## [b]An opener[/b] is something a runner can do that reaches the door or teleport through the map's output
-## graph: stand in a trigger volume (`walk`), press a button (`use`), or damage a button or a shootable
-## trigger (`shoot`, an OnDamaged output). [code]opened_by[/code] lists the opener dictionaries nearest
-## hop first; each carries [code]hops[/code], the length of the chain, so a consumer takes the first
-## it can reach. A disabled teleport with no opener is listed with an empty [code]opened_by[/code].
-## [b]Not here[/b]: a chain that needs a body to carry something, a keycard or a count of presses; an opener
-## whose entity has no box (a breakable's own model) is left out.
+## What a converted map's own logic adds to a navigation mesh: the doors and teleports a body cannot just walk through, and the buttons, triggers and shots that make each usable.
+## Data, not behaviour: [method read] takes a built map world by duck typing and returns [code]{teleports, doors, openers}[/code] dictionaries a bake or an AI reads; a baked mesh sees a shut door as a wall, this says which a path may cross.
+## [code]opened_by[/code] lists openers (walk, use, shoot) nearest hop first, each with [code]hops[/code]; a chain needing a carried item or a count of presses, or an opener with no box, is left out.
 
 ## Inputs that close, lock or disable: a chain through one of them never helps a runner get through.
 const NEGATIVE_INPUTS := ["disable", "turnoff", "kill", "killhierarchy", "close", "lock"]

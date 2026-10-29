@@ -1,11 +1,9 @@
 @tool
 extends EditorPlugin
 
-## Editor entry point for dot-map. Registers inspector types only.
-##
-## No autoloads. A map session is the clearest case for it after the controller: a
-## server switching maps and a replay viewer showing an old one are two sessions in
-## one process, and a singleton makes the second impossible.
+## Editor entry point for dot-map. Registers inspector types only. No autoloads. A map session is the
+## clearest case for it after the controller: a server switching maps and a replay viewer showing an old one
+## are two sessions in one process, and a singleton makes the second impossible.
 
 const _ICON := "res://addons/dot_map/icon_placeholder.svg"
 

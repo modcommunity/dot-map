@@ -1,39 +1,9 @@
 class_name DotMapSurfaces
 extends RefCounted
 
-## A map generator's answer to "what is this surface made of": it asks for a kind
-## ([code]&"brick"[/code], [code]&"asphalt"[/code]) and gets a [StandardMaterial3D].
-##
-## [codeblock]
-## var surfaces := DotMapSurfaces.new()          # or .new("res://assets/surfaces")
-## wall_mesh.material_override = surfaces.material(&"brick")
-## floor_mesh.material_override = surfaces.material(&"tile_dark", Color(0.8, 0.85, 0.9))
-## [/codeblock]
-##
-## [b]World-space triplanar, because a code-built box has no authored UVs.[/b] A map is
-## hundreds of boxes of every size; per-box UVs would stretch a brick across a two-metre wall
-## and a twenty-metre one alike. Mapped in world space a brick is the same size on every wall,
-## and [constant KINDS] says how many metres one texture covers, so texel density is the same
-## across the map too. Triplanar is a plain [StandardMaterial3D] flag, so it draws the same in
-## Forward+ and in the browser's Compatibility renderer.
-##
-## [b]Files, not generated, and loaded by path rather than referenced by a scene[/b], for the
-## delivered pack: an imported material records the AUTHORED location of its textures, and a
-## pack mounts elsewhere (dot-cloud's publishing.md, "Binary imports are fixed at mount"). A
-## material built here is given the textures [method ResourceLoader.load] opened at the path
-## [member root] plus the file name, so a game that ships the textures in its own pack points
-## [member root] at the mounted copy, or sets [member path_fn] to its path rebasing function.
-## [b]The default [member root] is this addon's own folder[/b], which is the host build's copy:
-## a pack that must carry the textures needs them inside its own tree.
-##
-## [b]Albedo is photographic and untouched[/b]; [param tint] multiplies it. A tint is what lets
-## one concrete be a cold street and a warm basement, and it is also what the lightmap baker
-## reads, because it bakes from albedo.
-##
-## [b]Normal maps are the OpenGL (Y+) convention[/b], which is what Godot reads. A DirectX map
-## looks fine on a flat wall and inside out on a bevel.
-##
-## Credits for every texture are in [code]surfaces/CREDITS.md[/code] beside the files.
+## A surface kind ([code]&"brick"[/code]) to a world-space triplanar [StandardMaterial3D]: a code-built box has no UVs, and this keeps texel density equal on every wall.
+## Textures load by path under [member root] (or [member path_fn]), never referenced by a scene, so a delivered pack that mounts elsewhere still finds them.
+## Albedo is untouched ([param tint] multiplies it); normal maps are the OpenGL (Y+) convention. Credits: [code]surfaces/CREDITS.md[/code].
 
 const CHANNEL := "dot_map.surfaces"
 

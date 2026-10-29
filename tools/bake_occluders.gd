@@ -1,12 +1,7 @@
 extends SceneTree
 
-## Bakes occluders into a scene file from its static meshes, headless.
-##
-## [codeblock]
-## godot --headless --path . -s tools/bake_occluders.gd -- res://levels/arena.tscn [--out=res://levels/arena.tscn]
-##     [--min-area=6] [--min-side=1.5] [--min-fill=0.85] [--max-quads=256] [--dry]
-## [/codeblock]
-## Run [code]--import[/code] first. Meshes in group [code]dot_no_occluder[/code], hidden and translucent ones are skipped.
+## Bakes occluders into a scene file from its static meshes, headless. Run [code]--import[/code] first.
+## Meshes in group [code]dot_no_occluder[/code], hidden and translucent ones are skipped.
 
 func _init() -> void:
 	var path := ""
