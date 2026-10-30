@@ -62,6 +62,77 @@ var _box_clusters := {}
 var _no_lights: Array[Dictionary] = []
 
 
+## The drawn chunks a sun shades, as a coarse occupancy grid with a summed-volume table: whether a swept box touches
+## any is eight reads, where a loop over every drawn chunk per hidden one was quadratic in the chunk count.
+## Conservative to a cell: a box near a receiver counts as touching it, so a shadow is never lost.
+class ReceiverGrid:
+	const CELLS := 16
+	var bounds := AABB()
+	var _sum := PackedInt32Array()
+	var _cell := Vector3.ONE
+
+	func _init(receivers: Array[AABB]) -> void:
+		if receivers.is_empty():
+			return
+		bounds = receivers[0]
+		for r in receivers:
+			bounds = bounds.merge(r)
+		_cell = (bounds.size / CELLS).max(Vector3.ONE * 0.001)
+		var n := CELLS + 1
+		var d := PackedInt32Array()
+		d.resize(n * n * n)
+		for r in receivers:
+			var a := _index(r.position, 0)
+			var b := _index(r.end, 1)
+			for corner in 8:
+				var x := b.x if corner & 1 else a.x
+				var y := b.y if corner & 2 else a.y
+				var z := b.z if corner & 4 else a.z
+				d[(z * n + y) * n + x] += -1 if (corner ^ (corner >> 1) ^ (corner >> 2)) & 1 else 1
+		_prefix(d, n)
+		for i in d.size():
+			d[i] = 1 if d[i] > 0 else 0
+		_prefix(d, n)
+		_sum = d
+
+	## Cell coordinate of [param p], clamped; [param round_up] 1 gives the first cell past it (an exclusive end).
+	func _index(p: Vector3, round_up: int) -> Vector3i:
+		var f := (p - bounds.position) / _cell
+		var v := Vector3i(floori(f.x), floori(f.y), floori(f.z)) + Vector3i.ONE * round_up
+		return v.clamp(Vector3i.ZERO, Vector3i.ONE * (CELLS - 1 + round_up))
+
+	static func _prefix(d: PackedInt32Array, n: int) -> void:
+		for z in n:
+			for y in n:
+				var row := (z * n + y) * n
+				for x in range(1, n):
+					d[row + x] += d[row + x - 1]
+		for z in n:
+			for y in range(1, n):
+				for x in n:
+					d[(z * n + y) * n + x] += d[(z * n + y - 1) * n + x]
+		for z in range(1, n):
+			for y in n:
+				for x in n:
+					d[(z * n + y) * n + x] += d[((z - 1) * n + y) * n + x]
+
+	func _at(x: int, y: int, z: int) -> int:
+		if x < 0 or y < 0 or z < 0:
+			return 0
+		return _sum[(z * (CELLS + 1) + y) * (CELLS + 1) + x]
+
+	## Whether [param box] overlaps a cell any receiver covers.
+	func touches(box: AABB) -> bool:
+		if _sum.is_empty() or not box.intersects(bounds.grow(0.001)):
+			return false
+		var a := _index(box.position, 0)
+		var b := _index(box.end, 1) - Vector3i.ONE
+		var lo := a - Vector3i.ONE
+		var total := _at(b.x, b.y, b.z) - _at(lo.x, b.y, b.z) - _at(b.x, lo.y, b.z) - _at(b.x, b.y, lo.z) \
+				+ _at(lo.x, lo.y, b.z) + _at(lo.x, b.y, lo.z) + _at(b.x, lo.y, lo.z) - _at(lo.x, lo.y, lo.z)
+		return total > 0
+
+
 static func parse_mode(text: String) -> Mode:
 	return MODE_NAMES.get(text.strip_edges().to_lower(), Mode.BOTH)
 
@@ -425,7 +496,7 @@ func _active_lights(local: Vector3) -> Array[Dictionary]:
 		var entry := {"at": at, "reach": reach}
 		if light is DirectionalLight3D:
 			entry["dir"] = (inv.basis * -light.global_basis.z).normalized()
-			entry["receivers"] = receivers
+			entry["grid"] = ReceiverGrid.new(receivers)
 		out.append(entry)
 	return out
 
@@ -440,9 +511,8 @@ func _reached(box: AABB, lights: Array[Dictionary]) -> bool:
 		if l.has("dir"):
 			# A sun's shadow falls along its direction from anywhere up-sun, however far: sweep the box and ask what it can land on.
 			var swept := box.merge(AABB(box.position + (l["dir"] as Vector3) * SUN_SWEEP, box.size))
-			for r: AABB in l["receivers"]:
-				if swept.intersects(r):
-					return true
+			if (l["grid"] as ReceiverGrid).touches(swept):
+				return true
 		elif _box_distance(box, l["at"]) <= float(l["reach"]):
 			return true
 	return false

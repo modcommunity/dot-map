@@ -3,6 +3,7 @@ extends Node3D
 ## [DotMapVisibility]: a hand-made three-cluster map, then real converted maps ray-cast for holes.
 
 const SYNTH_CHECKS := 16
+const SUN_CHECKS := 3
 const MAP_CHECKS := 4
 
 var _passed := 0
@@ -10,8 +11,8 @@ var _failed := 0
 var _failures := PackedStringArray()
 var _entered := 0
 var _completed := 0
-var _expected_sections := 1
-var _expected_checks := SYNTH_CHECKS
+var _expected_sections := 2
+var _expected_checks := SYNTH_CHECKS + SUN_CHECKS
 
 
 func _ready() -> void:
@@ -29,6 +30,7 @@ func _arg(key: String, fallback: String) -> String:
 func _run() -> void:
 	print("dot-map visibility")
 	_test_synthetic()
+	_test_sun_reach()
 	var maps := _arg("maps", "")
 	for prefix in (maps.split(",", false) if not maps.is_empty() else PackedStringArray()):
 		_expected_sections += 1
@@ -56,6 +58,48 @@ func _check(ok: bool, what: String) -> void:
 	else:
 		_failed += 1
 		_failures.append(what)
+
+
+## A hidden chunk casts sun shadow when its swept box lands on a drawn one: the grid never misses one the exact
+## sweep finds, and thousands of hidden chunks against a thousand drawn ones stay cheap (a pair loop took 90 ms).
+func _test_sun_reach() -> void:
+	_entered += 1
+	print("  sun reach: conservative grid, cost")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	var receivers: Array[AABB] = []
+	for i in 200:
+		receivers.append(AABB(Vector3(rng.randf_range(-300, 300), rng.randf_range(-50, 50), rng.randf_range(-300, 300)),
+				Vector3(rng.randf_range(0.5, 40), rng.randf_range(0.5, 10), rng.randf_range(0.5, 40))))
+	var grid := DotMapVisibility.ReceiverGrid.new(receivers)
+	var dir := Vector3(0.4, -0.8, 0.2).normalized()
+	var lost := 0
+	var misses := 0
+	for i in 2000:
+		var b := AABB(Vector3(rng.randf_range(-400, 400), rng.randf_range(-100, 100), rng.randf_range(-400, 400)), Vector3(4, 4, 4))
+		var swept := b.merge(AABB(b.position + dir * DotMapVisibility.SUN_SWEEP, b.size))
+		var exact := false
+		for r in receivers:
+			exact = exact or swept.intersects(r)
+		var got := grid.touches(swept)
+		lost += int(exact and not got)
+		misses += int(not got)
+	_check(lost == 0, "the grid finds every receiver the exact sweep finds (%d lost)" % lost)
+	_check(misses > 0, "and still answers no for some (%d of 2000)" % misses)
+	var floor_tiles: Array[AABB] = []
+	for x in 40:
+		for z in 40:
+			floor_tiles.append(AABB(Vector3(x * 10, -1, z * 10), Vector3(10, 1, 10)))
+	var vis := DotMapVisibility.new()
+	var lights: Array[Dictionary] = [{"at": Vector3.ZERO, "reach": INF, "dir": Vector3.RIGHT, "grid": DotMapVisibility.ReceiverGrid.new(floor_tiles)}]
+	var t := Time.get_ticks_usec()
+	var reached := 0
+	for i in 3000:
+		reached += int(vis._reached(AABB(Vector3(i % 400, 10, i / 8.0), Vector3.ONE), lights))
+	var ms := (Time.get_ticks_usec() - t) / 1000.0
+	_check(reached == 0 and ms < 60.0, "3000 hidden chunks over 1600 drawn ones: %d reached in %.1f ms (under 60)" % [reached, ms])
+	vis.free()
+	_completed += 1
 
 
 ## Space split at x = 0, 10 and 20: cluster 1 west of 0, cluster 0 to 10, solid to 20, cluster 2 past it.
