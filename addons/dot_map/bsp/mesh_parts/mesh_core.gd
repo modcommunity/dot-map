@@ -657,8 +657,9 @@ func _build_concave_shapes(model: int) -> Array[ConcavePolygonShape3D]:
 
 ## Every drawn model as a node tree: a [code]world[/code] child with one [MeshInstance3D] per chunk, and one
 ## [Node3D] per brush entity at its origin (named by its targetname when it has one, else
-## [code]model_<n>[/code]), meta [code]model[/code] and [code]mover[/code] set.
-func build_node(material_for: Callable = Callable(), draw: bool = true) -> Node3D:
+## [code]model_<n>[/code]), meta [code]model[/code] and [code]mover[/code] set. [param movers_only] leaves the
+## [code]world[/code] child empty, for a caller that draws the world model itself.
+func build_node(material_for: Callable = Callable(), draw: bool = true, movers_only: bool = false) -> Node3D:
 	var root := Node3D.new()
 	root.name = "BspMesh"
 	for model in models():
@@ -672,7 +673,7 @@ func build_node(material_for: Callable = Callable(), draw: bool = true) -> Node3
 			parent.position = model_origin(model)
 			parent.set_meta(&"mover", mover(model))
 		root.add_child(parent)
-		if not draw:
+		if not draw or (movers_only and model == WORLD):
 			continue
 		for g: Dictionary in build_meshes(model, material_for):
 			var mi := MeshInstance3D.new()

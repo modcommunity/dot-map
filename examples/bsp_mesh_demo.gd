@@ -2,7 +2,7 @@ extends Node3D
 
 ## [DotMapBspMesh]: the converter's fixture read, built, and ray-cast.
 
-const CHECKS := 143
+const CHECKS := 145
 const SECTIONS := 11
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
@@ -276,6 +276,12 @@ func _test_rebuild() -> void:
 	_check(bare.ok and (bare.value as DotMapWorld).visual.find_children("*", "MeshInstance3D", true, false).is_empty(),
 			"draw false builds no meshes")
 	_check(bare.ok and _collision_signature(bare.value) == sig, "draw false keeps the same collision")
+	var mo := DotMapWorld.build(FIXTURE, {}, {"doc": SOURCE, "environment": false, "draw": true, "movers_only": true})
+	_check(mo.ok and _collision_signature(mo.value).size() < sig.size(), "movers_only leaves the world model's collision to the caller")
+	var wnode: Node = (mo.value as DotMapWorld).visual.get_node_or_null("world") if mo.ok else null
+	_check(wnode != null and wnode.get_child_count() == 0, "movers_only draws no world model")
+	if mo.ok:
+		(mo.value as Node).free()
 	DotMapBspMesh.cache_meshes = false
 	var fresh := DotMapBspMesh.load_prefix(FIXTURE)
 	DotMapBspMesh.cache_meshes = true

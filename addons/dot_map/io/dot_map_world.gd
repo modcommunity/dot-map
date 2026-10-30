@@ -25,6 +25,8 @@ var lit: DotMapLitWorld = null
 var doors: Array[Node3D] = []
 var sounds: Node3D
 var map_id := ""
+## The world model is the caller's: not drawn, no collision, so only brush entities are built.
+var movers_only := false
 var ladder_fn := Callable()
 var swim_fn := Callable()
 ## The game's effect callable, called after the world has started or stopped a sound stand-in.
@@ -59,6 +61,7 @@ static func build(source: Variant, hooks: Dictionary = {}, options: Dictionary =
 	var w := DotMapWorld.new()
 	w.mesh = m
 	w.map_id = str(options.get("map_id", m.manifest.get("name", "")))
+	w.movers_only = bool(options.get("movers_only", false))
 	w.name = "World_" + w.map_id.validate_node_name()
 	var res := w._assemble(doc_res.value, hooks, options)
 	if not res.ok:
@@ -219,7 +222,7 @@ func _assemble(doc: Dictionary, hooks: Dictionary, options: Dictionary) -> DotRe
 		var surfaces: DotMapSurfaces = options.get("surfaces") if options.get("surfaces") is DotMapSurfaces else DotMapSurfaces.new()
 		surfaces.use_lightmap = bool(options.get("lightmap", true))
 		mat_for = surfaces.world_material_for(mesh, mesh.source_path.get_base_dir())
-	visual = mesh.build_node(mat_for, draw)
+	visual = mesh.build_node(mat_for, draw, movers_only)
 	add_child(visual)
 	var layers: Dictionary = options.get("layers", {})
 	if bool(options.get("environment", true)):
@@ -341,6 +344,8 @@ func _build_collision(ents: DotMapEntities, layers: Dictionary) -> void:
 		var parent: Node3D = by_model[model]
 		var mv := ents.mover_for_model(model)
 		if mv != null and not mv.solid:
+			continue
+		if movers_only and (model == DotMapBspMesh.WORLD or mv == null):
 			continue
 		var moving := model != DotMapBspMesh.WORLD and mv != null
 		for kind in ["solid", "clip", "glass"]:

@@ -32,6 +32,13 @@ func _init(world: DotMapWorld = null) -> void:
 	_world = world
 
 
+## Points this at another world (a game keeps one DotMapUse, and its cvars, across map changes).
+func attach(world: DotMapWorld) -> void:
+	_world = world
+	_by_model.clear()
+	_next_ok.clear()
+
+
 ## The prompt a game draws: `{index, label, state, distance, in_range, entity}` for the usable thing the ray from [param from] along [param dir] hits first, or an empty dictionary.
 ## [param state] is `ready`, `pressed` (a button waiting to come out) or `locked`.
 func aim(space: PhysicsDirectSpaceState3D, from: Vector3, dir: Vector3, exclude: Array[RID] = []) -> Dictionary:
@@ -102,6 +109,22 @@ func cvar_specs() -> Array[Dictionary]:
 		out.append({"name": spec[0], "description": spec[3], "value": str(get(spec[1])),
 			"min": kind[1].to_float(), "max": kind[2].to_float()})
 	return out
+
+
+## Registers [member reach] and [member cooldown] as cvars through [param add] (`name, value, description, flags` returning the cvar) and keeps them on their values.
+func bind_cvars(add: Callable, flags: int = 0) -> Array:
+	var made: Array = []
+	for spec in cvar_specs():
+		var cv: Variant = add.call(spec["name"], String(spec["value"]), String(spec["description"]), flags)
+		if not (cv is Object) or cv == null:
+			continue
+		var o := cv as Object
+		if o.has_method(&"with_range"):
+			o.call(&"with_range", float(spec["min"]), float(spec["max"]))
+		if o.has_signal(&"changed"):
+			o.connect(&"changed", func(_old: String, new_value: String) -> void: var _ok := set_cvar(spec["name"], new_value))
+		made.append(o)
+	return made
 
 
 ## Sets one setting from a cvar's text; false when the name is not ours or the text is not a number.
