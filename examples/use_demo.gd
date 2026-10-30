@@ -3,8 +3,8 @@ extends Node
 ## Press-E on a real converted map: the look ray finds a func_button, a press in reach moves its target door, and the
 ## refusals (too far, cooling down, a wall between, nothing under the eye) leave the door alone. Prints SKIP without the world.
 
-const CHECKS := 15
-const SECTIONS := 3
+const CHECKS := 19
+const SECTIONS := 4
 const WORLD := "godot/arena-surf-dm-maps/worlds/surf_forbidden_ways_2nd/surf_forbidden_ways_2nd"
 const BUTTON := 39
 
@@ -51,6 +51,7 @@ func _run() -> void:
 	await _test_aim()
 	await _test_press()
 	await _test_refusals()
+	await _test_prompt_matches_press()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -144,4 +145,23 @@ func _test_refusals() -> void:
 	_use.reach = 0.1
 	_check(not _use.press(_space(), _eye, _dir, "p4").ok, "a shorter sv_use_reach refuses the same press")
 	_check(_use.set_cvar("sv_use_reach", "3.5") and is_equal_approx(_use.reach, 3.5), "the cvar sets reach")
+	_completed += 1
+
+
+func _test_prompt_matches_press() -> void:
+	_section("the prompt is shown exactly when the server would take the press")
+	_dw.io.advance(_dw.io.ticks_for(30.0))
+	var prompt := DotMapUsePrompt.new()
+	_use.reach = 3.5
+	var info := _use.aim(_space(), _eye, _dir)
+	prompt.show_aim(info, _use)
+	_check(prompt.visible and _use.in_reach(info), "in reach: the prompt shows")
+	_use.reach = 0.1
+	prompt.show_aim(info, _use)
+	_check(not prompt.visible and not _use.in_reach(info), "after sv_use_reach drops below the distance the same aim hides it")
+	_check(not _use.press(_space(), _eye, _dir, "p5").ok, "and the press is refused with it")
+	_use.reach = 3.5
+	prompt.show_aim(info, _use)
+	_check(prompt.visible and _use.press(_space(), _eye, _dir, "p5").ok, "restored: shown, and the press goes through")
+	prompt.free()
 	_completed += 1
