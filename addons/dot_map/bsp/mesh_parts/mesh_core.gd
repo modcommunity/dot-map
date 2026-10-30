@@ -494,6 +494,30 @@ func _glass_for(rec: Dictionary) -> Material:
 ## A model's surfaces as meshes, grouped by chunk (the converter's columns of the world), each mesh under
 ## [constant MAX_SURFACES].
 func build_meshes(model: int, material_for: Callable = Callable()) -> Array[Dictionary]:
+	var planned := _mesh_plan(model, material_for)
+	var out: Array[Dictionary] = []
+	var state := {"mesh": null, "key": ""}
+	var step := DotMapParallelBuild.batch_size(load_threads)
+	for from in range(0, planned["plan"].size(), step):
+		_mesh_batch(planned, from, step, out, state)
+	return out
+
+
+## [method build_meshes] that awaits [method DotFrameSlice.pause] between batches, so a cover keeps drawing.
+func build_meshes_async(model: int, material_for: Callable, slice: DotFrameSlice) -> Array[Dictionary]:
+	var planned := _mesh_plan(model, material_for)
+	var out: Array[Dictionary] = []
+	var state := {"mesh": null, "key": ""}
+	var step := DotMapParallelBuild.batch_size(load_threads)
+	for from in range(0, planned["plan"].size(), step):
+		if slice.due():
+			await slice.pause()
+		_mesh_batch(planned, from, step, out, state)
+	return out
+
+
+## Groups a model's surface records by chunk and material: {plan: [[group key, entry]], groups}.
+func _mesh_plan(model: int, material_for: Callable) -> Dictionary:
 	var groups := {}
 	for rec: Dictionary in surfaces:
 		if int(rec["model"]) != model:
@@ -521,28 +545,31 @@ func build_meshes(model: int, material_for: Callable = Callable()) -> Array[Dict
 			(by_material[id]["recs"] as Array).append(rec)
 		for entry: Dictionary in by_material.values():
 			plan.append([key, entry])
-	var out: Array[Dictionary] = []
-	var mesh: ArrayMesh = null
-	var mesh_key := ""
-	var step := DotMapParallelBuild.batch_size(load_threads)
-	for from in range(0, plan.size(), step):
-		var chunk := plan.slice(from, from + step)
-		var arrays := DotMapParallelBuild.merged(self, chunk.map(func(p: Array) -> Array: return p[1]["recs"]), load_threads)
-		for i in chunk.size():
-			var key: String = chunk[i][0]
-			var entry: Dictionary = chunk[i][1]
-			var first: Dictionary = entry["recs"][0]
-			if key != mesh_key or mesh.get_surface_count() >= MAX_SURFACES:
-				mesh_key = key
-				mesh = ArrayMesh.new()
-				out.append({"mesh": mesh, "chunk": first.get("chunk", []), "sky3d": bool(first.get("sky3d", false)),
-						"glass": first.has("glass"), "clusters": _clusters_of(groups[key])})
-			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays[i])
-			var s := mesh.get_surface_count() - 1
-			mesh.surface_set_name(s, str(first.get("material", "")))
-			if entry["material"] != null:
-				mesh.surface_set_material(s, entry["material"])
-	return out
+	return {"plan": plan, "groups": groups}
+
+
+## Builds plan entries [param from] to [param from] + [param step] into [param out]; [param state] carries the open mesh between batches.
+func _mesh_batch(planned: Dictionary, from: int, step: int, out: Array[Dictionary], state: Dictionary) -> void:
+	var plan: Array = planned["plan"]
+	var groups: Dictionary = planned["groups"]
+	var chunk := plan.slice(from, from + step)
+	var arrays := DotMapParallelBuild.merged(self, chunk.map(func(p: Array) -> Array: return p[1]["recs"]), load_threads)
+	for i in chunk.size():
+		var key: String = chunk[i][0]
+		var entry: Dictionary = chunk[i][1]
+		var first: Dictionary = entry["recs"][0]
+		var mesh: ArrayMesh = state["mesh"]
+		if key != state["key"] or mesh.get_surface_count() >= MAX_SURFACES:
+			state["key"] = key
+			mesh = ArrayMesh.new()
+			state["mesh"] = mesh
+			out.append({"mesh": mesh, "chunk": first.get("chunk", []), "sky3d": bool(first.get("sky3d", false)),
+					"glass": first.has("glass"), "clusters": _clusters_of(groups[key])})
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays[i])
+		var s := mesh.get_surface_count() - 1
+		mesh.surface_set_name(s, str(first.get("material", "")))
+		if entry["material"] != null:
+			mesh.surface_set_material(s, entry["material"])
 
 
 ## The union of the records' clusters, or null when any record has none (drawn from everywhere).
@@ -663,33 +690,68 @@ func build_node(material_for: Callable = Callable(), draw: bool = true, movers_o
 	var root := Node3D.new()
 	root.name = "BspMesh"
 	for model in models():
-		var parent := Node3D.new()
-		parent.set_meta(&"model", model)
-		if model == WORLD:
-			parent.name = "world"
-		else:
-			var tn := str(mover(model).get("targetname", ""))
-			parent.name = ("%s_%d" % [tn.validate_node_name(), model]) if not tn.is_empty() else "model_%d" % model
-			parent.position = model_origin(model)
-			parent.set_meta(&"mover", mover(model))
-		root.add_child(parent)
+		var parent := _model_parent(model, root)
 		if not draw or (movers_only and model == WORLD):
 			continue
-		for g: Dictionary in build_meshes(model, material_for):
-			var mi := MeshInstance3D.new()
-			mi.mesh = g["mesh"]
-			mi.position = -parent.position
-			var c: Array = g["chunk"]
-			mi.name = "sky3d" if g["sky3d"] else ("chunk_" + "_".join(PackedStringArray(c.map(str))) if c.size() >= 2 else "mesh")
-			if g["clusters"] != null and model == WORLD:
-				mi.set_meta(&"vis_clusters", g["clusters"])
-			if g["glass"]:
-				mi.name = "glass_" + str(mi.name)
-				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			parent.add_child(mi)
-			if shadow_proxy and model == WORLD and not g["glass"] and not g["sky3d"]:
-				_add_shadow_proxy(parent, mi)
+		_add_model_meshes(parent, model, build_meshes(model, material_for))
 	return root
+
+
+## [method build_node] that pauses on [param slice] between batches of surfaces and between models.
+func build_node_async(material_for: Callable, draw: bool, movers_only: bool, slice: DotFrameSlice) -> Node3D:
+	var root := Node3D.new()
+	root.name = "BspMesh"
+	for model in models():
+		var parent := _model_parent(model, root)
+		if not draw or (movers_only and model == WORLD):
+			continue
+		var built: Array[Dictionary] = await build_meshes_async(model, material_for, slice)
+		await _add_model_meshes_async(parent, model, built, slice)
+		if slice.due():
+			await slice.pause()
+	return root
+
+
+func _model_parent(model: int, root: Node3D) -> Node3D:
+	var parent := Node3D.new()
+	parent.set_meta(&"model", model)
+	if model == WORLD:
+		parent.name = "world"
+	else:
+		var tn := str(mover(model).get("targetname", ""))
+		parent.name = ("%s_%d" % [tn.validate_node_name(), model]) if not tn.is_empty() else "model_%d" % model
+		parent.position = model_origin(model)
+		parent.set_meta(&"mover", mover(model))
+	root.add_child(parent)
+	return parent
+
+
+func _add_model_meshes(parent: Node3D, model: int, built: Array[Dictionary]) -> void:
+	for g: Dictionary in built:
+		_add_one_mesh(parent, model, g)
+
+
+func _add_model_meshes_async(parent: Node3D, model: int, built: Array[Dictionary], slice: DotFrameSlice) -> void:
+	for g: Dictionary in built:
+		_add_one_mesh(parent, model, g)
+		if slice.due():
+			await slice.pause()
+
+
+func _add_one_mesh(parent: Node3D, model: int, g: Dictionary) -> void:
+	var mi := MeshInstance3D.new()
+	mi.mesh = g["mesh"]
+	mi.position = -parent.position
+	var c: Array = g["chunk"]
+	mi.name = "sky3d" if g["sky3d"] else ("chunk_" + "_".join(PackedStringArray(c.map(str))) if c.size() >= 2 else "mesh")
+	if g["clusters"] != null and model == WORLD:
+		mi.set_meta(&"vis_clusters", g["clusters"])
+	if g["glass"]:
+		mi.name = "glass_" + str(mi.name)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
+	if shadow_proxy and model == WORLD and not g["glass"] and not g["sky3d"]:
+		_add_shadow_proxy(parent, mi)
 
 
 ## Whether [method build_node] draws a world chunk's sun shadow from a second, position-only, single-surface instance instead of the visual mesh (one draw per chunk per cascade, not one per material).

@@ -2,8 +2,8 @@ extends Node3D
 
 ## [DotMapBspMesh]: the converter's fixture read, built, and ray-cast.
 
-const CHECKS := 145
-const SECTIONS := 11
+const CHECKS := 149
+const SECTIONS := 12
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
 const TERRAIN := "res://examples/bsp_mesh/terrain_fixture.json"
@@ -29,6 +29,7 @@ func _run() -> void:
 		_test_environment(world)
 		await _test_collide(world)
 		await _test_glass()
+		await _test_async_build(world)
 	_test_terrain()
 	_test_mesh_lods()
 	var lit_world := _test_lightmap()
@@ -328,6 +329,31 @@ func _test_collide(world: DotMapBspMesh) -> void:
 	_check(hit.is_empty(), "a raised door lets the ray through: %s" % hit.get("position"))
 	hit = space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(5, 1, -1), Vector3(5, 1, -11)))
 	_check(not hit.is_empty() and absf(hit["position"].z + 496 * U) < 0.01, "the wall stops a ray at its face: %s" % hit.get("position"))
+	_done()
+
+
+func _test_async_build(world: DotMapBspMesh) -> void:
+	_section("the sliced build yields and matches the one-frame build")
+	var plain := func(_rec: Dictionary) -> Material: return StandardMaterial3D.new()
+	var sync_root := world.build_node(plain)
+	var slice := DotFrameSlice.new()
+	slice.budget_ms = 0
+	var frames := [0]
+	var counter := func() -> void:
+		while frames[0] >= 0:
+			await get_tree().process_frame
+			frames[0] += 1
+	counter.call()
+	var async_root: Node3D = await world.build_node_async(plain, true, false, slice)
+	var seen: int = frames[0]
+	frames[0] = -1
+	_check(seen > 1, "a zero budget spreads the build over frames: %d" % seen)
+	_check(async_root.get_child_count() == sync_root.get_child_count(), "same models: %d vs %d" % [async_root.get_child_count(), sync_root.get_child_count()])
+	var count := func(n: Node) -> int: return n.find_children("*", "MeshInstance3D", true, false).size()
+	_check(count.call(async_root) == count.call(sync_root), "same mesh instances: %d vs %d" % [count.call(async_root), count.call(sync_root)])
+	_check(not slice.due() or slice.budget_ms == 0, "the slice reports itself due only past its budget")
+	sync_root.free()
+	async_root.free()
 	_done()
 
 

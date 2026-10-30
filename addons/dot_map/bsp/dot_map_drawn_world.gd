@@ -32,13 +32,30 @@ static func read(prefix: String, cloud: Object = null) -> DotResult:
 
 ## Draws [param world] under [param parent].
 static func attach(parent: Node3D, world: DotMapBspMesh, options: Dictionary = {}) -> DotMapDrawnWorld:
-	var drawn := DotMapDrawnWorld.new()
-	drawn.world = world
-	drawn.credits = DotMapCredits.line(world.manifest)
+	var surfaces := _surfaces_for(world, options)
+	var node := world.build_node(surfaces.world_material_for(world, world.source_path.get_base_dir()))
+	return _finish(parent, world, options, surfaces, node)
+
+
+## [method attach] that pauses on [param slice] while the meshes are built (the bulk of the cost), so a loading cover keeps animating.
+static func attach_async(parent: Node3D, world: DotMapBspMesh, options: Dictionary, slice: DotFrameSlice) -> DotMapDrawnWorld:
+	var surfaces := _surfaces_for(world, options)
+	var node: Node3D = await world.build_node_async(
+			surfaces.world_material_for(world, world.source_path.get_base_dir()), true, false, slice)
+	return _finish(parent, world, options, surfaces, node)
+
+
+static func _surfaces_for(world: DotMapBspMesh, options: Dictionary) -> DotMapSurfaces:
 	var surfaces := DotMapSurfaces.new(str(options.get("surfaces_root", DotMapSurfaces.DEFAULT_ROOT)))
 	surfaces.use_lightmap = bool(options.get("lightmap", true))
 	DotMapStore.apply(world.licence(), options.get("cloud"), surfaces, world)
-	var node := world.build_node(surfaces.world_material_for(world, world.source_path.get_base_dir()))
+	return surfaces
+
+
+static func _finish(parent: Node3D, world: DotMapBspMesh, options: Dictionary, surfaces: DotMapSurfaces, node: Node3D) -> DotMapDrawnWorld:
+	var drawn := DotMapDrawnWorld.new()
+	drawn.world = world
+	drawn.credits = DotMapCredits.line(world.manifest)
 	node.name = "World"
 	if bool(options.get("only_world", true)):
 		for child in node.get_children():

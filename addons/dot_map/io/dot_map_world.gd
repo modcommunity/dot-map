@@ -27,6 +27,8 @@ var sounds: Node3D
 var map_id := ""
 ## The world model is the caller's: not drawn, no collision, so only brush entities are built.
 var movers_only := false
+
+var _slice: DotFrameSlice = null
 var ladder_fn := Callable()
 var swim_fn := Callable()
 ## The game's effect callable, called after the world has started or stopped a sound stand-in.
@@ -64,6 +66,32 @@ static func build(source: Variant, hooks: Dictionary = {}, options: Dictionary =
 	w.movers_only = bool(options.get("movers_only", false))
 	w.name = "World_" + w.map_id.validate_node_name()
 	var res := w._assemble(doc_res.value, hooks, options)
+	if not res.ok:
+		w.free()
+		return res.wrap("building a map world")
+	return DotResult.success(w)
+
+
+## [method build] that pauses on [param slice] while the meshes and collision are built, for a map change behind a loading cover. The world is the same; only the frames it takes differ.
+static func build_async(source: Variant, hooks: Dictionary, options: Dictionary, slice: DotFrameSlice) -> DotResult:
+	var m: DotMapBspMesh
+	if source is DotMapBspMesh:
+		m = source
+	else:
+		var loaded := DotMapBspMesh.load_prefix(str(source))
+		if not loaded.ok:
+			return loaded.wrap("building a map world")
+		m = loaded.value
+	var doc_res := _find_document(m, options)
+	if not doc_res.ok:
+		return doc_res.wrap("building a map world")
+	var w := DotMapWorld.new()
+	w.mesh = m
+	w.map_id = str(options.get("map_id", m.manifest.get("name", "")))
+	w.movers_only = bool(options.get("movers_only", false))
+	w.name = "World_" + w.map_id.validate_node_name()
+	w._slice = slice
+	var res: DotResult = await w._assemble_async(doc_res.value, hooks, options)
 	if not res.ok:
 		w.free()
 		return res.wrap("building a map world")
@@ -195,6 +223,30 @@ static func _find_document(m: DotMapBspMesh, options: Dictionary) -> DotResult:
 
 
 func _assemble(doc: Dictionary, hooks: Dictionary, options: Dictionary) -> DotResult:
+	var head := _assemble_head(doc, hooks, options)
+	if not head.ok:
+		return head
+	var c: Dictionary = head.value
+	visual = mesh.build_node(c["mat_for"], c["draw"], movers_only)
+	var layers := _assemble_mid(c["ents"], options)
+	if bool(options.get("collision", true)):
+		_build_collision(c["ents"], layers)
+	return _assemble_tail(c["ents"], hooks, options, layers)
+
+
+func _assemble_async(doc: Dictionary, hooks: Dictionary, options: Dictionary) -> DotResult:
+	var head := _assemble_head(doc, hooks, options)
+	if not head.ok:
+		return head
+	var c: Dictionary = head.value
+	visual = await mesh.build_node_async(c["mat_for"], c["draw"], movers_only, _slice)
+	var layers := _assemble_mid(c["ents"], options)
+	if bool(options.get("collision", true)):
+		await _build_collision_async(c["ents"], layers)
+	return _assemble_tail(c["ents"], hooks, options, layers)
+
+
+func _assemble_head(doc: Dictionary, hooks: Dictionary, options: Dictionary) -> DotResult:
 	var units: Dictionary = mesh.manifest.get("units", {})
 	io = DotMapIO.new()
 	io.rate = int(options.get("rate", 60))
@@ -222,7 +274,10 @@ func _assemble(doc: Dictionary, hooks: Dictionary, options: Dictionary) -> DotRe
 		var surfaces: DotMapSurfaces = options.get("surfaces") if options.get("surfaces") is DotMapSurfaces else DotMapSurfaces.new()
 		surfaces.use_lightmap = bool(options.get("lightmap", true))
 		mat_for = surfaces.world_material_for(mesh, mesh.source_path.get_base_dir())
-	visual = mesh.build_node(mat_for, draw, movers_only)
+	return DotResult.success({"ents": ents, "draw": draw, "mat_for": mat_for})
+
+
+func _assemble_mid(_ents: DotMapEntities, options: Dictionary) -> Dictionary:
 	add_child(visual)
 	var layers: Dictionary = options.get("layers", {})
 	if bool(options.get("environment", true)):
@@ -239,8 +294,10 @@ func _assemble(doc: Dictionary, hooks: Dictionary, options: Dictionary) -> DotRe
 		sounds = mesh.build_sounds()
 		add_child(sounds)
 	glass = mesh.build_breakables(visual, int(layers.get("glass", 1)), io.authoritative)
-	if bool(options.get("collision", true)):
-		_build_collision(ents, layers)
+	return layers
+
+
+func _assemble_tail(ents: DotMapEntities, hooks: Dictionary, options: Dictionary, layers: Dictionary) -> DotResult:
 	io.bind_movers(ents.movers)
 	io.bind_breakables(mesh.breakables())
 	io.attach_sounds(mesh.sounds_data().get("ambient", []))
@@ -326,7 +383,7 @@ func _apply_config(opts: Dictionary) -> void:
 
 
 ## Hulls as bodies under each model's node: one per kind, so a game gives clip and glass their own layers.
-func _build_collision(ents: DotMapEntities, layers: Dictionary) -> void:
+func _collision_context() -> Dictionary:
 	var broken := {}
 	for g in glass:
 		broken[g.model] = true
@@ -338,52 +395,78 @@ func _build_collision(ents: DotMapEntities, layers: Dictionary) -> void:
 	for e: DotMapEntity in io.entities:
 		if e is DotMapPhysbox and e.key("model").begins_with("*"):
 			physboxes[int(e.key("model").substr(1))] = e
+	return {"broken": broken, "by_model": by_model, "physboxes": physboxes}
+
+
+## The (model, kind) pairs that get a body, in build order.
+func _collision_units(ents: DotMapEntities, ctx: Dictionary) -> Array:
+	var units := []
 	for model in mesh.models():
-		if broken.has(model) or not by_model.has(model):
+		if ctx["broken"].has(model) or not ctx["by_model"].has(model):
 			continue
-		var parent: Node3D = by_model[model]
 		var mv := ents.mover_for_model(model)
 		if mv != null and not mv.solid:
 			continue
 		if movers_only and (model == DotMapBspMesh.WORLD or mv == null):
 			continue
-		var moving := model != DotMapBspMesh.WORLD and mv != null
 		for kind in ["solid", "clip", "glass"]:
-			var shapes := mesh.hull_shapes(model, PackedStringArray([kind]))
-			var concave: Array[ConcavePolygonShape3D] = []
-			if kind == "solid":
-				concave = mesh.concave_shapes(model)
-			if shapes.is_empty() and concave.is_empty():
-				continue
-			var phys: DotMapPhysbox = physboxes.get(model) if kind == "solid" else null
-			var body: PhysicsBody3D
-			if phys != null:
-				body = RigidBody3D.new()
-				concave = []
-				if shapes.is_empty():
-					continue
-			elif moving:
-				body = AnimatableBody3D.new()
-				# The io moves the parent. A synced body copies each physics step's pose back onto itself, which offsets
-				# it from the parent by however far the parent moved since: a collider that drifts with frame timing.
-				(body as AnimatableBody3D).sync_to_physics = false
-			else:
-				body = StaticBody3D.new()
-			body.name = "col_" + kind
-			body.collision_layer = int(layers.get(kind, 1))
-			body.collision_mask = body.collision_layer if phys != null else 0
-			body.set_meta(&"hull_kind", kind)
-			for h: Dictionary in shapes:
-				var cs := CollisionShape3D.new()
-				cs.shape = h["shape"]
-				body.add_child(cs)
-			for s in concave:
-				var cs2 := CollisionShape3D.new()
-				cs2.shape = s
-				body.add_child(cs2)
-			parent.add_child(body)
-			if phys != null:
-				_make_physbox(phys, body as RigidBody3D, parent)
+			units.append([model, kind, model != DotMapBspMesh.WORLD and mv != null])
+	return units
+
+
+func _build_collision(ents: DotMapEntities, layers: Dictionary) -> void:
+	var ctx := _collision_context()
+	for u: Array in _collision_units(ents, ctx):
+		_collide(ctx, u[0], u[1], u[2], layers)
+
+
+func _build_collision_async(ents: DotMapEntities, layers: Dictionary) -> void:
+	var ctx := _collision_context()
+	for u: Array in _collision_units(ents, ctx):
+		_collide(ctx, u[0], u[1], u[2], layers)
+		if _slice.due():
+			await _slice.pause()
+
+
+## One body of [param kind] hulls for [param model] under its drawn parent.
+func _collide(ctx: Dictionary, model: int, kind: String, moving: bool, layers: Dictionary) -> void:
+	var parent: Node3D = ctx["by_model"][model]
+	var physboxes: Dictionary = ctx["physboxes"]
+	var shapes := mesh.hull_shapes(model, PackedStringArray([kind]))
+	var concave: Array[ConcavePolygonShape3D] = []
+	if kind == "solid":
+		concave = mesh.concave_shapes(model)
+	if shapes.is_empty() and concave.is_empty():
+		return
+	var phys: DotMapPhysbox = physboxes.get(model) if kind == "solid" else null
+	var body: PhysicsBody3D
+	if phys != null:
+		body = RigidBody3D.new()
+		concave = []
+		if shapes.is_empty():
+			return
+	elif moving:
+		body = AnimatableBody3D.new()
+		# The io moves the parent. A synced body copies each physics step's pose back onto itself, which offsets
+		# it from the parent by however far the parent moved since: a collider that drifts with frame timing.
+		(body as AnimatableBody3D).sync_to_physics = false
+	else:
+		body = StaticBody3D.new()
+	body.name = "col_" + kind
+	body.collision_layer = int(layers.get(kind, 1))
+	body.collision_mask = body.collision_layer if phys != null else 0
+	body.set_meta(&"hull_kind", kind)
+	for h: Dictionary in shapes:
+		var cs := CollisionShape3D.new()
+		cs.shape = h["shape"]
+		body.add_child(cs)
+	for s in concave:
+		var cs2 := CollisionShape3D.new()
+		cs2.shape = s
+		body.add_child(cs2)
+	parent.add_child(body)
+	if phys != null:
+		_make_physbox(phys, body as RigidBody3D, parent)
 
 
 ## The drawn meshes of a func_physbox ride its rigid body; its mass follows the hulls' size.
