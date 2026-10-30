@@ -79,7 +79,8 @@ static func notice(licence: Dictionary) -> String:
 	var p := pack_of(licence)
 	if p.is_empty() or not _unfetched.has(str(p["id"])):
 		return ""
-	return "Low-detail art: %d art slices not installed (the maps repository's raw art stores are not staged: tools/stage_stores.sh)" % (_unfetched[str(p["id"])]["ids"] as PackedStringArray).size()
+	var n := (_unfetched[str(p["id"])]["ids"] as PackedStringArray).size()
+	return "Some map art is missing (%d art packs not downloaded), so surfaces look plainer. Reconnect to a server that provides them, or update the game." % n
 
 
 ## Forgets what [method ensure] recorded (a test, or slices staged since).
