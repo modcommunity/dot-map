@@ -95,6 +95,7 @@ func press_entity(index: int, user: Variant, activator: Variant = null, at: Vect
 		return DotResult.fail(DotError.CODE_STATE, "still in")
 	_next_ok[key] = io.now + io.ticks_for(cooldown)
 	var res := io.use(index, activator if activator != null else user)
+	DotLog.debug(CHANNEL, "use pressed", {"entity": index, "state": str(state), "ok": res.ok})
 	if res.ok and effect_fn.is_valid():
 		effect_fn.call(&"locked" if state == &"locked" else (&"toggle" if e.mover.toggle else &"press"), e, at)
 	return res
