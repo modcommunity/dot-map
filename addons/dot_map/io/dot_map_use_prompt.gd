@@ -15,10 +15,12 @@ func _init() -> void:
 	visible = false
 
 
-## Shows what [method DotMapUse.aim] returned (an empty dictionary hides it).
-func show_aim(info: Dictionary) -> void:
+## Shows what [method DotMapUse.aim] returned (an empty dictionary hides it). With [param rules] the
+## reach is the current [code]sv_use_reach[/code], the server's own test, not the one when [code]info[/code] was made.
+func show_aim(info: Dictionary, rules: DotMapUse = null) -> void:
 	var label := String(info.get("label", ""))
-	visible = not info.is_empty() and bool(info.get("in_range", false)) and label != ""
+	var reachable: bool = rules.in_reach(info) if rules != null else bool(info.get("in_range", false))
+	visible = not info.is_empty() and reachable and label != ""
 	if not visible:
 		return
 	text = label if info.get("state") == &"locked" else "[%s] %s" % [key_name, label]

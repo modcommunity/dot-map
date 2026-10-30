@@ -4,8 +4,8 @@ extends "suite_base.gd"
 ## gravity, trigger, ladder and water, the effects and sounds, the command allow-list, and Office's timed
 ## hurt reproduced from its own links.
 
-const CHECKS := 128
-const SECTIONS := 13
+const CHECKS := 146
+const SECTIONS := 15
 const OFFICE := "res://examples/io/office_io.doc.json"
 
 
@@ -27,6 +27,8 @@ func _run() -> void:
 	_test_soundscapes()
 	_test_trigger_soundscape()
 	_test_movers_push_and_block()
+	_test_riders()
+	_test_prompt_reach()
 	var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(OFFICE))
 	if doc is Dictionary:
 		_test_office_timing(doc)
@@ -581,6 +583,88 @@ func _test_movers_push_and_block() -> void:
 	for i in [io, io2]:
 		i.move_fn = Callable()
 		i.damage_fn = Callable()
+	_done()
+
+
+func _test_riders() -> void:
+	_section("a body standing on a moving platform rides it; sv_mover_ride 0 and sv_mover_push 0 leave it behind")
+	var rec := {"entity": 0, "model": 1, "kind": "slide", "classname": "func_door", "targetname": "plat",
+			"direction": [1, 0, 0], "distance": 4.0, "travel_time": 4.0, "wait": -1.0, "origin": [0, 0, 0],
+			"mins": [-1.0, -0.5, -1.0], "maxs": [1.0, 0.0, 1.0], "solid": true}
+	var results: Array = []
+	for mode in ["ride", "no ride", "no push"]:
+		var w := _world([_rec(0, "func_door", "plat")], [], 20)
+		var io: DotMapIO = w[0]
+		io.bind_movers([DotMapMover.from_record(rec)])
+		io.mover_ride = 0.0 if mode == "no ride" else 0.15
+		io.mover_push = mode != "no push"
+		var pos := [Vector3(0.5, 0.02, 0)]
+		var calls := [0]
+		io.carry_fn = func(_b: Variant, v: Variant, _m: Variant) -> void:
+			calls[0] += 1
+			pos[0] = (pos[0] as Vector3) + (v as Vector3) / 20.0
+		io.start()
+		io.send("plat", "Open")
+		_run_ticks(io, w[1], 40, func(_t: int) -> Array: return [_body(1, pos[0])])
+		results.append([pos[0], calls[0]])
+		io.carry_fn = Callable()
+	var rode: Vector3 = results[0][0]
+	_check(rode.x > 1.9 and rode.x < 2.7 and is_equal_approx(rode.y, 0.02), "a rider moves with the platform and keeps its height: %s" % [rode])
+	_check(results[0][1] > 30, "and is carried every tick it is on: %d" % results[0][1])
+	_check((results[1][0] as Vector3).x < 1.0 + 0.01, "with riding off it is only shoved by the edge, not carried: %s" % [results[1][0]])
+	var shoved: int = results[1][1]
+	_check(shoved < results[0][1], "so far fewer carries than riding: %d" % shoved)
+	_check(results[2][1] == results[0][1], "pushing off does not change riding: %d" % results[2][1])
+	var rec_down := rec.duplicate()
+	rec_down["kind"] = "slide"
+	rec_down["direction"] = [0, -1, 0]
+	rec_down["distance"] = 2.0
+	rec_down["travel_time"] = 2.0
+	rec_down["mins"] = [-1.0, -0.5, -1.0]
+	rec_down["maxs"] = [1.0, 0.0, 1.0]
+	var w2 := _world([_rec(0, "func_door", "plat")], [], 20)
+	var io2: DotMapIO = w2[0]
+	io2.bind_movers([DotMapMover.from_record(rec_down)])
+	var pos2 := [Vector3(0, 0.0, 0)]
+	io2.carry_fn = func(_b: Variant, v: Variant, _m: Variant) -> void: pos2[0] = (pos2[0] as Vector3) + (v as Vector3) / 20.0
+	io2.start()
+	io2.send("plat", "Open")
+	_run_ticks(io2, w2[1], 20, func(_t: int) -> Array: return [_body(1, pos2[0])])
+	_check(pos2[0].y < -0.8 and pos2[0].y > -1.2, "a platform going down takes its rider with it instead of leaving it hovering: %s" % [pos2[0]])
+	var away := [Vector3(5.0, 0.02, 0)]
+	var w3 := _world([_rec(0, "func_door", "plat")], [], 20)
+	var io3: DotMapIO = w3[0]
+	io3.bind_movers([DotMapMover.from_record(rec)])
+	var n3 := [0]
+	io3.carry_fn = func(_b: Variant, _v: Variant, _m: Variant) -> void: n3[0] += 1
+	io3.start()
+	io3.send("plat", "Open")
+	_run_ticks(io3, w3[1], 10, func(_t: int) -> Array: return [_body(1, away[0]), _body(2, Vector3(0.5, 1.0, 0))])
+	_check(n3[0] == 0, "a body beside it or well above it is not carried")
+	var n4 := [0]
+	io3.carry_fn = Callable()
+	io3.move_fn = func(_b: Variant, _v: Variant) -> void: n4[0] += 1
+	_run_ticks(io3, w3[1], 10, func(_t: int) -> Array: return [_body(1, Vector3(0.5, 0.02, 0))])
+	_check(n4[0] > 0, "without a carry_fn the game's move_fn gets the carry")
+	io3.move_fn = Callable()
+	_done()
+
+
+func _test_prompt_reach() -> void:
+	_section("the use prompt shows exactly when the server's reach test would let the press through")
+	var rules := DotMapUse.new()
+	var prompt := DotMapUsePrompt.new()
+	var info := {"index": 1, "state": &"ready", "distance": 3.0, "in_range": false, "label": "Use"}
+	prompt.show_aim(info, rules)
+	_check(not prompt.visible and not rules.in_reach(info), "3 m with the default reach: hidden")
+	_check(rules.set_cvar("sv_use_reach", "5"), "sv_use_reach is set")
+	prompt.show_aim(info, rules)
+	_check(prompt.visible and rules.in_reach(info), "3 m after raising the reach to 5: shown, though the stale info said out of range")
+	_check(rules.set_cvar("sv_use_reach", "1.5"), "sv_use_reach lowered")
+	var near := {"index": 1, "state": &"ready", "distance": 2.0, "in_range": true, "label": "Use"}
+	prompt.show_aim(near, rules)
+	_check(not prompt.visible and not rules.in_reach(near), "2 m after lowering the reach to 1.5: hidden, though the stale info said in range")
+	prompt.free()
 	_done()
 
 

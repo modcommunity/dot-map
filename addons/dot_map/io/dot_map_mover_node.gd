@@ -538,12 +538,20 @@ func push_bodies(io: DotMapIO, bodies: Array) -> void:
 		return
 	var step := now * before.affine_inverse()
 	var inv_now := now.affine_inverse()
+	var inv_before := before.affine_inverse()
 	var inv_box := hit_frame.affine_inverse()
+	var upright := (before.basis * hit_frame.basis * Vector3.UP).y > 0.5
 	var seen := {}
 	for info: Dictionary in bodies:
 		var feet: Vector3 = info["position"]
 		var h := float(info.get("height", 1.8))
 		var r := float(info.get("radius", 0.4))
+		if io.mover_ride > 0.0 and upright and _on_top(inv_box * (inv_before * feet), r, io.mover_ride):
+			# Standing on the top face: it travels with the mover, and is never "blocked" by it.
+			io.carry_body(info.get("body"), (step * feet - feet) * float(io.rate), self)
+			continue
+		if not io.mover_push:
+			continue
 		var hit := false
 		for y: float in [0.05, h * 0.5, h - 0.05]:
 			var p: Vector3 = feet + Vector3(0.0, y, 0.0)
@@ -557,7 +565,7 @@ func push_bodies(io: DotMapIO, bodies: Array) -> void:
 		seen[id] = true
 		var mid := feet + Vector3(0.0, h * 0.5, 0.0)
 		var push := step * mid - mid
-		io.move_body(info.get("body"), push * float(io.rate))
+		io.carry_body(info.get("body"), push * float(io.rate), self)
 		# Blocked is a push that moved nothing: a carried body is overlapped every tick but travels.
 		var last: Dictionary = _inside.get(id, {})
 		var n: int = 0
@@ -570,6 +578,12 @@ func push_bodies(io: DotMapIO, bodies: Array) -> void:
 		if not seen.has(id):
 			_inside.erase(id)
 			_hurt_at.erase(id)
+
+
+## True when a body's feet, in the brush's frame, rest on its top face (within [param reach] metres above it).
+func _on_top(q: Vector3, radius: float, reach: float) -> bool:
+	return absf(q.x) < hit_half.x + radius * 0.5 and absf(q.z) < hit_half.z + radius * 0.5 \
+			and q.y > hit_half.y - 0.05 and q.y < hit_half.y + reach
 
 
 func _blocked(io: DotMapIO, info: Dictionary, n: int) -> void:

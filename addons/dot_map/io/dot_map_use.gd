@@ -18,6 +18,10 @@ var effect_fn := Callable()
 ## Seconds an extra `button.ogg` click is audible when [member play_sounds] is on; the map's own sounds are the game's.
 var play_sounds := true
 
+## Metres above a mover's top face a body still rides it (0: no riding), and whether a moving mover pushes bodies (0 or 1).
+var mover_ride := 0.15
+var mover_push := 1.0
+
 var _world: DotMapWorld
 var _by_model: Dictionary = {}
 var _next_ok: Dictionary = {}
@@ -25,6 +29,8 @@ var _next_ok: Dictionary = {}
 const _SPECS := [
 	["sv_use_reach", "reach", "float:0.2:20", "Metres within which a button or door can be pressed with the use key"],
 	["sv_use_cooldown", "cooldown", "float:0:30", "Seconds before the same player can press the same button again"],
+	["sv_mover_ride", "mover_ride", "float:0:2", "Metres above a lift's or platform's top a player still rides it; 0 turns riding off"],
+	["sv_mover_push", "mover_push", "float:0:1", "1: a closing door or lift pushes the players in its way; 0: they are left to it"],
 ]
 
 
@@ -37,6 +43,7 @@ func attach(world: DotMapWorld) -> void:
 	_world = world
 	_by_model.clear()
 	_next_ok.clear()
+	_sync_io()
 
 
 ## The prompt a game draws: `{index, label, state, distance, in_range, entity}` for the usable thing the ray from [param from] along [param dir] hits first, or an empty dictionary.
@@ -69,7 +76,7 @@ func press(space: PhysicsDirectSpaceState3D, from: Vector3, dir: Vector3, user: 
 	var info := aim(space, from, dir, exclude)
 	if info.is_empty():
 		return DotResult.fail(DotError.CODE_INVALID, "nothing usable under the eye")
-	if not bool(info["in_range"]):
+	if not in_reach(info):
 		return DotResult.fail(DotError.CODE_INVALID, "out of reach")
 	return press_entity(int(info["index"]), user, activator if activator != null else user, info["at"] as Vector3)
 
@@ -133,8 +140,21 @@ func set_cvar(cvar_name: String, text: String) -> bool:
 		if spec[0] == cvar_name and text.is_valid_float():
 			var kind: PackedStringArray = String(spec[2]).split(":")
 			set(spec[1], clampf(text.to_float(), kind[1].to_float(), kind[2].to_float()))
+			_sync_io()
 			return true
 	return false
+
+
+func _sync_io() -> void:
+	if _world != null and _world.io != null:
+		_world.io.mover_ride = mover_ride
+		_world.io.mover_push = mover_push >= 0.5
+
+
+## True when the server would press [param info] (an [method aim] result) now: in reach by the current [member reach], and not a button still in.
+## The prompt and [method press] both ask this, so they cannot disagree.
+func in_reach(info: Dictionary) -> bool:
+	return not info.is_empty() and float(info.get("distance", INF)) <= reach and info.get("state", &"") != &""
 
 
 func _entity_of(node: Node) -> DotMapMoverNode:

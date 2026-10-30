@@ -36,6 +36,12 @@ var record_history := false
 var damage_fn := Callable()
 ## [code]move_body(body, velocity_or_transform)[/code].
 var move_fn := Callable()
+## [code]carry(body, velocity, mover)[/code]: a mover pushes or carries a body at [code]velocity[/code] (m/s); unset, [member move_fn] gets it.
+var carry_fn := Callable()
+## Whether a moving mover pushes the bodies in its way (cvar `sv_mover_push`).
+var mover_push := true
+## Metres above a mover's top face a body still rides it; 0 turns riding off (cvar `sv_mover_ride`).
+var mover_ride := 0.15
 ## [code]effect(kind, entity, on)[/code].
 var effect_fn := Callable()
 ## [code]event(kind, data)[/code]: text, hint, score, equip, say, cvar.
@@ -611,6 +617,13 @@ func move_body(body: Variant, motion: Variant) -> void:
 		move_fn.call(body, motion)
 	else:
 		_missing("move_body")
+
+
+func carry_body(body: Variant, velocity: Vector3, mover: Variant) -> void:
+	if carry_fn.is_valid():
+		carry_fn.call(body, velocity, mover)
+	else:
+		move_body(body, velocity)
 
 
 ## What the map asked for that nothing implemented: for the converter's coverage report.
