@@ -180,6 +180,17 @@ func _input(io: DotMapIO, name: String, param: String, activator: Variant, _call
 	return true
 
 
+## What pressing it would do now: "ready", "pressed" (a button still in, waiting to come out), "locked" or "".
+func use_state() -> StringName:
+	if mover == null or not alive or not mover.use:
+		return &""
+	if locked:
+		return &"locked"
+	if mover.kind in [DotMapMover.KIND_BUTTON, DotMapMover.KIND_HINGE_BUTTON] and _in and not mover.toggle:
+		return &"pressed"
+	return &"ready"
+
+
 ## A body used or touched it: a button presses, a door toggles; locked ones fire OnLockedUse.
 func touched(io: DotMapIO, activator: Variant, use: bool) -> bool:
 	if mover == null or not alive:
