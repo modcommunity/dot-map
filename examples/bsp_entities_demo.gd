@@ -2,8 +2,8 @@ extends Node3D
 
 ## [DotMapEntities] on a real converted map's entity data.
 
-const CHECKS := 44
-const SECTIONS := 7
+const CHECKS := 53
+const SECTIONS := 8
 const REAL := "res://examples/bsp_mesh/zm_4way_tunnel.entities.json"
 
 var _passed := 0
@@ -28,6 +28,7 @@ func _run() -> void:
 		_test_travel(ents)
 		_test_links(ents)
 		_test_generic(ents)
+		_test_commands(ents)
 		_test_push()
 	_test_trails()
 	_test_decal_kinds()
@@ -150,6 +151,25 @@ func _test_generic(ents: DotMapEntities) -> void:
 	_check(e.links.unresolved().size() == 1 and e.links.fired_by(7, "OnThing")[0]["delay"] == 0.5, "its outputs are in the graph")
 	var empty := DotMapEntities.from_manifest({})
 	_check(empty.movers.is_empty() and empty.links.size() == 0 and empty.mover_named("x") == null, "an old manifest with none of it reads as empty")
+	_done()
+
+
+func _test_commands(ents: DotMapEntities) -> void:
+	_section("inputs as game-neutral commands, and the unconverted list")
+	_check(DotMapLinks.command_of("Open") == &"open" and DotMapLinks.command_of("TOGGLE") == &"toggle", "command_of ignores case")
+	_check(DotMapLinks.command_of("Lock") == &"lock" and DotMapLinks.command_of("Unlock") == &"unlock" and DotMapLinks.command_of("Close") == &"close", "lock, unlock, close")
+	_check(DotMapLinks.command_of("Use") == &"press" and DotMapLinks.command_of("EnableMotion") == &"", "press; an input with no command is empty")
+	var plate := ents.mover_named("lift01_plate")
+	var cmds := ents.commands_for(plate)
+	_check(not cmds.is_empty() and cmds[0]["command"] == &"open", "the lift plate is opened by a link: %s" % [cmds])
+	var locked := ents.commands_for(ents.mover_named("lift01_button_down"))
+	_check(locked.any(func(c: Dictionary) -> bool: return c["command"] == &"unlock"), "a button is unlocked by another")
+	_check(locked.all(func(c: Dictionary) -> bool: return int(c["from"]) >= 0 and float(c["delay"]) >= 0.0), "every command names who sent it and when")
+	var all_classes := ents.unconverted(PackedStringArray())
+	_check(all_classes.has("phys_hinge") and all_classes.has("env_entity_maker"), "with an empty ignore list the data classes are listed: %s" % [all_classes])
+	var rest := ents.unconverted(PackedStringArray(["phys_hinge", "env_entity_maker", "path_track"]), PackedStringArray(["env_shake", "logic_auto", "point_template"]))
+	_check(rest.is_empty(), "the ignore list and the runnable classes clear it: %s" % [rest])
+	_check(ents.unconverted(PackedStringArray(), PackedStringArray(["phys_hinge"])).has("phys_hinge") == false, "a runnable class is not listed")
 	_done()
 
 

@@ -46,6 +46,12 @@ A link is `{from, from_name, from_class, output, target, input, param, delay, ti
 
 Logic, paths and every class with no row in `dotbsp/classes.py` are in `entities` with every key (not the outputs, which are links), their `treatment` (`data` or `unknown`) and `origin`. `bsp.py mesh` fails on an unknown class unless `--allow-unknown`, and prints the unknown classes and the link counts; `DotMapEntities.unknown_classes()` lists them at load time.
 
+## Commands and the unconverted list
+
+`DotMapLinks.command_of(input)` names an input in game-neutral terms (`open`, `close`, `toggle`, `lock`, `unlock`, `press`, `enable`, `disable`, `trigger`, else empty) and `commands_for(entity)` / `DotMapEntities.commands_for(mover)` give what drives one, by delay, with who sent it, so a game's door, lift or barricade system adapts at this layer without parsing input names.
+
+What nothing converts is listed per map: `bsp.py mesh` prints it, `bsp.py unconverted <maps>` fails (6) for a class that is neither converted (not `data`, or a runtime component in `classes.tsv`) nor on `tools/bsp/rules/unconverted_ignore.tsv` (class or `prefix*`, with a reason; a stale row also fails). `DotMapEntities.unconverted(ignore, runnable)` is the same check at load time, `runnable` being the classes the game's own handlers run.
+
 ## Glass and breakables
 
 A surface whose texture maps (in `source_textures.tsv`) to a generic id starting `glass` (`glass`, `glass_frosted`; a tint column multiplies the colour), or that belongs to a `func_reflective_glass`, carries `glass: <kind>` in its record. `DotMapBspMesh.build_meshes` gives such a surface an alpha-blended material of its kind (`glass_material`, or the game's `glass_material_for`) without asking the game's material callback, in meshes of their own, and `build_node` turns shadow casting off for them. A new kind is a row in the table, an entry in `GLASS_LOOKS`, and a row in `free_textures.tsv`.

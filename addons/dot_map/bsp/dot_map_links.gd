@@ -32,6 +32,46 @@ static func from_records(records: Array, names: Dictionary = {}) -> DotMapLinks:
 	return g
 
 
+## The game-neutral command an input name means: open, close, toggle, lock, unlock, press (a button), enable or disable (a volume
+## or logic entity), trigger, or empty for any other input (a game reads [code]input[/code] itself).
+static func command_of(input: String) -> StringName:
+	match input.to_lower():
+		"open", "setpositionopen", "unlockandopen":
+			return &"open"
+		"close":
+			return &"close"
+		"toggle", "togglepause":
+			return &"toggle"
+		"lock":
+			return &"lock"
+		"unlock":
+			return &"unlock"
+		"press", "use":
+			return &"press"
+		"enable", "enablerefire":
+			return &"enable"
+		"disable":
+			return &"disable"
+		"trigger", "fire", "fireuser1":
+			return &"trigger"
+	return &""
+
+
+## What drives [param entity] as game-neutral commands, by delay:
+## [code][{from, from_name, output, command, input, param, delay, times, special}][/code], only the inputs [method command_of] knows.
+func commands_for(entity: int) -> Array:
+	var out: Array = []
+	for rec: Dictionary in driving(entity):
+		var cmd := command_of(str(rec["input"]))
+		if cmd == &"":
+			continue
+		out.append({"from": int(rec["from"]), "from_name": str(rec.get("from_name", "")), "output": str(rec["output"]), "command": cmd,
+				"input": str(rec["input"]), "param": str(rec.get("param", "")), "delay": float(rec["delay"]),
+				"times": int(rec.get("times", -1)), "special": bool(rec.get("special", false))})
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["delay"]) < float(b["delay"]))
+	return out
+
+
 func size() -> int:
 	return _links.size()
 

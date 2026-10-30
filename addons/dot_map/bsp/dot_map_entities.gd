@@ -79,6 +79,26 @@ func unknown_classes() -> PackedStringArray:
 	return PackedStringArray(seen.keys())
 
 
+## Generic entities whose class is not in [param ignore] and that nothing runs: the map's unconverted list, per class
+## ([code]{classname: count}[/code]). [param runnable] is the classes a game or [DotMapIO] does run (their records are skipped), so
+## a coverage check is [code]unconverted(ignore, runnable).is_empty()[/code].
+func unconverted(ignore: PackedStringArray, runnable: PackedStringArray = PackedStringArray()) -> Dictionary:
+	var out := {}
+	for rec: Dictionary in generic:
+		var c := str(rec["classname"])
+		if c in ignore or c in runnable:
+			continue
+		if not (str(rec.get("treatment", "")) in ["data", "unknown"]):
+			continue
+		out[c] = int(out.get(c, 0)) + 1
+	return out
+
+
+## Every command that drives a mover: its [method DotMapLinks.commands_for].
+func commands_for(mover: DotMapMover) -> Array:
+	return links.commands_for(mover.entity)
+
+
 func describe() -> Dictionary:
 	return {"movers": movers.size(), "volumes": volumes.size(), "generic": generic.size(),
 			"links": links.size(), "unresolved": links.unresolved().size()}
