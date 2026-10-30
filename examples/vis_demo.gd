@@ -4,6 +4,7 @@ extends Node3D
 
 const SYNTH_CHECKS := 16
 const SUN_CHECKS := 3
+const LIGHT_CHECKS := 4
 const MAP_CHECKS := 4
 
 var _passed := 0
@@ -11,8 +12,8 @@ var _failed := 0
 var _failures := PackedStringArray()
 var _entered := 0
 var _completed := 0
-var _expected_sections := 2
-var _expected_checks := SYNTH_CHECKS + SUN_CHECKS
+var _expected_sections := 3
+var _expected_checks := SYNTH_CHECKS + SUN_CHECKS + LIGHT_CHECKS
 
 
 func _ready() -> void:
@@ -31,6 +32,7 @@ func _run() -> void:
 	print("dot-map visibility")
 	_test_synthetic()
 	_test_sun_reach()
+	_test_light_cache()
 	var maps := _arg("maps", "")
 	for prefix in (maps.split(",", false) if not maps.is_empty() else PackedStringArray()):
 		_expected_sections += 1
@@ -99,6 +101,32 @@ func _test_sun_reach() -> void:
 	var ms := (Time.get_ticks_usec() - t) / 1000.0
 	_check(reached == 0 and ms < 60.0, "3000 hidden chunks over 1600 drawn ones: %d reached in %.1f ms (under 60)" % [reached, ms])
 	vis.free()
+	_completed += 1
+
+
+func _test_light_cache() -> void:
+	_entered += 1
+	print("  light cache: found once, rescanned only when a light enters or leaves")
+	var holder := Node3D.new()
+	add_child(holder)
+	var vis := DotMapVisibility.new()
+	vis.root = holder
+	add_child(vis)
+	var sun := OmniLight3D.new()
+	sun.shadow_enabled = true
+	holder.add_child(sun)
+	_check(vis._all_lights().has(sun), "a light in the tree is found")
+	var first := vis._all_lights()
+	var stale_before := vis._lights_stale
+	_check(not stale_before and vis._all_lights() == first, "a second ask does not rescan")
+	var second := OmniLight3D.new()
+	holder.add_child(second)
+	_check(vis._lights_stale and vis._all_lights().has(second), "a light added later is found")
+	holder.remove_child(second)
+	_check(not vis._all_lights().has(second), "a light removed is gone")
+	second.free()
+	vis.queue_free()
+	holder.queue_free()
 	_completed += 1
 
 

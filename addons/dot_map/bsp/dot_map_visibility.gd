@@ -60,6 +60,9 @@ var _reach := {}
 var _todo: Array[int] = []
 var _box_clusters := {}
 var _no_lights: Array[Dictionary] = []
+var _light_nodes: Array[Light3D] = []
+var _lights_stale: bool = true
+var _lights_tree: SceneTree = null
 
 
 ## The drawn chunks a sun shades, as a coarse occupancy grid with a summed-volume table: whether a swept box touches
@@ -473,8 +476,7 @@ func _active_lights(local: Vector3) -> Array[Dictionary]:
 	if root == null or not root.is_inside_tree():
 		return out
 	var inv := root.global_transform.affine_inverse()
-	for l in root.get_tree().root.find_children("*", "Light3D", true, false):
-		var light := l as Light3D
+	for light in _all_lights():
 		if not light.shadow_enabled or not light.is_visible_in_tree():
 			continue
 		var reach := INF
@@ -499,6 +501,35 @@ func _active_lights(local: Vector3) -> Array[Dictionary]:
 			entry["grid"] = ReceiverGrid.new(receivers)
 		out.append(entry)
 	return out
+
+
+## Every Light3D in the tree, rescanned only after one entered or left it: a scan of the whole tree on each cell change was most of the update.
+func _all_lights() -> Array[Light3D]:
+	var tree := root.get_tree()
+	if tree != _lights_tree:
+		_unwatch_lights()
+		_lights_tree = tree
+		tree.node_added.connect(_on_tree_node_changed)
+		tree.node_removed.connect(_on_tree_node_changed)
+		_lights_stale = true
+	if _lights_stale:
+		_light_nodes.clear()
+		for l in tree.root.find_children("*", "Light3D", true, false):
+			_light_nodes.append(l as Light3D)
+		_lights_stale = false
+	return _light_nodes
+
+
+func _on_tree_node_changed(n: Node) -> void:
+	if n is Light3D:
+		_lights_stale = true
+
+
+func _unwatch_lights() -> void:
+	if _lights_tree != null and is_instance_valid(_lights_tree):
+		_lights_tree.node_added.disconnect(_on_tree_node_changed)
+		_lights_tree.node_removed.disconnect(_on_tree_node_changed)
+	_lights_tree = null
 
 
 static func _box_distance(box: AABB, p: Vector3) -> float:
@@ -577,5 +608,6 @@ func describe_lines() -> PackedStringArray:
 
 
 func _exit_tree() -> void:
+	_unwatch_lights()
 	if _occluder != null and not _viewport_had_occlusion and get_viewport() != null:
 		get_viewport().use_occlusion_culling = false
