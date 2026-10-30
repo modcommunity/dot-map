@@ -61,7 +61,6 @@ var _todo: Array[int] = []
 var _box_clusters := {}
 var _no_lights: Array[Dictionary] = []
 var _light_nodes: Array[Light3D] = []
-var _lights_stale: bool = true
 var _lights_tree: SceneTree = null
 
 
@@ -173,6 +172,7 @@ func setup(mesh: DotMapBspMesh, drawn: Node3D) -> DotResult:
 	DotLog.debug(CHANNEL, "visibility set up", describe())
 	if _clusters == 0 and _occluder == null:
 		return DotResult.fail(DotError.CODE_UNSUPPORTED, "the map has no visibility data", str(mesh.manifest.get("name", "")))
+	_watch_lights()
 	_apply_mode()
 	return DotResult.success(self)
 
@@ -503,33 +503,44 @@ func _active_lights(local: Vector3) -> Array[Dictionary]:
 	return out
 
 
-## Every Light3D in the tree, rescanned only after one entered or left it: a scan of the whole tree on each cell change was most of the update.
+## Every Light3D in the tree, kept current by the tree's node_added and node_removed signals.
 func _all_lights() -> Array[Light3D]:
-	var tree := root.get_tree()
-	if tree != _lights_tree:
-		_unwatch_lights()
-		_lights_tree = tree
-		tree.node_added.connect(_on_tree_node_changed)
-		tree.node_removed.connect(_on_tree_node_changed)
-		_lights_stale = true
-	if _lights_stale:
-		_light_nodes.clear()
-		for l in tree.root.find_children("*", "Light3D", true, false):
-			_light_nodes.append(l as Light3D)
-		_lights_stale = false
 	return _light_nodes
 
 
-func _on_tree_node_changed(n: Node) -> void:
+func _enter_tree() -> void:
+	_watch_lights()
+
+
+func _watch_lights() -> void:
+	var tree := get_tree()
+	if tree == null or tree == _lights_tree:
+		return
+	_unwatch_lights()
+	_lights_tree = tree
+	tree.node_added.connect(_on_light_added)
+	tree.node_removed.connect(_on_light_removed)
+	_light_nodes.clear()
+	for l in tree.root.find_children("*", "Light3D", true, false):
+		_light_nodes.append(l as Light3D)
+
+
+func _on_light_added(n: Node) -> void:
+	if n is Light3D and not _light_nodes.has(n):
+		_light_nodes.append(n as Light3D)
+
+
+func _on_light_removed(n: Node) -> void:
 	if n is Light3D:
-		_lights_stale = true
+		_light_nodes.erase(n as Light3D)
 
 
 func _unwatch_lights() -> void:
 	if _lights_tree != null and is_instance_valid(_lights_tree):
-		_lights_tree.node_added.disconnect(_on_tree_node_changed)
-		_lights_tree.node_removed.disconnect(_on_tree_node_changed)
+		_lights_tree.node_added.disconnect(_on_light_added)
+		_lights_tree.node_removed.disconnect(_on_light_removed)
 	_lights_tree = null
+	_light_nodes.clear()
 
 
 static func _box_distance(box: AABB, p: Vector3) -> float:

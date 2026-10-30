@@ -4,7 +4,7 @@ extends Node3D
 
 const SYNTH_CHECKS := 16
 const SUN_CHECKS := 3
-const LIGHT_CHECKS := 4
+const LIGHT_CHECKS := 5
 const MAP_CHECKS := 4
 
 var _passed := 0
@@ -106,7 +106,7 @@ func _test_sun_reach() -> void:
 
 func _test_light_cache() -> void:
 	_entered += 1
-	print("  light cache: found once, rescanned only when a light enters or leaves")
+	print("  light cache: found once, then kept by the tree signals")
 	var holder := Node3D.new()
 	add_child(holder)
 	var vis := DotMapVisibility.new()
@@ -117,15 +117,16 @@ func _test_light_cache() -> void:
 	holder.add_child(sun)
 	_check(vis._all_lights().has(sun), "a light in the tree is found")
 	var first := vis._all_lights()
-	var stale_before := vis._lights_stale
-	_check(not stale_before and vis._all_lights() == first, "a second ask does not rescan")
+	_check(vis._all_lights() == first and first.size() == 1, "a second ask returns the same list")
 	var second := OmniLight3D.new()
 	holder.add_child(second)
-	_check(vis._lights_stale and vis._all_lights().has(second), "a light added later is found")
+	_check(vis._all_lights().has(second), "a light added later is found")
 	holder.remove_child(second)
 	_check(not vis._all_lights().has(second), "a light removed is gone")
 	second.free()
-	vis.queue_free()
+	remove_child(vis)
+	_check(vis._all_lights().is_empty(), "leaving the tree drops the watch and the list")
+	vis.free()
 	holder.queue_free()
 	_completed += 1
 
