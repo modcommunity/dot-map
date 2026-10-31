@@ -49,6 +49,10 @@ static func _surfaces_for(world: DotMapBspMesh, options: Dictionary) -> DotMapSu
 	var surfaces := DotMapSurfaces.new(str(options.get("surfaces_root", DotMapSurfaces.DEFAULT_ROOT)))
 	surfaces.use_lightmap = bool(options.get("lightmap", true))
 	DotMapStore.apply(world.licence(), options.get("cloud"), surfaces, world)
+	if bool(options.get("one_way_glass", true)) and not world.glass_material_for.is_valid():
+		var cell := DotMapOneWayGlass.cell_of(world.manifest)
+		if not cell.is_empty():
+			world.glass_material_for = DotMapOneWayGlass.hook(cell["centre"], cell["radius"])
 	return surfaces
 
 
