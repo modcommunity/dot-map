@@ -6,6 +6,8 @@ extends RefCounted
 ## Any other usable thing (a weapon on the floor) can implement [method DotMapUse.usable_info]'s shape and share the same prompt.
 
 const CHANNEL := "map.use"
+## Metres a usable body may sit behind a non-usable surface and still be pressed.
+const SEE_THROUGH := 0.5
 
 ## Metres from the eye to the surface the player may press.
 var reach := 2.2
@@ -58,7 +60,18 @@ func aim(space: PhysicsDirectSpaceState3D, from: Vector3, dir: Vector3, exclude:
 		return {}
 	var e := _entity_of(hit["collider"] as Node)
 	if e == null:
-		return {}
+		# A game's static copy of the map's brushes can wrap a button's own body; look through it a hand's width.
+		var through := PhysicsRayQueryParameters3D.create(from, from + dir.normalized() * (reach + 4.0), mask)
+		var skip: Array[RID] = exclude.duplicate()
+		skip.append((hit["collider"] as CollisionObject3D).get_rid())
+		through.exclude = skip
+		var again := space.intersect_ray(through)
+		if again.is_empty() or from.distance_to(again["position"] as Vector3) > from.distance_to(hit["position"] as Vector3) + SEE_THROUGH:
+			return {}
+		e = _entity_of(again["collider"] as Node)
+		if e == null:
+			return {}
+		hit = again
 	var state := e.use_state()
 	if state == &"":
 		return {}
