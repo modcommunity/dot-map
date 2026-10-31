@@ -37,11 +37,15 @@ static var _shader: Shader
 
 ## A [Callable] for [member DotMapBspMesh.glass_material_for]: a cell shader for clear glass, null for the rest.
 static func hook(centre: Vector3, radius: float = 6.0) -> Callable:
-	return func(rec: Dictionary) -> Variant:
-		var kind := StringName(str(rec.get("glass", "")))
-		if kind in KINDS:
-			return material(kind, rec.get("tint", []), centre, radius)
-		return null
+	return Callable(DotMapOneWayGlass, "_glass_for").bind(centre, radius)
+
+
+## The hook's body: a plain static method, since a lambda here is freed after the script server at exit.
+static func _glass_for(rec: Dictionary, centre: Vector3, radius: float) -> Variant:
+	var kind := StringName(str(rec.get("glass", "")))
+	if kind in KINDS:
+		return material(kind, rec.get("tint", []), centre, radius)
+	return null
 
 
 ## The shader material for one glass kind and tint around the cell at [param centre].
