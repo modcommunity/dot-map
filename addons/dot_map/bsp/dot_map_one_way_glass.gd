@@ -10,7 +10,7 @@ extends RefCounted
 
 const SHADER_CODE := """
 shader_type spatial;
-render_mode cull_disabled, depth_draw_alpha_prepass;
+render_mode cull_disabled, depth_prepass_alpha;
 uniform vec4 tint : source_color = vec4(0.72, 0.86, 0.92, 0.22);
 uniform float roughness_value = 0.05;
 uniform vec3 cell_centre = vec3(0.0);
