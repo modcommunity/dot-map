@@ -28,6 +28,13 @@ var shard_material: Material = null
 
 var _broken := false
 
+## Every pane joins this group, so a game can find them all to follow their breaking.
+const PANE_GROUP := &"dot_map_glass"
+
+
+func _enter_tree() -> void:
+	add_to_group(PANE_GROUP)
+
 ## Group of a drawn glass model's node; a pane with no [member visual] finds its own by model number.
 const VISUAL_GROUP := &"dot_map_glass_visual"
 
