@@ -4,8 +4,8 @@ extends "suite_base.gd"
 ## gravity, trigger, ladder and water, the effects and sounds, the command allow-list, and Office's timed
 ## hurt reproduced from its own links.
 
-const CHECKS := 146
-const SECTIONS := 15
+const CHECKS := 154
+const SECTIONS := 16
 const OFFICE := "res://examples/io/office_io.doc.json"
 
 
@@ -29,6 +29,7 @@ func _run() -> void:
 	_test_movers_push_and_block()
 	_test_riders()
 	_test_prompt_reach()
+	_test_jail_glass_cell()
 	var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(OFFICE))
 	if doc is Dictionary:
 		_test_office_timing(doc)
@@ -748,4 +749,32 @@ func _test_office_second_entry(doc: Dictionary) -> void:
 	var snap := io.snapshot()
 	_check((snap["entities"][128] as Dictionary)["enabled"] == false, "a joiner's snapshot says it is off")
 	io.damage_fn = Callable()  # the lambda captures io: a cycle, reported as a leak at exit
+	_done()
+
+
+func _test_jail_glass_cell() -> void:
+	_section("jail glass: the cell is found by shape, seen solid from inside only")
+	var dests := {
+		"cell": {"at": [0, -40, 0]}, "cell_b": {"at": [2, -40, 1]}, "far_low": {"at": [200, -40, 0]},
+		"top": {"at": [0, 20, 100]},
+	}
+	var vols: Array = []
+	for i in 3:
+		vols.append({"kind": "teleport", "target": "cell"})
+	vols.append({"kind": "teleport", "target": "cell_b"})
+	vols.append({"kind": "teleport", "target": "top"})
+	vols.append({"kind": "teleport", "target": "top"})
+	vols.append({"kind": "teleport", "target": "top"})
+	var cell := DotMapOneWayGlass.cell_of({"destinations": dests, "volumes": vols})
+	_check(not cell.is_empty(), "the low destination three pits aim at is the jail cell")
+	var centre: Vector3 = cell["centre"]
+	_check(centre.distance_to(Vector3(1, -39, 0.5)) < 0.01, "its centre averages the destinations within 5 m, a metre up: %s" % [centre])
+	_check(DotMapOneWayGlass.sees_solid(centre + Vector3(2, 0, 0), centre, 6.0), "a camera inside the cell sees the glass solid")
+	_check(not DotMapOneWayGlass.sees_solid(centre + Vector3(20, 0, 0), centre, 6.0), "a camera outside sees through it")
+	var ramp := DotMapOneWayGlass.cell_of({"destinations": {"a": {"at": [0, 0, 0]}, "t": {"at": [0, 5, 0]}}, "volumes": vols.slice(0, 3).map(func(v): return {"kind": "teleport", "target": "a"}) + [{"kind": "teleport", "target": "t"}]})
+	_check(ramp.is_empty(), "a destination less than 10 m under the top is a ramp, not a cell")
+	_check(DotMapOneWayGlass.cell_of({}).is_empty(), "a manifest without teleports has no cell")
+	var m := DotMapOneWayGlass.material(&"glass", [0.5, 0.6, 0.7, 0.4], centre, 6.0)
+	_check(m != null and m.get_shader_parameter("cell_centre") == centre, "the glass material carries the cell centre")
+	_check(m.get_shader_parameter("cell_radius") == 6.0, "and the radius")
 	_done()
