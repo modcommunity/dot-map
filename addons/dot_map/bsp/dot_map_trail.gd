@@ -20,6 +20,8 @@ var _pts: Array = []
 var _times: Array = []
 var _mesh := ImmediateMesh.new()
 var _clock := 0.0
+## True while the mesh holds a surface; a trail with nothing to draw then leaves the mesh alone instead of rebuilding it every frame.
+var _drawn := false
 var _view: MeshInstance3D
 
 
@@ -54,9 +56,12 @@ func advance(delta: float, at: Vector3, eye: Vector3) -> int:
 	while not _times.is_empty() and (_clock - float(_times[0]) > lifetime or _pts.size() > max_samples):
 		_pts.remove_at(0)
 		_times.remove_at(0)
-	_mesh.clear_surfaces()
 	if _pts.size() < 2:
+		if _drawn:
+			_mesh.clear_surfaces()
+			_drawn = false
 		return _pts.size()
+	_mesh.clear_surfaces()
 	_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
 	for i in _pts.size():
 		var age := clampf((_clock - float(_times[i])) / maxf(lifetime, 0.001), 0.0, 1.0)
@@ -72,6 +77,7 @@ func advance(delta: float, at: Vector3, eye: Vector3) -> int:
 		_mesh.surface_set_color(c)
 		_mesh.surface_add_vertex(p - side * half)
 	_mesh.surface_end()
+	_drawn = true
 	return _pts.size()
 
 
