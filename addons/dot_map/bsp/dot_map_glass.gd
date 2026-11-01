@@ -28,6 +28,9 @@ var shard_material: Material = null
 
 var _broken := false
 
+## Group of a drawn glass model's node; a pane with no [member visual] finds its own by model number.
+const VISUAL_GROUP := &"dot_map_glass_visual"
+
 
 func is_broken() -> bool:
 	return _broken
@@ -56,6 +59,10 @@ func _shatter(at: Vector3, by: StringName) -> void:
 	health = 0.0
 	set_deferred(&"collision_layer", 0)
 	set_deferred(&"collision_mask", 0)
+	if visual == null and is_inside_tree():
+		for n in get_tree().get_nodes_in_group(VISUAL_GROUP):
+			if int(n.get_meta(&"model", -2)) == model:
+				visual = n as Node3D
 	if visual != null:
 		visual.visible = false
 	if is_inside_tree():

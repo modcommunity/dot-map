@@ -89,7 +89,7 @@ static func sky_kind(sky_name: String) -> StringName:
 	for w in ["borealis", "ep01", "ep02", "cloudy", "storm", "overcast", "verystill", "grey", "gray"]:
 		if n.contains(w):
 			return &"overcast"
-	if n.contains("day03") or n.contains("sunset") or n.contains("dusk") or n.contains("day01_09") or n.contains("day02_09"):
+	if n.contains("day03") or n.contains("sunset") or n.contains("dusk") or n == "hav" or n.contains("day01_09") or n.contains("day02_09"):
 		return &"dusk"
 	if n.contains("day01_01") or n.contains("day01_02") or n.contains("day01_03") or n.contains("clear"):
 		return &"clear"

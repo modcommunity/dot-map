@@ -62,10 +62,18 @@ static func _finish(parent: Node3D, world: DotMapBspMesh, options: Dictionary, s
 	drawn.credits = DotMapCredits.line(world.manifest)
 	node.name = "World"
 	if bool(options.get("only_world", true)):
+		var glass := {}
+		for rec: Dictionary in world.breakables():
+			if rec.get("model") != null and not str(rec.get("glass", "")).is_empty():
+				glass[int(rec["model"])] = true
 		for child in node.get_children():
-			if String(child.name) != "world":
-				node.remove_child(child)
-				child.free()
+			if String(child.name) == "world":
+				continue
+			if child.has_meta(&"model") and glass.has(int(child.get_meta(&"model"))):
+				child.add_to_group(DotMapGlass.VISUAL_GROUP)
+				continue
+			node.remove_child(child)
+			child.free()
 	node.transform = options.get("transform", Transform3D.IDENTITY)
 	parent.add_child(node)
 	drawn.root = node
