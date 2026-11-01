@@ -2,8 +2,8 @@ extends Node3D
 
 ## [DotMapBspMesh]: the converter's fixture read, built, and ray-cast.
 
-const CHECKS := 155
-const SECTIONS := 13
+const CHECKS := 164
+const SECTIONS := 14
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
 const TERRAIN := "res://examples/bsp_mesh/terrain_fixture.json"
@@ -30,6 +30,7 @@ func _run() -> void:
 		await _test_collide(world)
 		await _test_glass()
 		await _test_fence()
+		await _test_legacy_split()
 		await _test_async_build(world)
 	_test_terrain()
 	_test_mesh_lods()
@@ -391,6 +392,78 @@ func _test_fence() -> void:
 	_check(space.intersect_ray(ray).get("collider") == fb, "a body mask stops at the fence")
 	holder.queue_free()
 	_done()
+
+
+func _test_legacy_split() -> void:
+	_section("legacy hulls split by kind: a shot passes clip, stops at solid; a body is still stopped by clip")
+	# The glass fixture's brush 2 renamed a clip hull, in a copy the loader reads.
+	var doc: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(GLASS + ".json"))
+	for h: Dictionary in doc["hulls"]:
+		if int(h["brush"]) == 2:
+			h["kind"] = "clip"
+	DirAccess.make_dir_recursive_absolute("user://legacy_split")
+	var f := FileAccess.open("user://legacy_split/clipfix.json", FileAccess.WRITE)
+	f.store_string(JSON.stringify(doc))
+	f.close()
+	DirAccess.copy_absolute(GLASS + ".bin", "user://legacy_split/glass.bin")
+	var res := DotMapBspMesh.load_prefix("user://legacy_split/clipfix")
+	_check(res.ok, "the clip fixture reads")
+	if not res.ok:
+		_done()
+		return
+	var m: DotMapBspMesh = res.value
+	var blob := StaticBody3D.new()
+	blob.collision_layer = 1
+	for h: Dictionary in m.hull_shapes(0):
+		var cs := CollisionShape3D.new()
+		cs.shape = h["shape"]
+		blob.add_child(cs)
+	var clip_hulls := m.hull_shapes(0, PackedStringArray(["clip"])).size()
+	var total := blob.get_child_count()
+	var clip_layer := 1 << 5
+	var npc_layer := 1 << 6
+	var moved := m.split_legacy_hulls(blob, {"clip": clip_layer})
+	_check(clip_hulls == 1 and int(moved.get("clip", 0)) == clip_hulls, "one clip hull moved: %s" % [moved])
+	var clip_body: StaticBody3D = blob.get_node_or_null("ImportedClip")
+	_check(clip_body != null and clip_body.collision_layer == clip_layer and clip_body.collision_mask == 0, "it sits on its own layer")
+	_check(blob.get_child_count() == total - clip_hulls + 1, "the others stay in the legacy body")
+	_check(m.split_legacy_hulls(blob, {"clip": npc_layer}).get("clip", -1) == 0, "a second split finds nothing left to move")
+	var holder := Node3D.new()
+	add_child(holder)
+	holder.add_child(blob)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var space := get_world_3d().direct_space_state
+	var ray := PhysicsRayQueryParameters3D.create(Vector3(100 * U, 50 * U, 20 * U), Vector3(100 * U, 50 * U, -600 * U))
+	ray.collision_mask = 1
+	var shot := space.intersect_ray(ray)
+	_check(shot.has("collider") and shot["collider"] == blob and shot["position"].z < -400 * U, "a shot passes the clip hull and stops at the solid behind it (%s)" % [shot])
+	ray.collision_mask = 1 | clip_layer
+	_check(space.intersect_ray(ray).get("collider") == clip_body, "a mask with the clip layer stops at the clip hull")
+	var solid_ray := PhysicsRayQueryParameters3D.create(Vector3(100 * U, 50 * U, -300 * U), Vector3(100 * U, 50 * U, -700 * U))
+	solid_ray.collision_mask = 1
+	_check(space.intersect_ray(solid_ray).get("collider") == blob, "a shot at solid stops")
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = 0.3
+	capsule.height = 1.0
+	var q := PhysicsShapeQueryParameters3D.new()
+	q.shape = capsule
+	var cbox := _points_aabb((m.hull_shapes(0, PackedStringArray(["clip"]))[0]["shape"] as ConvexPolygonShape3D).points)
+	q.transform = Transform3D(Basis(), cbox.get_center())
+	q.collision_mask = clip_layer
+	var hit_clip := space.intersect_shape(q, 4)
+	q.collision_mask = 1
+	var hit_legacy := space.intersect_shape(q, 4)
+	_check(hit_clip.size() > 0 and hit_legacy.is_empty(), "a capsule in the clip hull is blocked on the clip layer and not on the shot layer (%d, %d)" % [hit_clip.size(), hit_legacy.size()])
+	holder.queue_free()
+	_done()
+
+
+func _points_aabb(points: PackedVector3Array) -> AABB:
+	var box := AABB(points[0], Vector3.ZERO)
+	for p in points:
+		box = box.expand(p)
+	return box
 
 
 func _test_glass() -> void:

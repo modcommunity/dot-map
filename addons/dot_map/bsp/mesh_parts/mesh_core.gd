@@ -494,6 +494,50 @@ func _build_hull_shapes(model: int, kinds: PackedStringArray) -> Array[Dictionar
 	return out
 
 
+## Moves the legacy blob's hulls of other kinds into a body each. [param layers] maps a hull kind ("clip", "fence",
+## "glass") to its collision layer; the legacy shapes are matched to the named hulls by bounds, because the blob does not
+## name them. A body keeps the legacy mask of 0 and carries `hull_kind` (and `dot_material` for fence and glass), so a
+## shot whose mask skips those layers passes, a body mask still stops. Returns kind to hulls moved.
+func split_legacy_hulls(body: StaticBody3D, layers: Dictionary) -> Dictionary:
+	var solids: Array[CollisionShape3D] = []
+	for child in body.get_children():
+		if child is CollisionShape3D and (child as CollisionShape3D).shape is ConvexPolygonShape3D:
+			solids.append(child)
+	var moved := {}
+	for kind: String in layers:
+		var dest := StaticBody3D.new()
+		dest.name = "Imported" + kind.capitalize()
+		dest.collision_layer = int(layers[kind])
+		dest.collision_mask = 0
+		dest.set_meta(&"hull_kind", kind)
+		if kind == "fence" or kind == "glass":
+			dest.set_meta(&"dot_material", StringName(kind))
+		for model in models():
+			var origin := model_origin(model)
+			for h: Dictionary in hull_shapes(model, PackedStringArray([kind])):
+				var want := _points_box((h["shape"] as ConvexPolygonShape3D).points, origin)
+				for s in solids:
+					var have := _points_box((s.shape as ConvexPolygonShape3D).points, Vector3.ZERO)
+					if have.position.distance_to(want.position) < 0.06 and have.size.distance_to(want.size) < 0.06:
+						solids.erase(s)
+						body.remove_child(s)
+						dest.add_child(s)
+						break
+		moved[kind] = dest.get_child_count()
+		if dest.get_child_count() > 0:
+			body.add_child(dest)
+		else:
+			dest.free()
+	return moved
+
+
+static func _points_box(points: PackedVector3Array, origin: Vector3) -> AABB:
+	var box := AABB(points[0] + origin, Vector3.ZERO) if points.size() > 0 else AABB()
+	for p in points:
+		box = box.expand(p + origin)
+	return box
+
+
 ## Triangle shapes for the surfaces that collide as drawn (displacements: terrain has no
 ## brushes), relative to [method model_origin].
 func concave_shapes(model: int) -> Array[ConcavePolygonShape3D]:
