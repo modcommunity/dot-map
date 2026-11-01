@@ -3,12 +3,12 @@ extends "map_selftest_parts/tests_cloud.gd"
 ## Proves the catalogue, the rotation, the vote and the map change do what a server depends on. The most
 ## important test here is [method _test_change_survives_a_failure].
 
-const CHECKS := 365
+const CHECKS := 378
 
 ## Sections entered against sections that ran to their last line, and against this. A runtime error inside a
 ## section aborts that function and nothing says so; a section that bailed out early after a failed guard is
 ## counted as not finished on purpose. The CHECKS total is the other half — see docs/testing.md.
-const SECTIONS := 36
+const SECTIONS := 37
 
 
 func _ready() -> void:
@@ -53,6 +53,7 @@ func _run() -> void:
 	await _test_rotation_paths()
 	_test_rotation_file_layout()
 	_test_zero_config_rotation()
+	_test_rotation_exempt()
 	_test_rotation_play()
 	_test_map_config()
 	_test_supports()
@@ -445,6 +446,75 @@ func _test_rotation_file_layout() -> void:
 	for d in ["addons/dot_map", "addons", "game/g/dot_map", "game/g", "game", "server/addons/dot_map", "server/addons", "server/game/g/dot_map", "server/game/g", "server/game", "server/dot_map", "server", ""]:
 		DirAccess.remove_absolute(base.path_join(d) if d != "" else base)
 	_done()
+
+
+func _ids_in(cat: DotMapCatalogue) -> Array:
+	var out: Array = []
+	for m in cat.maps:
+		if m.in_rotation:
+			out.append(String(m.id))
+	out.sort()
+	return out
+
+
+func _test_rotation_exempt() -> void:
+	_section("exempt: every installed map except these, globs, per rotation, late packs")
+	var ids := ["dm_a", "dm_b", "surf_x", "bhop_one", "m_z"]
+	# Only exempt: everything else, sorted by id; the exempt map stays installed.
+	var cat := _named_catalogue(ids)
+	var rot := DotMapRotation.of(cat)
+	var f := _file([{"exempt": ["m_z"]}])
+	var res := f.apply(rot)
+	_check(Array(res.value) == ["bhop_one", "dm_a", "dm_b", "surf_x"], "only exempt: all installed maps but m_z, sorted (%s)" % [res.value])
+	_check(cat.get_map(&"m_z") != null and not cat.get_map(&"m_z").in_rotation and not f.fell_back(),
+		"the exempt map stays installed and is marked out of rotation")
+	_check(_file([{"remove": ["m_z"]}]).resolve(cat).size() == 4, "remove: is still an alias")
+	# Globs, quoted leading star, and owner/map refs.
+	f = _file([{"exempt": ["dm_*", "*_x", "zed/bhop_one"]}])
+	f.apply(rot)
+	_check(_ids_in(cat) == ["m_z"], "globs and an owner/map ref exempt (%s)" % [_ids_in(cat)])
+	# Exempt beats an include in the same layer, and a merge layer adds exempts to a shipped list.
+	f = _file([{"defaults": {"maps": ["dm_a", "dm_b", "surf_x"]}, "exempt": ["dm_b"]}])
+	_check(Array(f.resolve(cat)) == ["dm_a", "surf_x"], "exempt wins over an include in the same layer")
+	f = _file([{"defaults": {"maps": ["dm_a", "dm_b", "surf_x"]}}, {"merge": true, "exempt": ["surf_*"]}])
+	_check(Array(f.resolve(cat)) == ["dm_a", "dm_b"], "a merge layer adds exempts to the shipped list")
+	# Inside defaults: and games: sections, and per rotation.
+	f = _file([{"defaults": {"exempt": ["dm_a"]}, "games": {"game-x": {"exempt": ["dm_b"]}, "other": {"exempt": ["m_z"]}}}])
+	_check(_ids_in_after(f, rot, cat) == ["bhop_one", "m_z", "surf_x"], "exempt inside defaults: and the game's entry, not another game's")
+	f = _file([{"defaults": {"rotation": "all", "rotations": {
+		"all": {"maps": ["*"], "exempt": ["m_z"]}, "dm": {"maps": ["dm_*", "m_z"], "exempt": ["dm_b"]}}}}])
+	_check(Array(f.resolve(cat, "all")) == ["bhop_one", "dm_a", "dm_b", "surf_x"], "per-rotation exempt (all)")
+	_check(Array(f.resolve(cat, "dm")) == ["dm_a", "m_z"], "per-rotation exempt does not leak into another (dm)")
+	f = _file([{"defaults": {"rotations": {"calm": {"exempt": ["surf_*"]}}}}])
+	f.apply(rot, "calm")
+	_check(_ids_in(cat) == ["bhop_one", "dm_a", "dm_b", "m_z"], "a rotation with only exempt: plays everything else")
+	# A pack that arrives later is covered by a file with only exempt:.
+	var index := DotContentIndex.new()
+	index.set_session(DotContentIndex.SESSION_SOLO)
+	var lcat := _named_catalogue(["dm_a", "m_z"])
+	lcat.follow_content(index, PackedStringArray(["surf", "bhop"]))
+	var lrot := DotMapRotation.of(lcat)
+	var lf := _file([{"exempt": ["m_z", "utopia_bhop"]}])
+	lf.apply(lrot)
+	index.add_pack(_workshop_pack("alice/utopia", "1.0.0", DotContentIndex.SESSION_SOLO))
+	_check(lcat.get_map(&"utopia_one").in_rotation and not lcat.get_map(&"utopia_bhop").in_rotation
+		and lcat.get_map(&"dm_a").in_rotation and not lcat.get_map(&"m_z").in_rotation,
+		"a pack mounted later joins the rotation except its exempt maps")
+	# A pattern matching nothing warns (once), like an include list.
+	f = _file([{"exempt": ["nothing_*"]}])
+	f.resolve(cat)
+	f.resolve(cat)
+	_check(f.warnings.is_empty() and f._warned.size() == 1, "an exempt pattern that matches nothing warns once (%d)" % f._warned.size())
+	# Everything exempt never empties the server.
+	f = _file([{"exempt": ["*"]}])
+	f.apply(rot)
+	_check(f.fell_back() and _ids_in(cat).size() == 5, "exempting everything falls back to every map")
+	_done()
+
+
+func _ids_in_after(f: DotMapRotationFile, rot: DotMapRotation, cat: DotMapCatalogue) -> Array:
+	f.apply(rot)
+	return _ids_in(cat)
 
 
 func _test_zero_config_rotation() -> void:

@@ -36,7 +36,7 @@ The clock can wait while the server hibernates: `DotMapSession.follow_hibernatio
 
 ## The rotation file
 
-`cfg/addons/dot_map/maps.yml` says which installed maps rotate (the game's `cfg/game/<game>/dot_map/maps.yml` over it, then the operator's `cfg/server/addons/dot_map/maps.yml` and `cfg/server/game/<game>/dot_map/maps.yml`; an operator file replaces the shipped list unless it starts `merge: true`, and `remove: [ids]` drops maps; [layout](cfg-layout.md#what-is-built-for-the-rotation-file); with no file every installed map rotates, sorted by id; the old `cfg/server/dot_map/maps.yml` is read through the shim too; the flat `cfg/maps.yml` is still found through `DotCfgLegacy` with one WARN until 2026-12-31, and `DotMapRotationFile.find("cfg/maps.yml")` does all of that; `find_layers` lists the new-layout files weakest first), in the shape of the server's content.yml: `defaults:` for every game and `games: <game>:` for one, read by `DotMapRotationFile`. Layers, weakest first: the game's shipped file, the server's defaults, the game's own entry. A list replaces a list; scalars merge.
+`cfg/addons/dot_map/maps.yml` says which installed maps rotate (the game's `cfg/game/<game>/dot_map/maps.yml` over it, then the operator's `cfg/server/addons/dot_map/maps.yml` and `cfg/server/game/<game>/dot_map/maps.yml`; an operator file replaces the shipped list unless it starts `merge: true`, and `exempt:` keeps maps out (see below); [layout](cfg-layout.md#what-is-built-for-the-rotation-file); with no file every installed map rotates, sorted by id; the old `cfg/server/dot_map/maps.yml` is read through the shim too; the flat `cfg/maps.yml` is still found through `DotCfgLegacy` with one WARN until 2026-12-31, and `DotMapRotationFile.find("cfg/maps.yml")` does all of that; `find_layers` lists the new-layout files weakest first), in the shape of the server's content.yml: `defaults:` for every game and `games: <game>:` for one, read by `DotMapRotationFile`. Layers, weakest first: the game's shipped file, the server's defaults, the game's own entry. A list replaces a list; scalars merge.
 
 ```yaml
 defaults:
@@ -58,6 +58,19 @@ A bare `maps:` list is shorthand for a rotation called `main`; if `rotations: ma
 An unlisted map stays installed and loadable (`map <id>`, the map list marks it "not in rotation") but is out of the rotation's pool, `set_next`, the ballot and nominations: all read `DotMapDef.in_rotation`. `sv_map_rotation <name>` switches the active rotation at run time (admin), `maps_rotations` lists them. A host calls `DotMapRotationFile.load_files`, then `attach(session)` so a catalogue change re-applies it; `collections` must be filled by a host that has them for `owner/collection/*` to match.
 
 `DotMapRotationFile.find(stem, config_dir)` looks in the host's `--config` directory first (`config_dir_arg()` reads the flag), so a server started with `--config /etc/x` is not silently skipped. When a rotation lists nothing that is installed, every map plays, unless the game sets `fallback_in` (`(DotMapDef) -> bool`) to keep some out, the way it does with no file at all. A sequential rotation never offers the map it just played, even when a forced or voted map moved the cursor under the cycle.
+
+### Listing what plays, or exempting what does not
+
+Two modes. **Include:** `maps:` lists what plays. **Exempt:** `exempt: [patterns]` keeps every installed map and takes some out. A file with only `exempt:` (no `maps:` anywhere) plays every installed map except those, sorted by id, and maps from mounted workshop or suggested packs that arrive later join it, because `content_refreshed` re-applies the file. `remove:` is the old name of the same key and is read the same way (the key is read once when the file is read, never per map).
+
+```yaml
+exempt: [dm_old_map, "dm_test_*", alice/some_map]
+```
+
+- Patterns are ids, `owner/map` refs and name globs; quote one that starts with `*`. One that matches nothing logs a WARN once, like an include entry.
+- `exempt:` is read at the top of any layer, inside `defaults:` or a game's entry, and inside one rotation (`rotations: <name>: exempt:`, which applies to that rotation only). A rotation written with only `exempt:` plays every installed map but those.
+- Exempt wins over an include in the same layer or any other; an operator layer with `merge: true` adds exempts to a shipped list.
+- An exempt map stays installed and loadable (`map <id>`), is marked "not in rotation" and is out of the pool, ballot and nominations (`DotMapDef.in_rotation`). Exempting every map falls back to every map, with one WARN, so the server is never left with nothing to play.
 
 ## Per-map settings
 

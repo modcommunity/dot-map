@@ -2,7 +2,7 @@ class_name DotMapRotationFile
 extends RefCounted
 
 ## The maps a server PLAYS, read from `cfg/addons/dot_map/maps.yml` and its tiers; the catalogue is what is merely installed. A map not in the rotation stays loadable by `map <id>` but is left out of the pool, ballots and nominations ([member DotMapDef.in_rotation]).
-## Keys: `defaults:` and `games: <game>:` with `rotation`, `mode` (random with `cooldown`, or cycle), `maps` (patterns), `rotations: {name: {maps}}`. No file means every installed map rotates, sorted by id; `merge: true` adds to the shipped file, `remove: [ids]` drops maps.
+## Keys: `defaults:` and `games: <game>:` with `rotation`, `mode` (random with `cooldown`, or cycle), `maps` (patterns), `rotations: {name: {maps}}`. No file means every installed map rotates, sorted by id; `merge: true` adds to the shipped file. `exempt: [patterns]` (alias `remove:`; ids, `owner/map`, name globs) keeps maps out of the rotation, at the top of any layer or inside one rotation; a file with only `exempt:` rotates every installed map except those.
 ## Layers, weakest first: shipped file, server `defaults:`, server `games:`. Parsing and matching are dot-core's [DotRotationSpec]; patterns expand at [method apply], called on every map change and rescan.
 
 const CHANNEL := "map.rotation_file"
@@ -24,8 +24,16 @@ var collections: Dictionary = {}
 ## Where the layers were read from, weakest first.
 var sources: PackedStringArray = PackedStringArray()
 
-## Map ids (or the last segment of a ref) taken out of every rotation, from a top-level `remove: [ids]` in any layer.
-var removed: PackedStringArray = PackedStringArray()
+## Patterns (id, `owner/map`, name glob) taken out of every rotation, from `exempt:` (or `remove:`) in any layer.
+var exempt: PackedStringArray = PackedStringArray()
+
+## The same, per rotation name, from `rotations: <name>: exempt:`.
+var exempt_by_rotation: Dictionary = {}
+
+## Old name of [member exempt].
+var removed: PackedStringArray:
+	get:
+		return exempt
 
 var warnings: PackedStringArray = PackedStringArray()
 var _warned: Dictionary = {}
@@ -111,20 +119,46 @@ static func from_trees(trees: Array, p_game: String = "", p_sources: PackedStrin
 	var layers: Array = []
 	for t: Variant in trees:
 		var tree := t as Dictionary
-		if tree.get("remove") is Array:
-			for r: Variant in (tree["remove"] as Array):
-				file.removed.append(str(r))
+		file._read_exempt(tree)
 		var where := "maps.yml"
 		if tree.get("defaults") is Dictionary:
+			file._read_exempt(tree["defaults"])
 			layers.append(DotRotationSpec.normalize(tree["defaults"], "maps", file.warnings, where + " defaults"))
 		if tree.get("games") is Dictionary:
 			for key: Variant in (tree["games"] as Dictionary):
 				if DotRotationSpec.key_matches(str(key), p_game) and (tree["games"] as Dictionary)[key] is Dictionary:
+					file._read_exempt((tree["games"] as Dictionary)[key])
 					layers.append(DotRotationSpec.normalize((tree["games"] as Dictionary)[key], "maps", file.warnings, "%s games.%s" % [where, key]))
 	file.spec = DotRotationSpec.layer(layers)
 	for w in file.warnings:
 		DotLog.warn(CHANNEL, w)
 	return DotResult.success(file)
+
+
+## Collects `exempt:`/`remove:` from one section (a file, `defaults:` or a game's entry) and from its rotations.
+func _read_exempt(section: Dictionary) -> void:
+	exempt.append_array(_patterns(section))
+	if section.get("rotations") is Dictionary:
+		for name: Variant in (section["rotations"] as Dictionary):
+			var body: Variant = (section["rotations"] as Dictionary)[name]
+			if body is Dictionary:
+				var found := _patterns(body as Dictionary)
+				if not found.is_empty():
+					var had: PackedStringArray = exempt_by_rotation.get(str(name), PackedStringArray())
+					had.append_array(found)
+					exempt_by_rotation[str(name)] = had
+
+
+static func _patterns(section: Dictionary) -> PackedStringArray:
+	var out := PackedStringArray()
+	for key in ["exempt", "remove"]:
+		var v: Variant = section.get(key)
+		if v is Array:
+			for r: Variant in (v as Array):
+				out.append(str(r))
+		elif v is String or v is int:
+			out.append(str(v))
+	return out
 
 
 ## Reads the given files (a missing one is skipped, an unreadable one fails), weakest first.
@@ -169,15 +203,28 @@ func active_name() -> String:
 func resolve(catalogue: DotMapCatalogue, name: String = "") -> PackedStringArray:
 	var use := name if name != "" else active_name()
 	var rots: Dictionary = spec.get("rotations", {})
-	if use == "" or not rots.has(use) or catalogue == null:
+	if catalogue == null:
 		return PackedStringArray()
 	var candidates := _candidates(catalogue)
 	var unmatched := PackedStringArray()
-	var ids := DotRotationSpec.expand((rots[use] as Dictionary)["entries"], candidates, collections, unmatched)
-	if not removed.is_empty():
+	var ids := PackedStringArray()
+	var listed: bool = rots.has(use) and not ((rots[use] as Dictionary)["entries"] as PackedStringArray).is_empty()
+	if listed:
+		ids = DotRotationSpec.expand((rots[use] as Dictionary)["entries"], candidates, collections, unmatched)
+	elif has_exempt() and (rots.is_empty() or rots.has(use)):
+		# Only exemptions: every installed map, sorted by id.
+		for c: Dictionary in candidates:
+			ids.append(str(c["id"]))
+		ids.sort()
+	else:
+		return PackedStringArray()
+	var out_patterns := exempt.duplicate()
+	out_patterns.append_array(exempt_by_rotation.get(use, PackedStringArray()))
+	if not out_patterns.is_empty():
+		var gone := DotRotationSpec.expand(out_patterns, candidates, collections, unmatched)
 		var kept := PackedStringArray()
 		for id in ids:
-			if not removed.has(id):
+			if not gone.has(id):
 				kept.append(id)
 		ids = kept
 	for entry in unmatched:
@@ -186,6 +233,11 @@ func resolve(catalogue: DotMapCatalogue, name: String = "") -> PackedStringArray
 			_warned[key] = true
 			DotLog.warn(CHANNEL, "a map rotation entry matches no installed map", {"rotation": use, "entry": entry})
 	return ids
+
+
+## Whether any `exempt:` was written, anywhere.
+func has_exempt() -> bool:
+	return not exempt.is_empty() or not exempt_by_rotation.is_empty()
 
 
 func _candidates(catalogue: DotMapCatalogue) -> Array:
@@ -214,7 +266,7 @@ func apply(rotation: DotMapRotation, name: String = "") -> DotResult:
 	var use := name if name != "" else active_name()
 	var ids := resolve(rotation.catalogue, use)
 	_fell_back = false
-	if has_rotations() and ids.is_empty():
+	if (has_rotations() or has_exempt()) and ids.is_empty():
 		_fell_back = true
 		var key := "empty|%s" % use
 		if not _warned.has(key):

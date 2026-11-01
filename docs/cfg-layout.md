@@ -13,7 +13,7 @@ The operator edits `cfg/server/` only; the shipped tiers are the author's. For `
 | operator | `cfg/server/addons/dot_map/maps.yml` |
 | operator, one game | `cfg/server/game/<game>/dot_map/maps.yml` |
 
-- **An operator file replaces the shipped list.** A file that starts with `merge: true` is layered over the weaker ones instead (a rotation of the same name still replaces its list). `remove: [map_id, ...]` at the top of any file takes those maps out of every rotation. `DotMapRotationFile.find_layers(config_dir, game)` returns the files that apply, from `DotAddonConfig.replace_aware_layers`, and `load_files` reads them.
+- **An operator file replaces the shipped list.** A file that starts with `merge: true` is layered over the weaker ones instead (a rotation of the same name still replaces its list). `exempt: [pattern, ...]` (ids, `owner/map`, globs; old name `remove:`) at the top of any file takes those maps out of every rotation; alone it means every installed map but those ([rotation](rotation.md#listing-what-plays-or-exempting-what-does-not)). `DotMapRotationFile.find_layers(config_dir, game)` returns the files that apply, from `DotAddonConfig.replace_aware_layers`, and `load_files` reads them.
 - **No file at all** is the zero-config case: every installed map rotates, sorted by id (`DotMapRotation.sort_unordered`). The game rotation and `cfg/content/games.yml` `maps:` lists are dot-server-deploy's and are not read here.
 - The old `cfg/server/dot_map/maps.yml` and the flat `cfg/maps.yml` are read through `DotCfgLegacy` (one WARN each, until 2026-12-31); the new path wins whole when both exist.
 - A game sets `DotAddonConfig.game` (or passes its name to `find_layers`) so the game tiers are read.
