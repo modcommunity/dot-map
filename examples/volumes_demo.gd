@@ -4,8 +4,8 @@ extends "suite_base.gd"
 ## gravity, trigger, ladder and water, the effects and sounds, the command allow-list, and Office's timed
 ## hurt reproduced from its own links.
 
-const CHECKS := 154
-const SECTIONS := 16
+const CHECKS := 170
+const SECTIONS := 17
 const OFFICE := "res://examples/io/office_io.doc.json"
 
 
@@ -30,6 +30,7 @@ func _run() -> void:
 	_test_riders()
 	_test_prompt_reach()
 	_test_jail_glass_cell()
+	await _test_jail_glass_rays()
 	var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(OFFICE))
 	if doc is Dictionary:
 		_test_office_timing(doc)
@@ -777,4 +778,47 @@ func _test_jail_glass_cell() -> void:
 	var m := DotMapOneWayGlass.material(&"glass", [0.5, 0.6, 0.7, 0.4], centre, 6.0)
 	_check(m != null and m.get_shader_parameter("cell_centre") == centre, "the glass material carries the cell centre")
 	_check(m.get_shader_parameter("cell_radius") == 6.0, "and the radius")
+	_done()
+
+
+func _test_jail_glass_rays() -> void:
+	_section("jail glass: rays from inside are stopped, from outside pass, per cvar")
+	var layer := 1 << 9
+	var body := StaticBody3D.new()
+	body.collision_layer = layer
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(0.2, 4, 8)
+	shape.shape = box
+	body.add_child(shape)
+	body.position = Vector3(4, 0, 0)
+	add_child(body)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var space := body.get_world_3d().direct_space_state
+	var sight := DotMapGlassSight.new(Vector3.ZERO, 3.0, layer)
+	var inside := Vector3(0, 0, 0)
+	var outside := Vector3(10, 0, 0)
+	_check(sight.blocks(space, inside, outside), "a ray from inside the cell is stopped by the glass")
+	_check(not sight.blocks(space, outside, inside), "the same line from outside passes")
+	_check(not sight.blocks(space, inside, Vector3(2, 0, 0)), "inside, a ray that stops short of the glass is clear")
+	_check(not sight.blocks(space, Vector3(20, 0, 0), Vector3(30, 0, 0)), "outside to outside is clear")
+	var los := sight.sight_fn(func() -> PhysicsDirectSpaceState3D: return space, func(_a: Vector3, _b: Vector3) -> bool: return true)
+	_check(not los.call(inside, outside), "a bot inside cannot see out")
+	_check(los.call(outside, inside), "a bot outside sees in")
+	_check(sight.shot_mask(inside, 1) == (1 | layer), "a shot from inside counts the glass layer")
+	_check(sight.shot_mask(outside, 1 | layer) == 1, "a shot from outside never does")
+	var q := PhysicsRayQueryParameters3D.create(inside, outside, sight.shot_mask(inside, 1))
+	_check(not space.intersect_ray(q).is_empty(), "the masked ray from inside hits the glass")
+	q = PhysicsRayQueryParameters3D.create(outside, inside, sight.shot_mask(outside, 1))
+	_check(space.intersect_ray(q).is_empty(), "the masked ray from outside passes through to the inside")
+	sight.set_cvar("sv_glass_block_sight", "0")
+	_check(los.call(inside, outside), "sv_glass_block_sight 0 lets the bot see out")
+	_check(sight.shot_mask(inside, 1) == (1 | layer), "and leaves shots blocked")
+	sight.set_cvar("sv_glass_block_shots", "0")
+	_check(sight.shot_mask(inside, 1) == 1, "sv_glass_block_shots 0 lets a shot out")
+	_check(not sight.set_cvar("sv_other", "1"), "a foreign cvar name is refused")
+	_check(sight.cvar_specs().size() == 2, "two cvars are offered")
+	_check(not DotMapGlassSight.new(Vector3.ZERO, 3.0, 0).blocks(space, inside, outside), "with no glass layer nothing blocks")
+	body.free()
 	_done()
