@@ -2,8 +2,8 @@ extends Node3D
 
 ## [DotMapBspMesh]: the converter's fixture read, built, and ray-cast.
 
-const CHECKS := 149
-const SECTIONS := 12
+const CHECKS := 155
+const SECTIONS := 13
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
 const TERRAIN := "res://examples/bsp_mesh/terrain_fixture.json"
@@ -29,6 +29,7 @@ func _run() -> void:
 		_test_environment(world)
 		await _test_collide(world)
 		await _test_glass()
+		await _test_fence()
 		await _test_async_build(world)
 	_test_terrain()
 	_test_mesh_lods()
@@ -354,6 +355,41 @@ func _test_async_build(world: DotMapBspMesh) -> void:
 	_check(not slice.due() or slice.budget_ms == 0, "the slice reports itself due only past its budget")
 	sync_root.free()
 	async_root.free()
+	_done()
+
+
+func _test_fence() -> void:
+	_section("a fence stops bodies and not shots; a wall stops both; the probe sees every solid")
+	var clip_layer := 1 << 8
+	var made := DotMapWorld.build(GLASS, {}, {"doc": SOURCE, "environment": false, "draw": false, "layers": {"fence": clip_layer}})
+	_check(made.ok, "the world builds")
+	if not made.ok:
+		_done()
+		return
+	var w: DotMapWorld = made.value
+	var holder := Node3D.new()
+	add_child(holder)
+	holder.add_child(w)
+	var bodies := w.find_children("col_fence", "StaticBody3D", true, false)
+	_check(bodies.size() == 1, "one fence body: %d" % bodies.size())
+	if bodies.size() != 1:
+		_done()
+		return
+	var fb: StaticBody3D = bodies[0]
+	_check(fb.collision_layer == clip_layer and fb.get_meta(&"dot_material") == &"fence", "it sits on the fence layer, as a fence")
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var space := get_world_3d().direct_space_state
+	var ray := PhysicsRayQueryParameters3D.create(Vector3(100 * U, 50 * U, 20 * U), Vector3(100 * U, 50 * U, -600 * U))
+	ray.collision_mask = 1
+	var shot := space.intersect_ray(ray)
+	_check(shot.has("collider") and shot["position"].z < -400 * U, "a shot passes (%s) the fence and stops at the wall behind it" % [shot])
+	ray.collision_mask = 1 | clip_layer
+	var probe := space.intersect_ray(ray)
+	_check(probe.get("collider") == fb, "a probe on the shot and clip layers stops at the fence")
+	ray.collision_mask = clip_layer
+	_check(space.intersect_ray(ray).get("collider") == fb, "a body mask stops at the fence")
+	holder.queue_free()
 	_done()
 
 

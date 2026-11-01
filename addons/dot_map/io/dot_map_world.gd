@@ -409,7 +409,7 @@ func _collision_units(ents: DotMapEntities, ctx: Dictionary) -> Array:
 			continue
 		if movers_only and (model == DotMapBspMesh.WORLD or mv == null):
 			continue
-		for kind in ["solid", "clip", "glass"]:
+		for kind in ["solid", "clip", "glass", "fence"]:
 			units.append([model, kind, model != DotMapBspMesh.WORLD and mv != null])
 	return units
 
@@ -456,6 +456,10 @@ func _collide(ctx: Dictionary, model: int, kind: String, moving: bool, layers: D
 	body.collision_layer = int(layers.get(kind, 1))
 	body.collision_mask = body.collision_layer if phys != null else 0
 	body.set_meta(&"hull_kind", kind)
+	# A fence stops a body but is a see-through surface to a shot: a game that sets layers["fence"] to a layer
+	# its shots skip gets bullets through it, and dot_material lets a penetration table price the ones that stop.
+	if kind == "fence" or kind == "glass":
+		body.set_meta(&"dot_material", kind)
 	for h: Dictionary in shapes:
 		var cs := CollisionShape3D.new()
 		cs.shape = h["shape"]

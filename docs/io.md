@@ -96,7 +96,7 @@ An earlier description of Office's lava talked about a `logic_timer` and a `logi
 
 ## DotMapWorld: the one call
 
-Work package 8. `DotMapWorld.build(prefix, hooks, options)` returns a `DotResult` whose value is a `Node3D` a game adds to its tree. It builds the mesh (glass included), environment, props and ambient sounds, one body per model and hull kind (`solid`, `clip`, `glass`, each on the layer the `layers` option names, an `AnimatableBody3D` for a mover so it carries riders), `DotMapGlass` panes, the `DotMapIO` from the stored source document, `bind_movers`, `bind_breakables`, `attach_sounds`, `DotMapVolumes`, `bind_world`, then `io.start()`.
+Work package 8. `DotMapWorld.build(prefix, hooks, options)` returns a `DotResult` whose value is a `Node3D` a game adds to its tree. It builds the mesh (glass included), environment, props and ambient sounds, one body per model and hull kind (`solid`, `clip`, `glass`, `fence`, each on the layer the `layers` option names; `fence` hulls (CONTENTS_GRATE or fence/grate/vent/chain-link textures, classified once in the converter) get `dot_material` meta and, with `layers.fence` on a layer shots skip, stop bodies but not bullets, an `AnimatableBody3D` for a mover so it carries riders), `DotMapGlass` panes, the `DotMapIO` from the stored source document, `bind_movers`, `bind_breakables`, `attach_sounds`, `DotMapVolumes`, `bind_world`, then `io.start()`.
 
 The source document is `options.doc`, `options.doc_path`, `<prefix>.doc.json` beside the mesh, or the store entry named by the manifest's `source.sha256` (`options.store`, `$DOTBSP_STORE`, `~/mapsrc/store`). The store is never shipped, so a game that ships a map ships its document beside the mesh.
 
