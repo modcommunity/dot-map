@@ -4,7 +4,7 @@ extends RefCounted
 
 const CHANNEL := "dot_map.store"
 ## What the one warning tells a developer to do; the steps are in docs/content.md#without-the-slices.
-const HOW_TO_GET := "run the maps repository's tools/stage_stores.sh, or point the game's dot-cloud at a server that publishes them (dot-map docs/content.md#without-the-slices)"
+const HOW_TO_GET := "run dot-map-convert/tools/stage_stores.sh, or point the game's dot-cloud at a server that publishes them (dot-map docs/content.md#without-the-slices)"
 
 ## Root slice id to `{ids, why}` for every map whose slices could not be had, so [method notice] can say so.
 static var _unfetched: Dictionary = {}

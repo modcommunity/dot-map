@@ -4,7 +4,7 @@ A converted map is drawn as 16 m chunks (a 6 m height band each) of merged faces
 
 ## What the converter keeps
 
-`tools/bsp/dotbsp/vis.py`, called at the end of `mesh.build` (on by default, `visibility=False` turns it off), writes a `vis` record into the `dot-bsp-mesh` manifest. Every array lives in the `.bin` as an `{offset, count}` block, so a map without the data costs nothing and an older reader ignores it (the manifest version is unchanged).
+`dot-map-convert/dotbsp/vis.py`, called at the end of `mesh.build` (on by default, `visibility=False` turns it off), writes a `vis` record into the `dot-bsp-mesh` manifest. Every array lives in the `.bin` as an `{offset, count}` block, so a map without the data costs nothing and an older reader ignores it (the manifest version is unchanged).
 
 | Key | What |
 | --- | --- |

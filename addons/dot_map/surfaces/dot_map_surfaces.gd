@@ -360,7 +360,7 @@ func _prefetch_done(plan: Dictionary, decode_ms: int) -> void:
 	DotLog.info(CHANNEL, "texture prefetch", {"disk": plan["disk"].size(), "baked": plan["baked"], "decode_ms": decode_ms, "imported": plan["imported"].size(), "formats": texture_report(_textures), "static_mb": OS.get_static_memory_usage() / 1048576})
 
 
-## The suffix of the pre-baked texture this build loads (`tools/bake_textures.gd`), "" when it has no VRAM format to read.
+## The suffix of the pre-baked texture this build loads (`dot-map-convert/tools/bake_textures.gd`), "" when it has no VRAM format to read.
 static func baked_variant() -> String:
 	return DotMapTextureBake.pick_variant(OS.has_feature, OS.get_environment("NOCOMP") != "")
 

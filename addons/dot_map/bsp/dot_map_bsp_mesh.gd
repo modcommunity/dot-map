@@ -1,7 +1,7 @@
 class_name DotMapBspMesh
 extends "mesh_parts/mesh_props.gd"
 
-## A converted map's drawn world and collision: the [code]dot-bsp-mesh[/code] files [code]tools/bsp/bsp.py mesh[/code] writes ([code]<id>.json[/code] + [code]<id>.bin[/code]), read back into meshes, convex shapes and mover and volume records; start at [code]DotMapBspMesh.load_prefix(path)[/code] then [method build_node].
+## A converted map's drawn world and collision: the [code]dot-bsp-mesh[/code] files [code]dot-map-convert/bsp.py mesh[/code] writes ([code]<id>.json[/code] + [code]<id>.bin[/code]), read back into meshes, convex shapes and mover and volume records; start at [code]DotMapBspMesh.load_prefix(path)[/code] then [method build_node].
 ## Game-neutral: [method build_node] asks a callback for each surface's [Material]; [method hull_shapes] returns shapes with their kind and the game makes the bodies. Positions are metres in Godot axes, and every brush entity gets its own node at its origin so a door turns about its hinge.
 ## The .bin is planar and gzip'd, read synchronously with no thread (it runs in a browser), and its sha256 is checked against the manifest first.
 

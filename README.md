@@ -122,7 +122,7 @@ DotMapLitWorld.attach(dw, world, environment, lamps)
 
 `examples/bsp_world_shot.gd` is this flow in about eighty lines with a camera (`tools/screenshot.sh dot-map out.png --scene res://examples/bsp_world_shot.tscn`, with `--world=<prefix>`), and `world.build_node()` alone gives just the mesh tree when you want to place everything yourself. `world` in the snippets above is that `DotMapBspMesh`, never a node.
 
-To make a converted map from an original, with the author's file in the converter's store (`bsp.py store`), from `tools/bsp`:
+To make a converted map from an original, with the author's file in the converter's store (`bsp.py store`), from `dot-map-convert`:
 
 ```bash
 python3 bsp.py regen --out ../maps/my_map/my_map <game>/<map>      # writes my_map.json, .bin, .coverage.json, .doc.json

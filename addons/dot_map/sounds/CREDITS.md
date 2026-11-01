@@ -1,6 +1,6 @@
 # Sound stand-ins
 
-Every file is CC0 1.0 from Kenney's audio packs (https://kenney.nl, converted none, copied unchanged). `tools/bsp/dotbsp/free_sounds.tsv` says which source sound name each one stands for.
+Every file is CC0 1.0 from Kenney's audio packs (https://kenney.nl, converted none, copied unchanged). `dot-map-convert/dotbsp/free_sounds.tsv` says which source sound name each one stands for.
 
 | File | Pack | Original |
 | --- | --- | --- |

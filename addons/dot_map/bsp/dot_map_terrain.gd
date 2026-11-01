@@ -1,6 +1,6 @@
 class_name DotMapTerrain
 extends RefCounted
-## A converted map's displacement ground as a heightfield (tools/bsp/dotbsp/terrain.py writes it): one
+## A converted map's displacement ground as a heightfield (dot-map-convert/dotbsp/terrain.py writes it): one
 ## triangle shape to collide with, a mesh to draw, and the points an AI graph walks.
 
 const FORMAT := 1
