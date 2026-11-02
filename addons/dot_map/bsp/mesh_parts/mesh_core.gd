@@ -43,11 +43,21 @@ var _concave_cache: Dictionary = {}
 static var cache_meshes := true
 static var cache_limit := 24
 static var _cache: Dictionary = {}
+static var _slim_shared: Dictionary = {}
+static var _slim_mutex := Mutex.new()
 
 
 ## Forgets every cached mesh (and the shapes each holds).
 static func clear_cache() -> void:
 	_cache.clear()
+	clear_slim_cache()
+
+
+## Forgets the textures [method slim_model_textures] shares between models.
+static func clear_slim_cache() -> void:
+	_slim_mutex.lock()
+	_slim_shared.clear()
+	_slim_mutex.unlock()
 
 
 ## Reads [code]<prefix>.json[/code] and [code]<prefix>.bin[/code]; the result is shared with every

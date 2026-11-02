@@ -362,6 +362,7 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 	DotLog.info(CHANNEL, "props built", {"models": cache.get(OWNED_KEY, []).size(), "model_ms": cache.get("__ms", 0), "static_mb": OS.get_static_memory_usage() / 1048576})
 	_free_templates(cache)
 	_decompose_cache.clear()
+	clear_slim_cache()
 	_warn_missing_models()
 	return root
 
@@ -733,6 +734,35 @@ static func half_model_texture(tex: ImageTexture, max_size: int) -> ImageTexture
 	return ImageTexture.create_from_image(img)
 
 
+## Models that embed the same bytes get one slimmed texture; the key holds the source hash and the target, and [param img] is only read.
+static func _slimmed_shared(tex: ImageTexture, img: Image, half: bool, max_size: int) -> ImageTexture:
+	var ctx := HashingContext.new()
+	ctx.start(HashingContext.HASH_SHA256)
+	ctx.update(img.get_data())
+	var key := "%s|%d|%d|%d|%d|%d" % [ctx.finish().hex_encode(), img.get_width(), img.get_height(), img.get_format(), int(half), max_size]
+	_slim_mutex.lock()
+	var hit: ImageTexture = _slim_shared.get(key)
+	_slim_mutex.unlock()
+	if hit != null:
+		return hit
+	var out: ImageTexture
+	if half:
+		out = half_model_texture(tex, max_size)
+	elif img.is_compressed():
+		out = tex
+	else:
+		var copy := img.duplicate() as Image
+		DotMapSurfaces.prepare_image(copy, "model.png", max_size)  # a part-less name: every channel stays
+		out = ImageTexture.create_from_image(copy)
+	_slim_mutex.lock()
+	if _slim_shared.has(key):
+		out = _slim_shared[key]
+	else:
+		_slim_shared[key] = out
+	_slim_mutex.unlock()
+	return out
+
+
 ## Replaces every texture of the materials under [param root] with a capped, mip-mapped, compressed copy (once per texture, so a
 ## texture two materials share stays shared) and frees the raw image; returns how many were replaced. Roughness, metallic, AO and
 ## normal maps are halved first under [member model_half_masks] and [member model_half_normals].
@@ -759,15 +789,7 @@ static func slim_model_textures(root: Node, max_size: int) -> int:
 				var seen := halved if half else done
 				if not seen.has(tex):
 					var img := tex.get_image()
-					if img == null:
-						seen[tex] = tex
-					elif half:
-						seen[tex] = half_model_texture(tex, max_size)
-					elif img.is_compressed():
-						seen[tex] = tex
-					else:
-						DotMapSurfaces.prepare_image(img, "model.png", max_size)  # a part-less name: every channel stays
-						seen[tex] = ImageTexture.create_from_image(img)
+					seen[tex] = tex if img == null else _slimmed_shared(tex, img, half, max_size)
 				if seen[tex] != tex:
 					m.set_texture(slot as BaseMaterial3D.TextureParam, seen[tex])
 					changed += 1

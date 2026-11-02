@@ -2,7 +2,7 @@ extends Node
 
 ## [DotMapParallelBuild]: the threaded load stages give byte-identical output to the inline ones.
 
-const CHECKS := 49
+const CHECKS := 55
 const SECTIONS := 6
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const COPIES := 40
@@ -262,6 +262,49 @@ func _test_model_halving() -> void:
 	_check(second.roughness_texture.get_width() == 32 and second.normal_texture.get_width() == 32, "both options off leave the maps at full size (%d, %d)" % [second.roughness_texture.get_width(), second.normal_texture.get_width()])
 	DotMapBspMesh.model_half_masks = kept
 	DotMapBspMesh.model_half_normals = kept_n
+	holder.free()
+	_test_model_sharing()
+
+
+func _test_model_sharing() -> void:
+	DotMapBspMesh.clear_slim_cache()
+	var noise := Image.create(32, 32, false, Image.FORMAT_RGB8)
+	noise.fill(Color(0.2, 0.4, 0.6))
+	noise.set_pixel(3, 3, Color.WHITE)
+	var holder := Node3D.new()
+	var mats: Array[StandardMaterial3D] = []
+	for i in 3:
+		var m := StandardMaterial3D.new()
+		m.albedo_texture = ImageTexture.create_from_image(noise.duplicate() if i < 2 else Image.create_empty(32, 32, false, Image.FORMAT_RGB8))
+		m.roughness_texture = ImageTexture.create_from_image(noise.duplicate())
+		m.ao_enabled = true
+		m.ao_texture = m.roughness_texture
+		var mi := MeshInstance3D.new()
+		mi.mesh = QuadMesh.new()
+		mi.mesh.surface_set_material(0, m)
+		holder.add_child(mi)
+		mats.append(m)
+	var before := noise.get_data().duplicate()
+	DotMapBspMesh.slim_model_textures(holder, 0)
+	_check(mats[0].albedo_texture == mats[1].albedo_texture, "two models with the same albedo bytes hold one texture")
+	_check(mats[0].albedo_texture != mats[2].albedo_texture, "different bytes stay different textures")
+	_check(mats[0].roughness_texture == mats[1].roughness_texture and mats[0].roughness_texture == mats[0].ao_texture, "a shared ORM image is one texture across models")
+	_check(mats[0].albedo_texture != mats[0].roughness_texture, "the same bytes halved are not the full-size texture")
+	_check(noise.get_data() == before, "the source image is never mutated")
+	var near := noise.duplicate() as Image
+	near.set_pixel(5, 5, Color.BLACK)
+	var a := StandardMaterial3D.new()
+	a.albedo_texture = ImageTexture.create_from_image(noise.duplicate())
+	var b := StandardMaterial3D.new()
+	b.albedo_texture = ImageTexture.create_from_image(near)
+	for m in [a, b]:
+		var mi2 := MeshInstance3D.new()
+		mi2.mesh = QuadMesh.new()
+		mi2.mesh.surface_set_material(0, m)
+		holder.add_child(mi2)
+	DotMapBspMesh.slim_model_textures(holder, 0)
+	_check(a.albedo_texture != b.albedo_texture, "two same-size images differing in one pixel are not shared")
+	DotMapBspMesh.clear_slim_cache()
 	holder.free()
 
 
