@@ -33,6 +33,52 @@ func _init(cell_centre: Vector3 = Vector3.ZERO, cell_radius: float = 6.0, glass_
 	glass_mask = glass_layers
 
 
+## Splits a map's legacy hulls and, when it has a jail cell, returns the rule for it (null otherwise).
+##
+## [param mesh] is the loaded [DotMapBspMesh], [param body] its legacy world body, [param clip_mask] the layer clip and fence hulls move to,
+## [param glass_bit] glass's own extra bit. Thin horizontal glass (floors) goes to a sibling body that is also on [param floor_mask] (the world layer),
+## because a downward ray must still find the floor; sight and shots only care about the walls. Bodies keep `hull_kind`, so [method is_exempt]
+## tells a game's blanket layer reset to leave them alone. The rule's [member world_mask] is [param world_mask]; check [method problem].
+static func install(mesh: Object, body: StaticBody3D, clip_mask: int, glass_bit: int, floor_mask: int, world_mask: int) -> DotMapGlassSight:
+	var cell: Dictionary = DotMapOneWayGlass.cell_of(mesh.manifest)
+	var layers := {"clip": clip_mask, "fence": clip_mask}
+	if not cell.is_empty():
+		layers["glass"] = clip_mask | glass_bit
+	var moved: Dictionary = mesh.split_legacy_hulls(body, layers)
+	if cell.is_empty() or int(moved.get("glass", 0)) == 0:
+		return null
+	var glass_body := body.find_child("ImportedGlass", true, false) as StaticBody3D
+	if glass_body != null:
+		var floors := StaticBody3D.new()
+		floors.name = "ImportedGlassFloor"
+		floors.collision_layer = floor_mask | clip_mask
+		floors.collision_mask = 0
+		floors.set_meta(&"hull_kind", "glass_floor")
+		floors.set_meta(&"dot_material", &"glass")
+		for c in glass_body.get_children():
+			var shape := (c as CollisionShape3D).shape as ConvexPolygonShape3D if c is CollisionShape3D else null
+			if shape == null or shape.points.is_empty():
+				continue
+			var box := AABB(shape.points[0], Vector3.ZERO)
+			for p in shape.points:
+				box = box.expand(p)
+			if box.size.y < 0.5 * minf(box.size.x, box.size.z):
+				glass_body.remove_child(c)
+				floors.add_child(c)
+		if floors.get_child_count() > 0:
+			glass_body.get_parent().add_child(floors)
+		else:
+			floors.free()
+	var rules := DotMapGlassSight.new(cell["centre"], float(cell["radius"]), glass_bit)
+	rules.world_mask = world_mask
+	return rules
+
+
+## Whether [param node] is an importer hull body (clip, fence, glass) whose layers a game's blanket layer reset must keep.
+static func is_exempt(node: Node) -> bool:
+	return node.has_meta(&"hull_kind")
+
+
 ## Whether a query starting at [param from] is inside the cell.
 func from_inside(from: Vector3) -> bool:
 	return DotMapOneWayGlass.sees_solid(from, centre, radius)
