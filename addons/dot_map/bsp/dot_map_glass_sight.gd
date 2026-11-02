@@ -2,11 +2,8 @@ class_name DotMapGlassSight
 extends RefCounted
 
 ## The jail glass rule for gameplay queries: a ray that starts inside the cell is stopped by the glass, one that starts outside passes.
-##
-## [DotMapOneWayGlass] only draws the rule. This applies it to sight and hitscan without a second body: a query whose
-## origin is within [member radius] of the cell centre counts the glass layer as solid, any other query ignores it.
-## Defaults: bots inside cannot see out ([member block_sight]), a shooter inside cannot hit out ([member block_shots]),
-## everyone outside sees and shoots in. Spectator and dev cameras never ask, so they are unaffected.
+## [DotMapOneWayGlass] only draws it; this applies it to sight and hitscan: a query within [member radius] of the cell centre counts the glass layer as solid.
+## Defaults: bots and shooters inside cannot see or hit out ([member block_sight], [member block_shots]); spectator and dev cameras never ask.
 
 const _SPECS := [
 	["sv_glass_block_sight", "block_sight", "1: bot sight and line_of_sight from inside the jail cell is blocked by its glass; 0: sees through"],
@@ -33,12 +30,9 @@ func _init(cell_centre: Vector3 = Vector3.ZERO, cell_radius: float = 6.0, glass_
 	glass_mask = glass_layers
 
 
-## Splits a map's legacy hulls and, when it has a jail cell, returns the rule for it (null otherwise).
-##
-## [param mesh] is the loaded [DotMapBspMesh], [param body] its legacy world body, [param clip_mask] the layer clip and fence hulls move to,
-## [param glass_bit] glass's own extra bit. Thin horizontal glass (floors) goes to a sibling body that is also on [param floor_mask] (the world layer),
-## because a downward ray must still find the floor; sight and shots only care about the walls. Bodies keep `hull_kind`, so [method is_exempt]
-## tells a game's blanket layer reset to leave them alone. The rule's [member world_mask] is [param world_mask]; check [method problem].
+## Splits a map's legacy hulls and, when it has a jail cell, returns the rule for it (null otherwise); clip and fence hulls move to [param clip_mask], glass to [param glass_bit].
+## Thin horizontal glass goes to a sibling body also on [param floor_mask], because a downward ray must still find the floor; bodies keep `hull_kind` so [method is_exempt] spares them a layer reset.
+## The rule's [member world_mask] is [param world_mask]; check [method problem].
 static func install(mesh: Object, body: StaticBody3D, clip_mask: int, glass_bit: int, floor_mask: int, world_mask: int) -> DotMapGlassSight:
 	var cell: Dictionary = DotMapOneWayGlass.cell_of(mesh.manifest)
 	var layers := {"clip": clip_mask, "fence": clip_mask}

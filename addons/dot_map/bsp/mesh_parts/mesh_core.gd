@@ -504,10 +504,8 @@ func _build_hull_shapes(model: int, kinds: PackedStringArray) -> Array[Dictionar
 	return out
 
 
-## Moves the legacy blob's hulls of other kinds into a body each. [param layers] maps a hull kind ("clip", "fence",
-## "glass") to its collision layer; the legacy shapes are matched to the named hulls by bounds, because the blob does not
-## name them. A body keeps the legacy mask of 0 and carries `hull_kind` (and `dot_material` for fence and glass), so a
-## shot whose mask skips those layers passes, a body mask still stops. Returns kind to hulls moved.
+## Moves the legacy blob's hulls of other kinds into a body each; [param layers] maps a hull kind ("clip", "fence", "glass") to its layer, and shapes are matched to the named hulls by bounds.
+## A body keeps the legacy mask of 0 and carries `hull_kind` (and `dot_material` for fence and glass), so a shot whose mask skips those layers passes. Returns kind to hulls moved.
 func split_legacy_hulls(body: StaticBody3D, layers: Dictionary) -> Dictionary:
 	var solids: Array[CollisionShape3D] = []
 	for child in body.get_children():
