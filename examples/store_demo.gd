@@ -297,6 +297,7 @@ func _missing_models() -> void:
 			"collide": {"box": [1.0, 1.5, 0.4], "at": [6, 0.75, -2], "yaw": 0.0}},
 		{"stand_in": "lib/sf_pine_tree_d45218", "at": [20, 0, 20], "yaw": 0.0, "size": 11.7, "solid": 6,
 			"collide": {"box": [3.6, 11.7, 3.6], "at": [20, 5.85, 20], "yaw": 0.0}},
+		{"stand_in": "lib/ph_crate", "at": [-9, 0, -9], "yaw": 0.0, "solid": 6},
 	]}
 	var warns: Array[Dictionary] = []
 	var sink := func(rec: Dictionary) -> void:
@@ -307,8 +308,8 @@ func _missing_models() -> void:
 	var bodies: Array[StaticBody3D] = []
 	var props := w.build_props(Callable(), func(b: StaticBody3D) -> void: bodies.append(b))
 	var proxies := props.get_children().filter(func(c: Node) -> bool: return c.has_meta(&"dot_map_proxy"))
-	_check("a missing library model with measured bounds is drawn as a box", proxies.size() == 4 and w.missing_proxied == 4)
-	_check("one with no measure is left out, and counted", w.missing_models == 5)
+	_check("a missing library model with measured bounds is drawn as a box", proxies.size() == 5 and w.missing_proxied == 5)
+	_check("one with neither a measure nor a size is left out, and counted; one with only a size gets a sized block", w.missing_models == 6)
 	var shelf := proxies[0] as MeshInstance3D
 	_check("the box is the original's measured size", (shelf.mesh as BoxMesh).size.is_equal_approx(Vector3(1.0, 1.5, 0.4))
 			and shelf.position.is_equal_approx(Vector3(2, 0.75, 3)))
@@ -321,22 +322,22 @@ func _missing_models() -> void:
 		if not drawn.any(func(b: AABB) -> bool: return b.grow(0.01).has_point(c)):
 			unseen += 1
 	_check("no invisible solid: every collision box has a drawn box around it", server.get_child_count() == 3 and unseen == 0)
-	_check("nothing collides where nothing is drawn (the unmeasured truck)", not bodies.any(func(b: StaticBody3D) -> bool: return b.position.distance_to(Vector3(9, 0, 9)) < 3.0))
+	_check("nothing collides where nothing is drawn (the unmeasured crate)", not bodies.any(func(b: StaticBody3D) -> bool: return b.position.distance_to(Vector3(-9, 0, -9)) < 3.0))
 	w.build_props().free()
-	var unseen_root := w.draw_unseen_boxes([[9.02, 1.5, 9.0, 2.0, 3.0, 5.0, 0.0], [9.0, 10.0, 9.0, 2.0, 3.0, 5.0, 0.0], [-40.0, 1.0, -40.0, 1.0, 2.0, 1.0, 0.0]])
-	_check("a game's own box at the unmeasured truck is drawn, and only that one", unseen_root != null and unseen_root.get_child_count() == 1
-			and (unseen_root.get_child(0) as Node3D).position.is_equal_approx(Vector3(9.02, 1.5, 9.0)))
+	var unseen_root := w.draw_unseen_boxes([[-9.02, 1.5, -9.0, 2.0, 3.0, 5.0, 0.0], [-9.0, 10.0, -9.0, 2.0, 3.0, 5.0, 0.0], [-40.0, 1.0, -40.0, 1.0, 2.0, 1.0, 0.0]])
+	_check("a game's own box at the unmeasured crate is drawn, and only that one", unseen_root != null and unseen_root.get_child_count() == 1
+			and (unseen_root.get_child(0) as Node3D).position.is_equal_approx(Vector3(-9.02, 1.5, -9.0)))
 	if unseen_root != null:
 		unseen_root.free()
 	_check("one warning per map, however often it is built", warns.size() == 1)
-	_check("the warning counts the boxes and says how to get the models", warns.size() == 1 and str(warns[0]["message"]).contains("4 drawn as low-detail boxes, 1 left out")
+	_check("the warning counts the boxes and says how to get the models", warns.size() == 1 and str(warns[0]["message"]).contains("5 drawn as low-detail boxes, 1 left out")
 			and str(warns[0]["message"]).contains("stage_stores.sh"))
 	_check("a map without a store_pack warns too", warns.size() == 1 and str(warns[0]["fields"].get("store_pack", "")) == "none")
-	var tree_box := (bodies[2].get_child(0) as CollisionShape3D).shape as BoxShape3D
+	var tree_box := (bodies.back().get_child(0) as CollisionShape3D).shape as BoxShape3D
 	_check("a tree collides as its trunk, not its crown", tree_box.size.is_equal_approx(Vector3(0.54, 11.7, 0.54)))
-	var server_tree := ((server.get_child(2) as CollisionShape3D).shape as BoxShape3D).size
+	var server_tree := ((server.get_child(server.get_child_count() - 1) as CollisionShape3D).shape as BoxShape3D).size
 	_check("and the same on a server", server_tree.is_equal_approx(Vector3(0.54, 11.7, 0.54)))
-	_check("its proxy is a trunk with a crown that does not collide", (proxies[3] as MeshInstance3D).get_aabb().size.x < 1.0 and proxies[3].get_child_count() == 1)
+	_check("its proxy is a trunk with a crown that does not collide", (proxies[4] as MeshInstance3D).get_aabb().size.x < 1.0 and proxies[4].get_child_count() == 1)
 	_check("a street lamp is not a tree", DotMapBspMesh.is_tree({"stand_in": "lib/ph_street_lamp_01"}) == false
 			and DotMapBspMesh.is_tree({"stand_in": "tree"}) and DotMapBspMesh.is_tree({"stand_in": "lib/kenney_retro-urban-kit_tree-large"}))
 	DotLog.remove_sink(sink)
