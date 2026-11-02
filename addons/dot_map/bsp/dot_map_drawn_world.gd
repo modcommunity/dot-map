@@ -63,7 +63,8 @@ static func _finish(parent: Node3D, world: DotMapBspMesh, options: Dictionary, s
 	node.name = "World"
 	if bool(options.get("only_world", true)):
 		var glass := {}
-		for rec: Dictionary in world.breakables():
+		# Drawn glass is solid only through a DotMapGlass pane; a caller that builds none must not draw it.
+		for rec: Dictionary in (world.breakables() if bool(options.get("keep_glass", false)) else []):
 			if rec.get("model") != null:
 				glass[int(rec["model"])] = true
 		for child in node.get_children():
