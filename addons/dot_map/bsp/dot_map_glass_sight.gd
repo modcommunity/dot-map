@@ -20,6 +20,9 @@ var radius := 6.0
 var margin := 2.0
 ## Collision layer bit mask the glass hulls are on ([method DotMapBspMesh.split_legacy_hulls]).
 var glass_mask := 0
+## Layer bits of everything else a shot must hit (world, clip, props). A glass bit shared with these is never stripped from an outside shot.
+## The BSP world defaults the glass hulls to layer 1, so a game must give glass its own bit via the `layers` option and check [method problem].
+var world_mask := 0
 var block_sight := true
 var block_shots := true
 
@@ -39,7 +42,14 @@ func from_inside(from: Vector3) -> bool:
 func shot_mask(from: Vector3, mask: int) -> int:
 	if block_shots and from_inside(from):
 		return mask | glass_mask
-	return mask & ~glass_mask
+	return mask & ~(glass_mask & ~world_mask)
+
+
+## Empty when the glass layer is its own; otherwise why it is not (shared with [member world_mask], so sight and shots from inside would hit walls).
+func problem() -> String:
+	if glass_mask != 0 and glass_mask & world_mask != 0:
+		return "glass layer mask %d shares bits with the world mask %d; give glass its own layer" % [glass_mask, world_mask]
+	return ""
 
 
 ## Whether the glass stops a ray from [param from] to [param to] (false for any origin outside the cell).

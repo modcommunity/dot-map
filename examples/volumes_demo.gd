@@ -4,7 +4,7 @@ extends "suite_base.gd"
 ## gravity, trigger, ladder and water, the effects and sounds, the command allow-list, and Office's timed
 ## hurt reproduced from its own links.
 
-const CHECKS := 170
+const CHECKS := 172
 const SECTIONS := 17
 const OFFICE := "res://examples/io/office_io.doc.json"
 
@@ -808,6 +808,10 @@ func _test_jail_glass_rays() -> void:
 	_check(los.call(outside, inside), "a bot outside sees in")
 	_check(sight.shot_mask(inside, 1) == (1 | layer), "a shot from inside counts the glass layer")
 	_check(sight.shot_mask(outside, 1 | layer) == 1, "a shot from outside never does")
+	var shared := DotMapGlassSight.new(Vector3.ZERO, 3.0, 1)
+	shared.world_mask = 1
+	_check(shared.shot_mask(outside, 1) == 1, "a glass bit shared with the world is never stripped from an outside shot")
+	_check(shared.problem() != "" and sight.problem() == "", "a shared glass layer is reported, an own one is not")
 	var q := PhysicsRayQueryParameters3D.create(inside, outside, sight.shot_mask(inside, 1))
 	_check(not space.intersect_ray(q).is_empty(), "the masked ray from inside hits the glass")
 	q = PhysicsRayQueryParameters3D.create(outside, inside, sight.shot_mask(outside, 1))
