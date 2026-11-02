@@ -22,3 +22,6 @@ Thumbs.db
 # Python
 __pycache__/
 /shotpacks/
+
+# Git worktrees some sessions put inside the checkout.
+/wt-*/
