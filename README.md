@@ -122,6 +122,8 @@ DotMapLitWorld.attach(dw, world, environment, lamps)
 
 `examples/bsp_world_shot.gd` is this flow in about eighty lines with a camera (`tools/screenshot.sh dot-map out.png --scene res://examples/bsp_world_shot.tscn`, with `--world=<prefix>`), and `world.build_node()` alone gives just the mesh tree when you want to place everything yourself. `world` in the snippets above is that `DotMapBspMesh`, never a node.
 
+`tools/prop_audit.gd` is the check that no converted world has a library prop that failed to load or would be invisible but solid: `godot --headless --path . -s res://tools/prop_audit.gd -- <worlds dir>...` (exit 1 on any; `--allow-proxied` tolerates maps drawn with box proxies). Run it on the path a game reaches the worlds by (its `worlds` link), because the store is found beside the manifest.
+
 To make a converted map from an original, with the author's file in the converter's store (`bsp.py store`), from `dot-map-convert`:
 
 ```bash

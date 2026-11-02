@@ -370,7 +370,7 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 func _proxy_for(rec: Dictionary) -> Node3D:
 	var src: Variant = rec.get("collide", rec.get("bounds", null))
 	if not src is Dictionary or not (src as Dictionary).has("box"):
-		return null
+		return _sized_proxy(rec)
 	var d: Array = src["box"]
 	if float(d[0]) <= 0.001 or float(d[1]) <= 0.001 or float(d[2]) <= 0.001:
 		return null
@@ -384,6 +384,19 @@ func _proxy_for(rec: Dictionary) -> Node3D:
 		block.add_child(_crown_blob(Vector3(d[0], d[1] * 0.65, d[2]), Vector3(0, d[1] * 0.175, 0)))
 	else:
 		block = _support_block({"box": d, "at": at, "yaw": yaw})
+	block.name = "Proxy"
+	block.set_meta(&"dot_map_proxy", str(rec.get("stand_in", "")))
+	return block
+
+
+## A record with no measured bounds but a `size` (its longest side): a block of that length, half as wide and tall, standing on `at`, so a missing model with collision is not invisible.
+func _sized_proxy(rec: Dictionary) -> Node3D:
+	var size := float(rec.get("size", 0.0))
+	if size <= 0.05 or not rec.has("at"):
+		return null
+	var at: Array = rec["at"]
+	var h := size * 0.5
+	var block := _support_block({"box": [size, h, h], "at": [at[0], float(at[1]) + h * 0.5, at[2]], "yaw": rec.get("yaw", 0.0)})
 	block.name = "Proxy"
 	block.set_meta(&"dot_map_proxy", str(rec.get("stand_in", "")))
 	return block
@@ -562,8 +575,7 @@ func _library_path(id: String) -> String:
 			row = r
 	if row.is_empty() or not row.has("store_file"):
 		return ""
-	var root := model_library if not model_library.is_empty() \
-			else source_path.get_base_dir().path_join(str(licence().get("model_store", "model-library"))).simplify_path()
+	var root := model_library if not model_library.is_empty() else _store_beside_mesh()
 	var path := root.path_join(str(row["store_file"]))
 	for lib in model_libraries:
 		var cand := lib.path_join(str(row["store_file"]))
@@ -571,6 +583,45 @@ func _library_path(id: String) -> String:
 			path = cand
 			break
 	return path
+
+
+## The licence's `model_store` beside the mesh. `simplify_path` is lexical, so a mesh reached through a linked `worlds/` folder
+## would look for the store beside the link; when that is missing, the link is followed first.
+func _store_beside_mesh() -> String:
+	var store := str(licence().get("model_store", "model-library"))
+	var base := source_path.get_base_dir()
+	var root := base.path_join(store).simplify_path()
+	if DirAccess.dir_exists_absolute(root) or (root.begins_with("res://") and DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(root))):
+		return root
+	return real_dir(base).path_join(store).simplify_path()
+
+
+## [param dir] with every symbolic link in it followed (unchanged when none is, or off a desktop filesystem).
+static func real_dir(dir: String) -> String:
+	var abs_dir := ProjectSettings.globalize_path(dir) if dir.begins_with("res://") or dir.begins_with("user://") else dir
+	if not abs_dir.begins_with("/"):
+		return dir
+	var cur := "/"
+	for part in abs_dir.split("/", false):
+		cur = cur.path_join(part)
+		var hops := 0
+		while DirAccess.dir_exists_absolute(cur) and hops < 16 and _is_link(cur):
+			var target := _link_target(cur)
+			if target == "":
+				break
+			cur = target if target.begins_with("/") else cur.get_base_dir().path_join(target).simplify_path()
+			hops += 1
+	return cur
+
+
+static func _is_link(path: String) -> bool:
+	var d := DirAccess.open(path.get_base_dir())
+	return d != null and d.is_link(path.get_file())
+
+
+static func _link_target(path: String) -> String:
+	var d := DirAccess.open(path.get_base_dir())
+	return d.read_link(path.get_file()) if d != null else ""
 
 
 func _note_defect(path: String, defect: String) -> void:
