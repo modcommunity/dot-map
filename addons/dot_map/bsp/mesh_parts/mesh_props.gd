@@ -531,6 +531,26 @@ static func gltf_defect(path: String) -> String:
 	return ""
 
 
+## True when the glTF/GLB at [param path] declares the specular-glossiness material extension. The engine's parse of one deadlocks
+## on a worker thread, so such a model is parsed on the main thread.
+static func uses_spec_gloss(path: String) -> bool:
+	var text := ""
+	if path.get_extension().to_lower() == "glb":
+		var f := FileAccess.open(path, FileAccess.READ)
+		if f == null or f.get_length() < 20:
+			return false
+		f.seek(12)
+		var len := f.get_32()
+		f.get_32()
+		text = f.get_buffer(len).get_string_from_utf8()
+	else:
+		text = FileAccess.get_file_as_string(path)
+	if not text.strip_edges().begins_with("{"):
+		return false
+	var json: Variant = JSON.parse_string(text)
+	return json is Dictionary and "KHR_materials_pbrSpecularGlossiness" in (json as Dictionary).get("extensionsUsed", [])
+
+
 ## A shipped library model (stand-in id [code]lib/<name>[/code]) loaded from the pack, re-rooted so its bottom centre sits at
 ## the origin; null when the pack lacks it. A glTF outside the project has no import, so it is read with [GLTFDocument].
 func _library_model(id: String, parsed: GLTFState = null) -> Node3D:
@@ -652,7 +672,7 @@ func _preload_library_models(ids: Array, scene_for: Callable, cache: Dictionary)
 			if path.begins_with("res://") and ResourceLoader.exists(path) and not imported.has(path):
 				imported[path] = true
 				ResourceLoader.load_threaded_request(path)
-			if path != "" and not imported.has(path) and not ResourceLoader.exists(path) and FileAccess.file_exists(path) and gltf_defect(path) == "":
+			if path != "" and not imported.has(path) and not ResourceLoader.exists(path) and FileAccess.file_exists(path) and gltf_defect(path) == "" and not uses_spec_gloss(path):
 				todo.append([id, path])
 	var started := Time.get_ticks_msec()
 	for path: String in imported:  # request order, so the result does not depend on which worker finished first

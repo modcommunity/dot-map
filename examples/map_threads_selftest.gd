@@ -2,7 +2,7 @@ extends Node
 
 ## [DotMapParallelBuild]: the threaded load stages give byte-identical output to the inline ones.
 
-const CHECKS := 47
+const CHECKS := 49
 const SECTIONS := 6
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const COPIES := 40
@@ -115,6 +115,13 @@ func _test_defaults(world: DotMapBspMesh) -> void:
 	_check(DotMapParallelBuild.default_workers == 0, "default is off")
 	_check(world.load_threads == 0, "a new world is inline")
 	_check(DotMapSurfaces.new().load_threads == 0, "new surfaces are inline")
+	var sg := "user://map_specgloss.gltf"
+	var f := FileAccess.open(sg, FileAccess.WRITE)
+	f.store_string('{"asset":{"version":"2.0"},"extensionsUsed":["KHR_materials_pbrSpecularGlossiness"]}')
+	f.close()
+	_check(DotMapBspMesh.uses_spec_gloss(sg), "a spec-gloss glTF is kept off the worker threads")
+	_check(not DotMapBspMesh.uses_spec_gloss(ProjectSettings.globalize_path("res://project.godot")), "a file with no extension list is not spec-gloss")
+	DirAccess.remove_absolute(sg)
 	_check(DotParallel.resolve_workers(0) == 0, "0 resolves to no workers")
 	DotParallel.reset_stats()
 	_mesh_digest(world, 0)
