@@ -74,9 +74,10 @@ static func install(mesh: Object, body: StaticBody3D, clip_mask: int, glass_bit:
 	return rules
 
 
-## Whether [param node] is an importer hull body (clip, fence, glass) whose layers a game's blanket layer reset must keep.
+## Whether [param node] is an importer fence or glass body whose layers a game's blanket layer reset must keep.
+## Clip bodies are left out on purpose: bots' surf rides depend on a clip brush being solid to the world layer.
 static func is_exempt(node: Node) -> bool:
-	return node.has_meta(&"hull_kind")
+	return node.get_meta(&"hull_kind", "") in ["fence", "glass", "glass_floor"]
 
 
 ## Whether a query starting at [param from] is inside the cell.

@@ -64,7 +64,7 @@ static func _finish(parent: Node3D, world: DotMapBspMesh, options: Dictionary, s
 	if bool(options.get("only_world", true)):
 		var glass := {}
 		for rec: Dictionary in world.breakables():
-			if rec.get("model") != null and not str(rec.get("glass", "")).is_empty():
+			if rec.get("model") != null:
 				glass[int(rec["model"])] = true
 		for child in node.get_children():
 			if String(child.name) == "world":
