@@ -3,12 +3,12 @@ extends "map_selftest_parts/tests_cloud.gd"
 ## Proves the catalogue, the rotation, the vote and the map change do what a server depends on. The most
 ## important test here is [method _test_change_survives_a_failure].
 
-const CHECKS := 378
+const CHECKS := 383
 
 ## Sections entered against sections that ran to their last line, and against this. A runtime error inside a
 ## section aborts that function and nothing says so; a section that bailed out early after a failed guard is
 ## counted as not finished on purpose. The CHECKS total is the other half — see docs/testing.md.
-const SECTIONS := 37
+const SECTIONS := 38
 
 
 func _ready() -> void:
@@ -56,6 +56,7 @@ func _run() -> void:
 	_test_rotation_exempt()
 	_test_rotation_play()
 	_test_map_config()
+	_test_model_texture_max()
 	_test_supports()
 
 	print("")
@@ -678,6 +679,27 @@ class _FakeCtx extends RefCounted:
 		out = sink
 	func reply(text: String) -> void:
 		out.append(text)
+
+
+func _test_model_texture_max() -> void:
+	_section("model_texture_max: family default 2048, layered")
+	var mesh := load("res://addons/dot_map/bsp/mesh_parts/mesh_props.gd") as GDScript
+	var kept: Variant = mesh.get("model_texture_max")
+	_check(kept == 2048, "the default is 2048 (%s)" % [kept])
+	mesh.call("apply_config")
+	_check(mesh.get("model_texture_max") == 2048, "no file, env or argv leaves the default")
+	OS.set_environment("DOT_MAP_MODEL_TEXTURE_MAX", "1024")
+	mesh.call("apply_config")
+	_check(mesh.get("model_texture_max") == 1024, "the environment overrides it")
+	OS.set_environment("DOT_MAP_MODEL_TEXTURE_MAX", "-1")
+	mesh.call("apply_config")
+	_check(mesh.get("model_texture_max") == -1, "-1 stays uncapped")
+	OS.unset_environment("DOT_MAP_MODEL_TEXTURE_MAX")
+	mesh.set("model_texture_max", 512)
+	mesh.call("apply_config")
+	_check(mesh.get("model_texture_max") == 512, "a game's own assignment survives with nothing above it")
+	mesh.set("model_texture_max", kept)
+	_completed += 1
 
 
 func _test_supports() -> void:

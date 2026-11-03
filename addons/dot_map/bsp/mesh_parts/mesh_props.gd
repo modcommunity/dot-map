@@ -305,6 +305,7 @@ func supports() -> Array:
 ## scene_for] takes the stand-in id and returns a [PackedScene] (default: [constant DEFAULT_PROP_DIRS],
 ## [code].glb[/code]).
 func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callable()) -> Node3D:
+	apply_config()
 	var root := Node3D.new()
 	root.name = "Props"
 	var cache := {}
@@ -705,8 +706,15 @@ static func set_model_lod(min_tris: int, max_tris: int = 0) -> void:
 	model_max_tris = maxi(max_tris, 0)
 
 
-## Longest side a library model's texture keeps (a glTF read at run time decodes to raw RGBA with mips, 85 MB for a 4k map); 0 keeps the model's own size, and every one is VRAM-compressed either way; below 0 leaves the textures as the glTF made them.
-static var model_texture_max: int = -1
+## Longest side a library model's texture keeps (a glTF read at run time decodes to raw RGBA with mips, 85 MB for a 4k map); 0 keeps the model's own size, and every one is VRAM-compressed either way; below 0 leaves the textures as the glTF made them (the manor's static memory is 1624 MB uncapped, 400 MB at 2048). [method apply_config] layers it: this value, then `model_texture_max` in `cfg/addon/dot_map/*.yml`, then `DOT_MAP_MODEL_TEXTURE_MAX`, then `--dot-map.model_texture_max=`.
+static var model_texture_max: int = 2048
+
+
+## Applies the operator's layers over [member model_texture_max]; [method build_props] calls it, so a game's own assignment is the weakest layer.
+static func apply_config() -> void:
+	var res := DotAddonConfig.load_dir("dot-map", {"model_texture_max": model_texture_max})
+	if res.ok:
+		model_texture_max = int((res.value as Dictionary).get("model_texture_max", model_texture_max))
 
 
 ## Whether [method slim_model_textures] halves a model's roughness, metallic and AO maps (the glTF ORM image); the diff against full size is in docs/surfaces.md.
