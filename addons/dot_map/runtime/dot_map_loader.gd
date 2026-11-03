@@ -134,6 +134,9 @@ func ensure_content(map: DotMapDef) -> DotResult:
 
 		if typed.ok:
 			packs_fetched += 1
+		elif typed.error != null and typed.error.http_status == 404:
+			# The origin answered and has no such pack: say so, as that is not a network fault to retry.
+			return typed.wrap("%s is not published on the content server (HTTP 404)." % ("%s@%s" % [String(map.content_id), version]))
 
 		return typed
 
