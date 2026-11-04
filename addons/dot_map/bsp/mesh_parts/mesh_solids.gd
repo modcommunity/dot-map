@@ -6,7 +6,7 @@ extends "mesh_core.gd"
 const SOLID_BOX := [2, 3, 4, 6]
 
 ## A solid prop whose box would be wider than this (metres) is a room, a roof or a hull the map's own brushes already cover; a box would seal it.
-const SOLID_MAX_SIDE := 6.0
+static var solid_max_side: float = 6.0
 ## ...and one smaller than this on its longest side is a pebble that only snags a body.
 const SOLID_MIN_SIDE := 0.25
 
@@ -34,7 +34,8 @@ static var decompose_cells: int = 12
 static var decompose_max_boxes: int = 32
 ## A stand-in whose longest side is under this stays one box: a lamp is not worth thirty.
 static var decompose_min_size: float = 0.8
-const DECOMPOSE_MAX_TRIS := 400000
+## Most triangles read to cut one stand-in (a safety bound against a hostile model).
+static var decompose_max_tris: int = 400000
 
 
 ## [param n]'s meshes as boxes of occupied cells, in the same {size, transform} form as [method _solid_shape]; [] when the model is
@@ -68,7 +69,7 @@ static func _cut_into_boxes(n: Node3D) -> Array[AABB]:
 			p = p.get_parent()
 		for v in mi.mesh.get_faces():
 			tris.append(t * v)
-		if tris.size() > DECOMPOSE_MAX_TRIS * 3:
+		if tris.size() > decompose_max_tris * 3:
 			return none
 	var box := _local_aabb(n)
 	var longest := maxf(box.size.x, maxf(box.size.y, box.size.z))
@@ -231,7 +232,7 @@ func _solid_shape(rec: Dictionary, n: Node3D) -> Dictionary:
 			xf = thin["transform"]
 	if size.x <= 0.001 or size.y <= 0.001 or size.z <= 0.001:
 		return {}
-	if maxf(size.x, maxf(size.y, size.z)) < SOLID_MIN_SIDE or maxf(size.x, size.z) > SOLID_MAX_SIDE:
+	if maxf(size.x, maxf(size.y, size.z)) < SOLID_MIN_SIDE or maxf(size.x, size.z) > solid_max_side:
 		return {}
 	if is_tree(rec):
 		var w := clampf(minf(size.x, size.z) * TRUNK_SHARE, TRUNK_MIN, TRUNK_MAX)
