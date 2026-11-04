@@ -89,7 +89,9 @@ static func sky_kind(sky_name: String) -> StringName:
 	for w in ["borealis", "ep01", "ep02", "cloudy", "storm", "overcast", "verystill", "grey", "gray"]:
 		if n.contains(w):
 			return &"overcast"
-	if n.contains("day03") or n.contains("sunset") or n.contains("dusk") or n == "hav" or n.contains("day01_09") or n.contains("day02_09"):
+	if n.contains("day02_09"):
+		return &"twilight"
+	if n.contains("day03") or n.contains("sunset") or n.contains("dusk") or n == "hav" or n.contains("day01_09"):
 		return &"dusk"
 	if n.contains("day01_01") or n.contains("day01_02") or n.contains("day01_03") or n.contains("clear"):
 		return &"clear"
@@ -108,7 +110,7 @@ static func sky_material_for(sky_name: String, root: String = "res://addons/dot_
 	return m
 
 
-## The manifest's sky as a panorama texture from [param root] (a folder holding the four kinds), or null.
+## The manifest's sky as a panorama texture from [param root] (a folder holding the kinds), or null.
 func sky_panorama(root: String = "res://addons/dot_map/sky") -> Texture2D:
 	var kind := sky_kind(str(environment_data().get("sky", {}).get("name", "")))
 	if kind == &"":
