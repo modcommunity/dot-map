@@ -28,4 +28,4 @@ Not covered: keys and counts of presses, a chain that needs something carried, a
 
 ## Proof
 
-`examples/nav_links_demo.tscn` (24 checks) builds a synthetic entity set: a button through a relay to a door, a closer that must not count, a walk-in pad to a touch door, a shot button to a disabled teleport. dot-bot's `bot_selftest` section "unlock export" covers the gadget. mg-wipeout's `headless_io_bots` pins the first real runs on its Oaks and Pauls courses.
+`examples/nav_links_demo.tscn` builds a synthetic entity set: a button through a relay to a door, a closer that must not count, a walk-in pad to a touch door, a shot button to a disabled teleport. dot-bot's `bot_selftest` section "unlock export" covers the gadget. mg-wipeout's `headless_io_bots` pins the first real runs on its Oaks and Pauls courses.

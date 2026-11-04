@@ -66,7 +66,7 @@ The manifest's `breakables` lists every `func_breakable` and `func_breakable_sur
 
 ## Testing
 
-`python3 -I dot-map-convert/tests/test_mesh.py` (the `Entities` tests) and `res://examples/bsp_entities_demo.tscn` (32 checks) run on `examples/bsp_mesh/zm_4way_tunnel.entities.json`, the entity data of a real map with three lifts whose buttons lock and unlock one another (`dot-map-convert/tests/entities_fixture.py` rewrites it from the downloaded map; only the derived data is in the repository).
+`python3 -I dot-map-convert/tests/test_mesh.py` (the `Entities` tests) and `res://examples/bsp_entities_demo.tscn` run on `examples/bsp_mesh/zm_4way_tunnel.entities.json`, the entity data of a real map with three lifts whose buttons lock and unlock one another (`dot-map-convert/tests/entities_fixture.py` rewrites it from the downloaded map; only the derived data is in the repository).
 
 ## What a game does with it
 

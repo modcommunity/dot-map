@@ -43,7 +43,7 @@ A game exposes the mode as a client video setting and a server or command-line o
 
 ## Proof: no holes
 
-`examples/vis_demo.tscn` runs 16 checks on a three-cluster synthetic map (plane tree, box queries, PVS rows, solid fallback, the margin near a wall, a closed door, mode off, the no-data failure). With `-- --maps=<pack prefix>,...` it also loads real converted maps, builds collision from every chunk and prop, picks random sample points in non-solid leaves with a floor below, and casts uniform rays to 300 m. A ray that first hits a hidden item is a hole, unless it crossed a solid leaf on the way (a gap in the drawn world, where no face exists to see through, counted separately).
+`examples/vis_demo.tscn` runs on a three-cluster synthetic map (plane tree, box queries, PVS rows, solid fallback, the margin near a wall, a closed door, mode off, the no-data failure). With `-- --maps=<pack prefix>,...` it also loads real converted maps, builds collision from every chunk and prop, picks random sample points in non-solid leaves with a floor below, and casts uniform rays to 300 m. A ray that first hits a hidden item is a hole, unless it crossed a solid leaf on the way (a gap in the drawn world, where no face exists to see through, counted separately).
 
 | Map | Points × rays | Holes | Rays through undrawn solid | Items drawn on average |
 | --- | --- | --- | --- | --- |

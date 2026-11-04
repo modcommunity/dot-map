@@ -209,7 +209,7 @@ A level you built by hand gets the same from `DotOccluderBaker` (large walls and
 
 ```bash
 godot --headless --path . --import
-godot --headless --path . res://examples/map_selftest.tscn   # 223 checks
+godot --headless --path . res://examples/map_selftest.tscn
 ```
 
 ## Licence

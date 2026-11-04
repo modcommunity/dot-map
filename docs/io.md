@@ -56,7 +56,7 @@ Work package 7. `DotMapVolumes.build(entities, io)` joins each manifest volume t
 
 Map commands go through `DotMapCommand.judge`: a line is split on `;`, a chat line (200 characters) or a cvar on `command_allow` with a plain value is allowed, a list of verbs (`quit`, `exec`, `rcon*`, passwords, `bind`, `map`...) is never allowed even if listed, and every verdict is recorded.
 
-`examples/volumes_demo.tscn` (headless, 146 checks in 15 sections) runs all of it, and shows Office's lava room from its own links: the trigger starts a 3 s timer, the hurt volume comes on at tick 181 and hits at once, then every 0.5 s while the player stays; leaving stops the hits; the trigger re-arms at 6 s and a second entry turns the hurt volume off before it can hit. The volume geometry there is a stand-in box, since the repository keeps Office's logic and not its brushes.
+`examples/volumes_demo.tscn` (headless) runs all of it, and shows Office's lava room from its own links: the trigger starts a 3 s timer, the hurt volume comes on at tick 181 and hits at once, then every 0.5 s while the player stays; leaving stops the hits; the trigger re-arms at 6 s and a second entry turns the hurt volume off before it can hit. The volume geometry there is a stand-in box, since the repository keeps Office's logic and not its brushes.
 
 `trigger_hurt` honours `damageonce` (a body is hit once per stay; `DotMapHurt.once_flag` stays 0, see below) and `damageforce` (sent as the `damage_force` event `{body, force, source}` in m/s, zeroed by `nodmgforce`). `env_soundscape`, `_proxy` and `_triggerable` are `DotMapSoundscape`: the nearest enabled one covering a player fires the `soundscape` event `{body, name, entity, positions}` when it changes, and its `OnPlay` output.
 
@@ -80,7 +80,7 @@ Work package 6. `bind_world(world_root, manifest)` joins each entity to the draw
 
 Replication: the server is authoritative (`io.authoritative`), a client runs no logic and refuses `send`, `raise` and `touch`. `DotMapStateSync` batches every `state_changed` on the `settled` signal into one `io_state` message (`tick`, `[index, key, value]` changes), sends it through each peer's `send_fn`, and `add_peer` sends an `io_snapshot` of every entity first (join in progress). `apply()` on the client sets its clock, applies the changes and counts unknown entities in `refused` and unknown keys in `ignored`.
 
-`examples/io_world_demo.tscn` (headless, 162 checks in 15 sections) covers all of it, including a two-peer exchange and a determinism run.
+`examples/io_world_demo.tscn` (headless) covers all of it, including a two-peer exchange and a determinism run.
 
 Movers push bodies (`DotMapMoverNode.push_bodies`, run by `DotMapVolumes.step`, through `move_fn`); a body pushed that does not move at least half the push is blocked: the `dmg` key is applied as `crush` damage every 0.25 s, `OnBlockedOpening` / `OnBlockedClosing` fire, and a slide, hinge or plat with `wait >= 0` reverses. `func_physbox` is `DotMapPhysbox` (a `RigidBody3D`; `damagetoenablemotion` / `forcetoenablemotion`, `EnableMotion` and the other inputs, `OnMotionEnabled`).
 

@@ -48,7 +48,7 @@ On a converted BSP map, `DotMapVisibility.bind_area_portals(level_root)` makes e
 
 ## 3. Check it
 
-`godot --headless --path . res://examples/culling_demo.tscn` (28 checks in 4 sections: the baker, the portal, the binding and a save round trip).
+`godot --headless --path . res://examples/culling_demo.tscn` (the baker, the portal, the binding and a save round trip).
 
 The occlusion scene is rebuilt in the background after a change, so the first frames after a bake or a door move still draw everything. A frame-time or draw-call test must wait about a second after changing an occluder before it counts.
 

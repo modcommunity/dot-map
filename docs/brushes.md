@@ -8,6 +8,6 @@
 
 **Direction.** Wedge, stairs and quarter-pipe climb toward +x; turn the node. Brushes are centred on their bounding box, like a map box.
 
-`examples/brushes_demo.tscn` is the suite (62 checks: bounds, centring, convex collision, UV spans, a slope's UV length, rays down stairs, through an arch's opening and a slab's holes). With `-- --shot=<prefix>` it renders three frames on a checker, which is how a stretched slope or an inside-out face shows; run it under `xvfb-run`, not `--headless`.
+`examples/brushes_demo.tscn` is the suite (bounds, centring, convex collision, UV spans, a slope's UV length, rays down stairs, through an arch's opening and a slab's holes). With `-- --shot=<prefix>` it renders three frames on a checker, which is how a stretched slope or an inside-out face shows; run it under `xvfb-run`, not `--headless`.
 
 Not here: a map editor, boolean cuts, curved normals (faces are flat, the cylinder is 16-sided by default; raise `segments`), and per-face materials.
