@@ -2,11 +2,8 @@ class_name DotMapOneWayGlass
 extends RefCounted
 
 ## One-way glass for a jail cell: clear from outside, opaque from inside.
-##
-## A shader, not a second wall or a culling rule: the glass shows through (its own alpha) unless
-## the camera is within [param radius] of the cell, in which case glass within that radius plus a
-## margin is drawn solid. Everyone outside sees in, the prisoner sees a wall, and nothing is added
-## to the physics or the draw call count. Install it as [member DotMapBspMesh.glass_material_for].
+## A shader, not a wall or culling rule: glass within [param radius] of the camera's cell is drawn
+## solid, so outsiders see in and the prisoner sees a wall. Install it as [member DotMapBspMesh.glass_material_for].
 
 const SHADER_CODE := """
 shader_type spatial;
@@ -75,7 +72,7 @@ static func sees_solid(eye: Vector3, centre: Vector3, radius: float) -> bool:
 
 ## The jail cell of a world manifest as `{centre, radius}`, or {} when it has none. A cell is a
 ## destination that two or more teleport volumes aim at and that lies well below the highest such
-## destination (a ramp's top); found by shape, never by a destination's name.
+## destination (a ramp's top); matched by shape, never by a destination's name.
 static func cell_of(manifest: Dictionary, radius: float = 6.0) -> Dictionary:
 	var dests: Dictionary = manifest.get("destinations", {})
 	var aimed: Dictionary = {}
