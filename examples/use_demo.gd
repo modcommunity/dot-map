@@ -5,7 +5,7 @@ extends Node
 
 const CHECKS := 19
 const SECTIONS := 4
-const WORLD := "godot/arena-surf-dm-maps/worlds/surf_forbidden_ways_2nd/surf_forbidden_ways_2nd"
+const WORLD := "../arena-surf-dm-maps/worlds/surf_forbidden_ways_2nd/surf_forbidden_ways_2nd"
 const BUTTON := 39
 
 var _passed := 0
@@ -28,7 +28,7 @@ func _ready() -> void:
 
 func _run() -> void:
 	print("dot-map use")
-	var prefix := OS.get_environment("HOME").path_join(WORLD)
+	var prefix := ProjectSettings.globalize_path("res://").path_join(WORLD)
 	var res := DotMapBspMesh.load_prefix(prefix)
 	if not res.ok:
 		print("SKIP: no converted world at " + prefix)

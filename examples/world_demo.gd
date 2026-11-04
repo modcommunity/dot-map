@@ -17,7 +17,7 @@ var _dir := ""
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
-	_dir = OS.get_environment("HOME").path_join("godot/mg-wipeout-maps/worlds")
+	_dir = ProjectSettings.globalize_path("res://").path_join("../mg-wipeout-maps/worlds")
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--worlds="):
 			_dir = a.substr(9)
