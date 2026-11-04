@@ -96,6 +96,18 @@ static func sky_kind(sky_name: String) -> StringName:
 	return &"cloudy"
 
 
+## A [PanoramaSkyMaterial] for a sky name from [param root], or null for a night, space or unnamed sky.
+## For a game that lights its own map: `environment.sky.sky_material = DotMapBspMesh.sky_material_for(name)`.
+static func sky_material_for(sky_name: String, root: String = "res://addons/dot_map/sky") -> PanoramaSkyMaterial:
+	var kind := sky_kind(sky_name)
+	var path := root.path_join("%s.jpg" % kind)
+	if kind == &"" or not ResourceLoader.exists(path):
+		return null
+	var m := PanoramaSkyMaterial.new()
+	m.panorama = load(path) as Texture2D
+	return m
+
+
 ## The manifest's sky as a panorama texture from [param root] (a folder holding the four kinds), or null.
 func sky_panorama(root: String = "res://addons/dot_map/sky") -> Texture2D:
 	var kind := sky_kind(str(environment_data().get("sky", {}).get("name", "")))
