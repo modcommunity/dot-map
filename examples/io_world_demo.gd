@@ -2,7 +2,7 @@ extends "io_world_base.gd"
 
 ## Toggle brushes, breakables, movers and their replication on [DotMapIO] (work package 6).
 
-const CHECKS := 205
+const CHECKS := 213
 const SECTIONS := 17
 const TUNNEL := "res://examples/bsp_mesh/zm_4way_tunnel.entities.json"
 
@@ -322,6 +322,24 @@ func _test_train() -> void:
 	_check(t2.path_at(io2.now, 20) < 13.7 and t2.path_at(io2.now, 20) >= 0.0 and io2.pending() > 0, "a looped path wraps and keeps scheduling its next corner: %s, %d pending" % [t2.path_at(io2.now, 20), io2.pending()])
 	var tank := _io([_rec(0, "func_tanktrain", "tank")])
 	_check(tank.entity_of(0) is DotMapMoverNode, "a tank train is a path mover like a track train")
+	var tpath: Array = [{"name": "a", "at": [0, 0, 0]}, {"name": "b", "at": [10, 0, 0]}, {"name": "c", "at": [10, 0, 10]}]
+	var tio := _io([_rec(0, "func_tanktrain", "tk"), _rec(1, "func_tracktrain", "tr")])
+	tio.bind_movers([DotMapMover.from_record({"entity": 0, "model": 0, "kind": "path", "classname": "func_tanktrain", "speed": 4.0, "path": tpath}),
+			DotMapMover.from_record({"entity": 1, "model": 0, "kind": "path", "classname": "func_tracktrain", "speed": 4.0, "path": tpath})])
+	var tk := tio.entity_of(0) as DotMapMoverNode
+	var trk := tio.entity_of(1) as DotMapMoverNode
+	_check(tk.turns_with_path() and not trk.turns_with_path(), "only a tank train turns with its path")
+	_check(absf(tk.path_yaw(2.0)) < 0.001 and absf(tk.path_yaw(5.0)) < 0.001, "a tank train faces its first leg's heading along a straight")
+	var turned := absf(tk.path_yaw(15.0))
+	_check(absf(turned - PI * 0.5) < 0.001, "after the corner it has turned a quarter circle: %s" % turned)
+	_check(absf(tk.path_yaw(10.0)) > 0.1 and absf(tk.path_yaw(10.0)) < PI * 0.5 - 0.1, "mid-corner it is part way round, not snapped")
+	var d_tk := tk.pose_delta(0, 20)
+	_check(d_tk.is_equal_approx(Transform3D.IDENTITY), "at the start the tank train is at its rest pose")
+	tk._a0 = 15.0
+	trk._a0 = 15.0
+	var after := tk.pose_delta(tio.now, 20)
+	_check(after.origin.distance_to(Vector3(10, 0, 5)) < 0.01 or after.origin.distance_to(Vector3(10, 0, 5) - (Vector3.ZERO)) < 0.01, "a tank train's pivot ends at its path point: %s" % after.origin)
+	_check(absf(after.basis.get_euler().y) > 1.5 and trk.pose_delta(tio.now, 20).basis.is_equal_approx(Basis.IDENTITY), "the tank train's basis turned, a track train's did not")
 	n.free()
 	_done()
 
