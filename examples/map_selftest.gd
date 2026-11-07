@@ -1,14 +1,14 @@
-extends "map_selftest_parts/tests_cloud.gd"
+extends "map_selftest_parts/tests_data_remote.gd"
 
 ## Proves the catalogue, the rotation, the vote and the map change do what a server depends on. The most
 ## important test here is [method _test_change_survives_a_failure].
 
-const CHECKS := 383
+const CHECKS := 477
 
 ## Sections entered against sections that ran to their last line, and against this. A runtime error inside a
 ## section aborts that function and nothing says so; a section that bailed out early after a failed guard is
 ## counted as not finished on purpose. The CHECKS total is the other half — see docs/testing.md.
-const SECTIONS := 38
+const SECTIONS := 47
 
 
 func _ready() -> void:
@@ -58,6 +58,15 @@ func _run() -> void:
 	_test_map_config()
 	_test_model_texture_max()
 	_test_supports()
+	await _test_data_round_trip()
+	await _test_data_layering()
+	await _test_data_stale()
+	_test_data_hostile_import()
+	await _test_data_sql()
+	await _test_data_sql_hostile_rows()
+	await _test_data_http()
+	await _test_data_http_hostile_reply()
+	_test_data_config()
 
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
