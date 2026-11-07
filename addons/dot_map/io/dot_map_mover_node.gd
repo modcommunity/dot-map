@@ -6,6 +6,8 @@ extends DotMapEntity
 
 ## Ticks a body may stay inside a moving mover before it counts as blocked.
 const BLOCK_TICKS := 3
+## Metres either side of a corner over which a tank train turns.
+const TANK_TURN_M := 1.0
 ## Seconds between a blocked body's hits.
 const BLOCK_DAMAGE_PERIOD := 0.25
 
@@ -127,6 +129,42 @@ func path_point(s: float) -> Vector3:
 			var p1: Vector3 = _corners[(i + 1) % n]
 			return p0.lerp(p1, clampf((ss - a) / (b - a), 0.0, 1.0) if b > a else 0.0)
 	return _corners[n - 1]
+
+
+## True for a [code]func_tanktrain[/code]: it turns to face its path as it runs; a track train keeps its orientation.
+func turns_with_path() -> bool:
+	return mover != null and mover.kind == DotMapMover.KIND_PATH and mover.classname == "func_tanktrain"
+
+
+## A tank train's heading (radians about up) at [param s] metres along its path, relative to its heading at the start.
+## A corner is turned over [constant TANK_TURN_M] metres either side of it.
+func path_yaw(s: float) -> float:
+	var n := _corners.size()
+	if n < 2:
+		return 0.0
+	var segs := n if _ring else n - 1
+	var ss := _wrap(s)
+	var i := segs - 1
+	for k in segs:
+		if ss <= (_cum[k + 1] if k + 1 < _cum.size() else _length):
+			i = k
+			break
+	var a: float = _cum[i]
+	var b: float = _cum[i + 1] if i + 1 < _cum.size() else _length
+	var cur := _seg_heading(i, n)
+	var half := minf(TANK_TURN_M, (b - a) * 0.5)
+	var out := cur
+	if half > 0.0:
+		if ss > b - half and (_ring or i < segs - 1):
+			out = lerp_angle(cur, _seg_heading((i + 1) % segs, n), (ss - (b - half)) / (2.0 * half))
+		elif ss < a + half and (_ring or i > 0):
+			out = lerp_angle(_seg_heading((i - 1 + segs) % segs, n), cur, 0.5 + (ss - a) / (2.0 * half))
+	return wrapf(out - _seg_heading(0, n), -PI, PI)
+
+
+func _seg_heading(i: int, n: int) -> float:
+	var d: Vector3 = _corners[(i + 1) % n] - _corners[i]
+	return atan2(d.x, d.z) if absf(d.x) + absf(d.z) > 0.0001 else 0.0
 
 
 func on_map_spawn(io: DotMapIO) -> void:
@@ -512,7 +550,11 @@ func pose_delta(tick: int, rate: int) -> Transform3D:
 		DotMapMover.KIND_SPIN:
 			return _about(mover.origin, Basis(mover.axis.normalized(), angle_at(tick, rate)))
 		DotMapMover.KIND_PATH:
-			return Transform3D(Basis.IDENTITY, path_point(path_at(tick, rate)) - (_corners[0] if _corners.size() > 0 else Vector3.ZERO))
+			var c0: Vector3 = _corners[0] if _corners.size() > 0 else Vector3.ZERO
+			var sp := path_at(tick, rate)
+			if turns_with_path():
+				return Transform3D(Basis.IDENTITY, path_point(sp) - c0) * _about(c0, Basis(Vector3.UP, path_yaw(sp)))
+			return Transform3D(Basis.IDENTITY, path_point(sp) - c0)
 		_:
 			if not mover.is_animatable():
 				return Transform3D.IDENTITY
@@ -616,7 +658,12 @@ func _view(io: DotMapIO) -> void:
 			pose = Transform3D(Basis(mover.axis.normalized(), f) * _base.basis, _base.origin)
 		DotMapMover.KIND_PATH:
 			f = path_at(io.now, io.rate)
-			pose = Transform3D(_base.basis, _base.origin + path_point(f))
+			if turns_with_path():
+				var c0: Vector3 = _corners[0]
+				var rest := Transform3D(_base.basis, _base.origin + c0)
+				pose = Transform3D(Basis.IDENTITY, path_point(f)) * Transform3D(Basis(Vector3.UP, path_yaw(f)), Vector3.ZERO) * Transform3D(Basis.IDENTITY, -c0) * rest
+			else:
+				pose = Transform3D(_base.basis, _base.origin + path_point(f))
 		_:
 			f = fraction_at(io.now, io.rate)
 			if not mover.is_animatable():

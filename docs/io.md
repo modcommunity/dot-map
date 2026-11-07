@@ -88,7 +88,7 @@ A `func_rotating` with a `fanfriction` (the converter writes `fan_friction` only
 
 `DotMapStateTransport` is the reference `send_fn`: `sync.attach_host(io, t.send)` (or the world's `send_fn` hook) queues each peer's messages, `t.flush_on(io)` sends them when a tick settles, as one `io_batch` per peer up to `max_bytes` (1100) of JSON; a bigger message, a snapshot say, goes alone. It names no net addon: `t.raw_send(peer, payload)` is the game's reliable channel, and on the client `DotMapStateTransport.is_state_payload(payload)` then `t.receive(io, sync, payload)` unpacks it. The payloads are plain dictionaries, so the channel only has to carry one of those.
 
-Not done: tank-style train rotation.
+A `func_tanktrain` also turns to face its path (`path_yaw`, a corner turned over 1 m either side; `pose_delta` and the node pose carry it); a `func_tracktrain` keeps its orientation.
 
 ## Correction: the Office lava room
 
@@ -110,7 +110,7 @@ Every tick the game calls `world.step(bodies)` (advance the logic, then the volu
 
 A `prop_door_rotating` is drawn by `DotMapDoorStandIn` (a panel hung at the hinge, with an `AnimatableBody3D` when solid; the hook `door_fn(mover, yaw)` replaces it with the game's model, built with its origin where the model's is and the entity's yaw (on a door hung off an authored hinge the world puts it under a pivot on the hinge, `panel_offset` along the panel, because the node swings about its own origin); `world.doors` lists them). Its direction follows the source keys: `opendir` 0 swings away from whoever opens it (the side is picked on opening from the opener's position, a `Vector3`, `Node3D` or body dictionary, and replicated as the `side` state), 1 forward, 2 back; `spawnpos` 1 or 2 (and spawnflag 1) starts it open on that side; spawnflag 2 is not "reverse" on a model door. The hinge is the model origin, except where the entity's `axis` key is a vertical line (or one point) within 1.2 m of it: 7 of the 304 stored doors. Those are stall and hospital doors whose origin is the panel's middle, so the converter puts the hinge on the axis, runs the panel from it through the origin (`panel_yaw`, `panel_width` in the record, clamped to 0.6-1.6 m and flagged `panel_assumed` because the origin is taken to be mid-panel; forward and back swap when the model's yaw faces away from that line) and `yaw` follows that frame; a horizontal axis (6 doors) or one farther off than a door is wide (3, copied helpers) is ignored. The engine's own use of `axis` is unverified; this follows the rendered result (`tools/door_shot.sh`: closed, half open from both sides). Not done: which side the panel hangs on for a model whose origin is the hinge is a guess until compared with the real model, and `regen` now keeps these doors in `movers` (before, `DotMapWorld` never saw one), so shipped worlds draw them only after a re-conversion. The manifest's `settings` (the map's own `point_servercommand` cvars, written by the converter) are the weakest layer of the config. `<prefix>.doc.json` is shipped beside each converted map by `bsp.py regen` and the importer.
 
-Not done: tank trains.
+Tank trains turn with their path (see the train notes above).
 
 ## Riders and pushing
 
