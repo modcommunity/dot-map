@@ -42,7 +42,7 @@ func _ready() -> void:
 		return
 	var dw: DotMapWorld = built.value
 	add_child(dw)
-	_overview_sky(dw, args)
+	_overview_sky(dw, world, args)
 	var node: Node3D = dw.visual
 	_light_if_unlit(world)
 	if args.has("aniso"):
@@ -101,8 +101,9 @@ func _light_if_unlit(world: DotMapBspMesh) -> void:
 		add_child(sun)
 
 
-func _overview_sky(dw: DotMapWorld, args: Dictionary) -> void:
-	if str(args.get("view", "")) == "overview":
+func _overview_sky(dw: DotMapWorld, world: DotMapBspMesh, args: Dictionary) -> void:
+	if str(args.get("view", "")) == "overview" or world.manifest.get("spawns", []).is_empty():
+		# (a map with no spawns frames from outside too, whatever --view says)
 		# a map's fog is set for play inside it: from outside the map it hides the whole thing
 		for we in dw.find_children("*", "WorldEnvironment", true, false):
 			var env := (we as WorldEnvironment).environment
