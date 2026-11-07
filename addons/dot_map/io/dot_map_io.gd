@@ -106,11 +106,13 @@ func _init() -> void:
 		"prop_physics_override": DotMapBreakable,
 		"math_colorblend": DotMapColorBlend, "logic_measure_movement": DotMapMeasureMovement,
 		"env_global": DotMapGlobal, "point_template": DotMapTemplate,
-		"logic_beats": DotMapBeats, "logic_winlose": DotMapWinLose, "game_score": DotMapGameScore, "game_ui": DotMapGameUi, "logic_collision_pair": DotMapCollisionPair,
+		"logic_beats": DotMapBeats, "logic_winlose": DotMapWinLose, "game_score": DotMapGameScore, "game_player_equip": DotMapPlayerEquip, "game_ui": DotMapGameUi, "logic_collision_pair": DotMapCollisionPair,
 		"func_physbox": DotMapPhysbox, "func_physbox_multiplayer": DotMapPhysbox,
 		"env_soundscape": DotMapSoundscape, "env_soundscape_proxy": DotMapSoundscape,
 		"env_soundscape_triggerable": DotMapSoundscape, "trigger_soundscape": DotMapTriggerSoundscape, "trigger_hurt": DotMapHurt, "trigger_push": DotMapPush, "ambient_generic": DotMapSound,
 	}
+	for cls in ["filter_activator_name", "filter_activator_class", "filter_activator_team", "filter_damage_type", "filter_multi"]:
+		_classes[cls] = DotMapFilter
 	for cls in ["func_door", "func_door_rotating", "func_movelinear", "func_rotating", "func_tracktrain",
 			"func_train", "func_tanktrain", "func_plat", "func_button", "func_rot_button", "prop_door_rotating"]:
 		_classes[cls] = DotMapMoverNode

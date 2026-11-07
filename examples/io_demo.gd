@@ -3,8 +3,8 @@ extends "suite_base.gd"
 ## [DotMapIO] on synthetic maps (delays, fire-once counts, cycles, logic classes, the extension points) and
 ## on the Office course's real timed hazards.
 
-const CHECKS := 184
-const SECTIONS := 14
+const CHECKS := 197
+const SECTIONS := 15
 const OFFICE := "res://examples/io/office_io.doc.json"
 
 
@@ -26,6 +26,7 @@ func _run() -> void:
 	_test_map_scripts()
 	_test_catalogue_and_new_classes()
 	_test_score_ui_and_pairs()
+	_test_filters_and_equip()
 	_test_beats_and_winlose()
 	var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(OFFICE))
 	if doc is Dictionary:
@@ -387,6 +388,42 @@ func _test_score_ui_and_pairs() -> void:
 	io.advance(1)
 	_check(io.active_uis().is_empty() and not (events.filter(func(e: Array) -> bool: return e[0] == "ui_active").back()[1]["on"]), "jump gives the controls back (spawnflag 256)")
 	_check(io.unhandled.is_empty(), "no input went unhandled: %s" % [io.unhandled])
+	_done()
+
+
+func _test_filters_and_equip() -> void:
+	_section("filters as entities and game_player_equip")
+	var io := _io([
+		_rec(0, "filter_activator_name", "fn", [["filtername", "ali*"]], [["OnPass", "pass", "Add", "1"], ["OnFail", "fail", "Add", "1"]]),
+		_rec(1, "filter_activator_team", "ft", [["filterteam", "3"], ["negated", "1"]]),
+		_rec(2, "filter_damage_type", "fd", [["damagetype", "32"]]),
+		_rec(3, "filter_multi", "any", [["filtertype", "1"], ["filter01", "fn"], ["filter02", "ft"]]),
+		_rec(4, "filter_multi", "all", [["filtertype", "0"], ["filter01", "fn"], ["filter02", "ft"]]),
+		_rec(5, "math_counter", "pass"), _rec(6, "math_counter", "fail"),
+		_rec(7, "game_player_equip", "gear", [["weapon_knife", "1"], ["item_ammo_smg1", "3"], ["spawnflags", "2"]]),
+		_rec(8, "filter_enemy", "other")])
+	_check(io.entities[0] is DotMapFilter and io.entities[3] is DotMapFilter, "the filter classes are DotMapFilter entities")
+	var f: Array = [io.entities[0], io.entities[1], io.entities[2], io.entities[3], io.entities[4]]
+	_check(f[0].passes(io, {"name": "alice"}) and not f[0].passes(io, {"name": "bob"}), "activator name matches with a wildcard")
+	_check(f[1].passes(io, {"team": 2}) and not f[1].passes(io, {"team": 3}), "negated flips the team filter")
+	_check(f[2].passes(io, {"damage_type": 32}) and not f[2].passes(io, {"damage_type": 8}), "damage type compares the hit")
+	_check(f[3].passes(io, {"name": "alice", "team": 3}) and not f[3].passes(io, {"name": "bob", "team": 3}), "filter_multi OR passes when one passes")
+	_check(f[4].passes(io, {"name": "alice", "team": 2}) and not f[4].passes(io, {"name": "alice", "team": 3}), "filter_multi AND needs every one")
+	_check(io.unhandled.is_empty(), "no unhandled so far: %s" % [io.unhandled])
+	_check(f[2].passes(io, {"name": "x"}) and io.unhandled.get("filter|filter_damage_type", 0) == 1, "a hit with no damage type is admitted and counted")
+	_check(DotMapFilter.entity_passes(io, io.entities[8], {}) and io.unhandled.get("filter|filter_enemy", 0) == 1, "another filter class admits and is counted")
+	io.send("fn", "TestActivator", "", 0.0, "alice")
+	io.send("fn", "TestActivator", "", 0.0, "bob")
+	io.advance(1)
+	_check(io.entities[5].value == 1.0 and io.entities[6].value == 1.0, "TestActivator fires OnPass or OnFail")
+	var events: Array = []
+	io.event_fn = func(kind: String, data: Dictionary) -> void: events.append([kind, data])
+	io.send("gear", "EquipActivator", "", 0.0, "bob")
+	io.send("gear", "EquipAllPlayers")
+	io.advance(1)
+	var eq: Array = events.filter(func(e: Array) -> bool: return e[0] == "equip")
+	_check(eq.size() == 2 and eq[0][1]["to"] == "activator" and eq[0][1]["activator"] == "bob" and eq[1][1]["to"] == "all", "Equip inputs tell the game who")
+	_check(eq[0][1]["items"] == {"weapon_knife": 1, "item_ammo_smg1": 3} and eq[0][1]["strip_first"] == true, "the items and the strip flag are carried: %s" % [eq[0][1]])
 	_done()
 
 
