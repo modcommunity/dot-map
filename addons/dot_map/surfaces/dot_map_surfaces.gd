@@ -82,6 +82,10 @@ var root: String = DEFAULT_ROOT
 ## ([code]func(path: String) -> String[/code]).
 var path_fn: Callable = Callable()
 
+## Folders (each laid out like [member root]) a texture under [member root] or [constant DEFAULT_ROOT] is looked for in when this build does not carry it.
+## The client shell leaves the textures out of its pck and a host adds the mounted surfaces pack's folder here.
+static var fallback_roots: PackedStringArray = PackedStringArray()
+
 ## Scales every kind's metallic value. A game that lays baked light over its map sets this to 0
 ## on the instance it bakes with: a lightmap holds diffuse light only, and a metallic surface has
 ## almost no diffuse, so a baked corrugated roof drew nearly black.
@@ -771,5 +775,19 @@ func _load(path: String) -> Texture2D:
 	if path_fn.is_valid():
 		path = String(path_fn.call(path))
 	if not ResourceLoader.exists(path):
-		return null
+		path = _from_fallback(path)
+		if path.is_empty():
+			return null
 	return load(path) as Texture2D
+
+
+func _from_fallback(path: String) -> String:
+	var base := root if path.begins_with(root + "/") else DEFAULT_ROOT
+	if not path.begins_with(base + "/"):
+		return ""
+	var rel := path.substr(base.length())
+	for r in fallback_roots:
+		var cand := r.trim_suffix("/") + rel
+		if ResourceLoader.exists(cand):
+			return cand
+	return ""
