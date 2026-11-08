@@ -3,7 +3,7 @@ extends "map_selftest_parts/tests_data_remote.gd"
 ## Proves the catalogue, the rotation, the vote and the map change do what a server depends on. The most
 ## important test here is [method _test_change_survives_a_failure].
 
-const CHECKS := 477
+const CHECKS := 474
 
 ## Sections entered against sections that ran to their last line, and against this. A runtime error inside a
 ## section aborts that function and nothing says so; a section that bailed out early after a failed guard is
