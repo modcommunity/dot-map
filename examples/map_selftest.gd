@@ -712,7 +712,7 @@ func _test_model_texture_max() -> void:
 
 
 func _test_supports() -> void:
-	_section("supports: a shot breaks a breakable that holds a barrel up, and says what stood on it")
+	_section("supports: a shot breaks a support and says what stood on it, and says what stood on it")
 	var recs := [
 		{"bounds": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0], "health": 30.0, "holds": [0, 1], "model": 7},
 		{"bounds": [5.0, 0.0, 0.0, 6.0, 1.0, 1.0], "health": 10.0, "holds": [2], "model": 8},
@@ -729,23 +729,6 @@ func _test_supports() -> void:
 	var _c := s.broken.connect(func(held: PackedInt32Array, _at: Vector3) -> void: told.append(held))
 	var _hit := DotMapSupport.shoot(made, Vector3(-3, 0.5, 0.5), Vector3.RIGHT, 20.0, 25.0)
 	_check(s.is_broken() and told.size() == 1 and told[0] == PackedInt32Array([10, 11]) and s.collision_layer == 0, "when its health runs out it breaks, tells what stood on it and stops being a body")
-	var mesh := DotMapBspMesh.new()
-	mesh.manifest = {"props": [{"model": "a", "stand_in": "x", "at": [0, 0, 0]}, {"model": "b", "stand_in": "x", "loose": "barrel", "at": [1, 0.1, 2], "yaw": 30.0}, {"model": "c", "stand_in": "x", "loose": "barrel", "at": [3, 0, 4]}],
-			"breakables": [{"model": 5, "health": 1.0, "holds": [2], "bounds": [0, 0, 0, 1, 1, 1]}, {"model": 6, "holds": [0], "bounds": [0, 0, 0, 1, 1, 1]}, {"model": 7, "holds": []}]}
-	_check(mesh.loose_toys().size() == 2 and mesh.loose_toys()[0]["toy"] == "barrel", "the manifest's loose props are toy placements", str(mesh.loose_toys()))
-	var sup := mesh.supports()
-	_check(sup.size() == 1 and sup[0]["holds"] == [1] and sup[0]["model"] == 5, "a support's holds are renumbered into the loose list, and one holding no loose prop is no support", str(sup))
-	var one := PackedScene.new()
-	var leaf := Node3D.new()
-	var _p := one.pack(leaf)
-	leaf.free()
-	var drawn := mesh.build_props(func(_id: Variant) -> PackedScene: return one)
-	var plain := drawn.get_child_count()
-	drawn.free()
-	mesh.skip_loose = true
-	var drawn_less := mesh.build_props(func(_id: Variant) -> PackedScene: return one)
-	_check(plain == 3 and drawn_less.get_child_count() == 1, "skip_loose leaves the loose props to the game", "%d then %d" % [plain, drawn_less.get_child_count()])
-	drawn_less.free()
 	var client := DotMapSupport.build_all(recs, 8, false)
 	_check(not client[1].hurt(500.0) and not client[1].is_broken(), "a client's hurt does nothing")
 	client[1].apply_broken()

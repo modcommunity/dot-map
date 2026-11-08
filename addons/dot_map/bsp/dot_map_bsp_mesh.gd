@@ -14,7 +14,7 @@ func build_prop_collision(scene_for: Callable = Callable()) -> StaticBody3D:
 	var cache := {}
 	var longest_of := {}
 	for rec: Dictionary in manifest.get("props", []):
-		if not int(rec.get("solid", 0)) in SOLID_BOX or (skip_loose and rec.has("loose")):
+		if not int(rec.get("solid", 0)) in SOLID_BOX:
 			continue
 		var n: Node3D = null
 		if not rec.has("box"):
