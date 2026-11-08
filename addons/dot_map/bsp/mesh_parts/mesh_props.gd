@@ -280,41 +280,6 @@ var missing_proxied: int = 0
 static var _models_warned: Dictionary = {}
 
 
-## Leaves out the props the importer marked `loose` (free physics barrels): the game simulates those as toys
-## ([method loose_toys]) and draws and collides with them there. Off, they are static props like any other.
-var skip_loose: bool = false
-
-
-## The props marked `loose` as dot-props toy placements ([code]{toy, at, yaw}[/code]), in manifest order.
-func loose_toys() -> Array:
-	var out: Array = []
-	for rec: Dictionary in manifest.get("props", []):
-		if rec.has("loose"):
-			out.append({"toy": str(rec["loose"]), "at": rec["at"], "yaw": float(rec.get("yaw", 0.0))})
-	return out
-
-
-## The breakables that hold loose props up, as [method DotMapSupport.build_all] takes them; each `holds` is an index
-## into [method loose_toys] (not into the manifest's props).
-func supports() -> Array:
-	var order := {}
-	var i := 0
-	var props: Array = manifest.get("props", [])
-	for k in props.size():
-		if (props[k] as Dictionary).has("loose"):
-			order[k] = i
-			i += 1
-	var out: Array = []
-	for rec: Dictionary in breakables():
-		var held: Array = []
-		for h: Variant in rec.get("holds", []):
-			if order.has(int(h)):
-				held.append(order[int(h)])
-		if not held.is_empty() and rec.has("bounds"):
-			out.append({"bounds": rec["bounds"], "health": maxf(float(rec.get("health", 1.0)), 1.0), "holds": held, "model": int(rec["model"])})
-	return out
-
-
 ## The free stand-in models the converter placed for the map's own, as nodes under [code]Props[/code]. [param
 ## scene_for] takes the stand-in id and returns a [PackedScene] (default: [constant DEFAULT_PROP_DIRS],
 ## [code].glb[/code]).
@@ -329,12 +294,10 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 	_unseen.clear()
 	var lib_ids := {}
 	for rec: Dictionary in manifest.get("props", []):
-		if not rec.has("box") and str(rec.get("stand_in", "")).begins_with("lib/") and not (skip_loose and rec.has("loose")):
+		if not rec.has("box") and str(rec.get("stand_in", "")).begins_with("lib/"):
 			lib_ids[str(rec["stand_in"])] = true
 	_preload_library_models(lib_ids.keys(), scene_for, cache)
 	for rec: Dictionary in manifest.get("props", []):
-		if skip_loose and rec.has("loose"):
-			continue
 		if rec.has("box"):
 			var block := _support_block(rec)
 			root.add_child(block)
