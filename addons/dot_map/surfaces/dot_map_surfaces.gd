@@ -9,6 +9,7 @@ const CHANNEL := "dot_map.surfaces"
 
 const DEFAULT_ROOT := "res://addons/dot_map/surfaces"
 const LIGHTMAPPED := preload("lightmapped.gdshader")
+const BLENDED := preload("blended.gdshader")
 const LIQUID := preload("liquid.gdshader")
 ## Liquid kind to its shader colours: tint, deep tint, sky tint, alpha looking down, glow.
 const LIQUIDS := {
@@ -290,6 +291,8 @@ func _material_callable(world: DotMapBspMesh, generated: Dictionary, library: Di
 			if not free2.is_empty() and m is ShaderMaterial:
 				m.set_shader_parameter("albedo2_tex", _set_texture(library[free2], "albedo"))
 				m.set_shader_parameter("has_blend", true)
+		elif library.has(free) and not free2.is_empty():
+			m = _blended_material(library[free], library[free2], free)
 		elif library.has(free):
 			m = _pbr_material(library[free], free)
 		elif generated.has(free):
@@ -512,6 +515,17 @@ func _pbr_material(dir: String, key: String) -> StandardMaterial3D:
 		sm.ao_texture = ao
 		sm.ao_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
 	return sm
+
+
+## A two-layer terrain without a bake: both sets' albedo, mixed by the vertex weight (the unlit twin of the lit blend).
+func _blended_material(dir: String, dir2: String, key: String) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.resource_name = key
+	m.shader = BLENDED
+	m.set_shader_parameter("albedo_tex", _set_texture(dir, "albedo"))
+	m.set_shader_parameter("albedo2_tex", _set_texture(dir2, "albedo"))
+	m.set_shader_parameter("sharpness", sharpness)
+	return m
 
 
 ## The folder of the PBR set [param t] names: `<library>/<id>/<tier>` for a shared store, the pack's own `pbr/<id>` for an older one.

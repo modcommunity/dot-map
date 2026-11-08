@@ -3,8 +3,8 @@ extends Node3D
 ## Every surface kind of [DotMapSurfaces] on code-built boxes, and the suite that proves the library hands
 ## back what a map generator expects.
 
-const CHECKS := 134
-const SECTIONS := 7
+const CHECKS := 137
+const SECTIONS := 8
 
 const COLUMNS := 5
 const CUBE := 3.0
@@ -30,6 +30,7 @@ func _run() -> void:
 	_test_aliases_and_fallback()
 	_test_paths()
 	_test_liquids()
+	_test_unlit_blend()
 	_test_light_rolloff()
 	_test_chroma_limit()
 	_build_gallery()
@@ -138,6 +139,16 @@ func _test_paths() -> void:
 	_check(res.ok, "asphalt loads through the rebased path")
 	_check(seen.size() == 3, "the function saw each of three textures")
 	_check(seen.size() > 0 and String(seen[0]).begins_with("res://nowhere/asphalt/"), "it saw the unrebased path")
+	_done()
+
+
+func _test_unlit_blend() -> void:
+	_section("a blended face without a bake draws both layers")
+	var root := DotMapSurfaces.DEFAULT_ROOT
+	var m := _surfaces._blended_material(root + "/asphalt", root + "/brick", "blend")
+	_check(m.shader == DotMapSurfaces.BLENDED, "it is the blended shader")
+	_check(m.get_shader_parameter("albedo_tex") != null, "the first layer's albedo is bound")
+	_check(m.get_shader_parameter("albedo2_tex") != null and m.get_shader_parameter("albedo2_tex") != m.get_shader_parameter("albedo_tex"), "the second layer's albedo is bound and differs")
 	_done()
 
 
