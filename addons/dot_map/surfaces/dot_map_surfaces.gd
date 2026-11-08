@@ -363,7 +363,9 @@ func _prefetch_async(world: DotMapBspMesh, generated: Dictionary, library: Dicti
 
 func _prefetch_done(plan: Dictionary, decode_ms: int) -> void:
 	for p: String in plan["imported"]:
-		_textures[p] = _masked(p, ResourceLoader.load_threaded_get(p) as Texture2D)
+		var tex := ResourceLoader.load_threaded_get(p) as Texture2D
+		if tex != null:    # a stray .import marker whose .ctex is not mounted loads null: leave it to the raw read in _file_texture
+			_textures[p] = _masked(p, tex)
 	DotLog.info(CHANNEL, "texture prefetch", {"disk": plan["disk"].size(), "baked": plan["baked"], "decode_ms": decode_ms, "imported": plan["imported"].size(), "formats": texture_report(_textures), "static_mb": OS.get_static_memory_usage() / 1048576})
 
 
@@ -562,9 +564,12 @@ func _file_texture(path: String) -> Texture2D:
 		return _textures[path]
 	# A mounted store slice holds the engine's import (VRAM-compressed, mipmapped), never the source file.
 	if path.begins_with("res://") and ResourceLoader.exists(path):
-		var imported := _masked(path, load(path) as Texture2D)
-		_textures[path] = imported
-		return imported
+		var loaded := load(path) as Texture2D
+		# A pack published with an .import marker but without its .ctex exists and loads as null: the raw file is still there.
+		if loaded != null:
+			var imported := _masked(path, loaded)
+			_textures[path] = imported
+			return imported
 	var baked := _baked_texture(path)
 	if baked != null:
 		baked = _masked(path, baked)
