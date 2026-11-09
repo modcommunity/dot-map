@@ -13,10 +13,20 @@ func _init() -> void:
 	var maps := 0
 	var bad := 0
 	for root in roots:
-		for id in DirAccess.get_directories_at(root):
-			var prefix := root.path_join(id).path_join(id)
-			if not FileAccess.file_exists(prefix + ".json"):
-				continue
+		# Layouts: <root>/<id>/<id>.json (arena), flat <root>/<id>.json (g2gfast, wipeout), <root>/<dir>/<id>.json (hide-n-seek);
+		# a world is a .json with its .bin beside it.
+		var found: Array[Array] = []
+		for f in DirAccess.get_files_at(root):
+			if f.ends_with(".json") and FileAccess.file_exists(root.path_join(f.get_basename() + ".bin")):
+				found.append([f.get_basename(), root.path_join(f.get_basename())])
+		for dir_id in DirAccess.get_directories_at(root):
+			var sub := root.path_join(dir_id)
+			for f in DirAccess.get_files_at(sub):
+				if f.ends_with(".json") and FileAccess.file_exists(sub.path_join(f.get_basename() + ".bin")):
+					found.append([f.get_basename(), sub.path_join(f.get_basename())])
+		for entry in found:
+			var id: String = entry[0]
+			var prefix: String = entry[1]
 			var res := DotMapBspMesh.load_prefix(prefix)
 			if not res.ok:
 				continue
