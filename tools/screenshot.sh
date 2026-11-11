@@ -9,7 +9,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 command -v Xvfb >/dev/null || { echo "Xvfb not installed" >&2; exit 3; }
 [ $# -ge 2 ] || { sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
-# Absolute but NOT symlink-resolved (realpath -s): a world reached through a symlink (game-arena /worlds) must load by that
+# Absolute but NOT symlink-resolved (realpath -s): a world reached through a symlink (game-fatal-contact /worlds) must load by that
 # path, or a bug that only shows through the link cannot be reproduced.
 WORLD="$(realpath -m -s "$1")"; OUT="$(realpath -m -s "$2")"; shift 2
 mkdir -p "$(dirname "$OUT")"

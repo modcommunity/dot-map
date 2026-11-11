@@ -133,8 +133,8 @@ One builder, one repository per package, in order. Each "done when" includes the
 | 13 | mg-prop-hunt-maps | Same; deletes its `bsp_read.py` and local tables | as above |
 | 14 | hide-n-seek-maps | Same | as above |
 | 15 | mg-deathrun-maps | Traps from buttons, relays and movers run by `DotMapIO` instead of `bsp_to_course.py`'s own logic; hull scale kept | every course regenerated; a trap fires in the game's suite |
-| 16 | game-playground-maps | Same | as above |
-| 17 | game-g2gfast | Last: its own mesh and lightmap importer moves onto the store and `regen`, keeping baked light | the shipped maps import byte-identical in geometry, `headless_imported` passes |
+| 16 | playlot-maps | Same | as above |
+| 17 | game-airdrift | Last: its own mesh and lightmap importer moves onto the store and `regen`, keeping baked light | the shipped maps import byte-identical in geometry, `headless_imported` passes |
 
 Packages 1 to 8 are sequential in dot-map; 9 and 10 need 8; 11 to 17 need 8 and can run two at a time.
 

@@ -37,7 +37,7 @@ var session: DotMapSession = null
 var changer: Object = null
 
 ## `(id: StringName) -> DotResult`, for a host whose change is its own method. Takes precedence over [member
-## changer]. game-playground's `change_map` resets the props, the NPCs and the course before it touches the
+## changer]. game-playlot's `change_map` resets the props, the NPCs and the course before it touches the
 ## session, so handing the session straight to a command would change the world out from under all three.
 var change_fn: Callable = Callable()
 
