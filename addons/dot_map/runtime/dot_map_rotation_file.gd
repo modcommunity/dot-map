@@ -8,7 +8,7 @@ extends RefCounted
 const CHANNEL := "map.rotation_file"
 const EXTENSIONS := ["yml", "yaml"]
 
-## The game this server runs, as a section key matches it (`game-g2gfast`).
+## The game this server runs, as a section key matches it (`game-airdrift`).
 var game: String = ""
 
 ## The merged spec ([DotRotationSpec]).
