@@ -3,7 +3,7 @@ extends "suite_base.gd"
 ## [DotMapIO] on synthetic maps (delays, fire-once counts, cycles, logic classes, the extension points) and
 ## on the Office course's real timed hazards.
 
-const CHECKS := 212
+const CHECKS := 213
 const SECTIONS := 16
 const OFFICE := "res://examples/io/office_io.doc.json"
 
@@ -66,7 +66,7 @@ func _test_dm_inputs() -> void:
 		_rec(8, "phys_ballsocket", "bs", [], [["OnBreak", "log", "FireUser1"]]), _rec(9, "logic_relay", "log"),
 		_rec(10, "point_clientcommand", "cc"),
 		_rec(11, "logic_relay", "r", [], [["OnTrigger", "tgt", "SetParent", "door"], ["OnTrigger", "gt", "Display", "", 0.1],
-				["OnTrigger", "tes", "DoSpark"], ["OnTrigger", "cop", "SetHealth", "40"], ["OnTrigger", "pd", "SetAnimation", "open"],
+				["OnTrigger", "tes", "DoSpark"], ["OnTrigger", "cop", "SetHealth", "40"], ["OnTrigger", "pd", "SetAnimation", "open"], ["OnTrigger", "pd", "Skin", "2"],
 				["OnTrigger", "pp", "EnableMotion"], ["OnTrigger", "pp", "Ignite"], ["OnTrigger", "tm", "SetBloomScale", "2.5"],
 				["OnTrigger", "tm", "SetAutoExposureMax", "3"], ["OnTrigger", "tm", "SetAutoExposureMin", "0.5"],
 				["OnTrigger", "bs", "Break"], ["OnTrigger", "cc", "Command", "say hi"]]),
@@ -84,6 +84,7 @@ func _test_dm_inputs() -> void:
 	_check(kinds.has("game_text") and ev[kinds.find("game_text")][1]["message"] == "Hello" and ev[kinds.find("game_text")][1]["all_players"], "Display sends game_text with its keys")
 	_check(kinds.has("tesla_spark") and kinds.has("npc_health") and kinds.has("prop_animation"), "spark, npc health and animation are events")
 	_check(ev[kinds.find("npc_health")][1]["health"] == 40.0 and ev[kinds.find("prop_animation")][1]["animation"] == "open", "with their values")
+	_check(kinds.has("prop_skin") and ev[kinds.find("prop_skin")][1]["skin"] == 2, "Skin sends prop_skin with the number")
 	var tm := io.find("tm")[0] as DotMapTonemap
 	_check(tm.values == {"bloom_scale": 2.5, "auto_exposure_max": 3.0, "auto_exposure_min": 0.5}, "tonemap values kept")
 	_check(kinds.count("tonemap") == 3 and kinds.has("constraint_break"), "tonemap and constraint events")
