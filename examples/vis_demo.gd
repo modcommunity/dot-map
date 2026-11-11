@@ -5,15 +5,17 @@ extends Node3D
 const SYNTH_CHECKS := 16
 const SUN_CHECKS := 3
 const LIGHT_CHECKS := 5
+const OFF_TREE_CHECKS := 4
 const MAP_CHECKS := 4
+const ErrorCatcher := preload("res://examples/error_catcher.gd")
 
 var _passed := 0
 var _failed := 0
 var _failures := PackedStringArray()
 var _entered := 0
 var _completed := 0
-var _expected_sections := 3
-var _expected_checks := SYNTH_CHECKS + SUN_CHECKS + LIGHT_CHECKS
+var _expected_sections := 4
+var _expected_checks := SYNTH_CHECKS + SUN_CHECKS + LIGHT_CHECKS + OFF_TREE_CHECKS
 
 
 func _ready() -> void:
@@ -33,6 +35,7 @@ func _run() -> void:
 	_test_synthetic()
 	_test_sun_reach()
 	_test_light_cache()
+	_test_off_tree()
 	var maps := _arg("maps", "")
 	for prefix in (maps.split(",", false) if not maps.is_empty() else PackedStringArray()):
 		_expected_sections += 1
@@ -128,6 +131,27 @@ func _test_light_cache() -> void:
 	_check(vis._all_lights().is_empty(), "leaving the tree drops the watch and the list")
 	vis.free()
 	holder.queue_free()
+	_completed += 1
+
+
+## A world built before its root joins the tree (a game's async map load) sets up off the tree, then watches on entering.
+func _test_off_tree() -> void:
+	_entered += 1
+	print("  set up off the tree, then added")
+	var drawn := Node3D.new()
+	var vis := DotMapVisibility.new()
+	vis.run_headless = true
+	drawn.add_child(vis)
+	var catcher := ErrorCatcher.new()
+	OS.add_logger(catcher)
+	var ok := vis.setup(_synthetic_mesh(true), drawn).ok
+	OS.remove_logger(catcher)
+	_check(ok, "setup off the tree succeeds")
+	_check(catcher.errors.is_empty(), "and raises no engine error: %s" % [catcher.errors])
+	_check(vis._lights_tree == null, "nothing is watched while off the tree")
+	add_child(drawn)
+	_check(vis._lights_tree == get_tree(), "entering the tree starts the light watch")
+	drawn.queue_free()
 	_completed += 1
 
 
@@ -331,3 +355,4 @@ static func _crosses_solid(vis: DotMapVisibility, a: Vector3, b: Vector3) -> boo
 		if leaf >= 0 and leaf < vis._leaf_cluster.size() and vis._leaf_cluster[leaf] < 0:
 			return true
 	return false
+
