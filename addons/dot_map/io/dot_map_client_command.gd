@@ -5,7 +5,9 @@ extends DotMapEntity
 
 
 func _input(io: DotMapIO, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
-	if name != "command":
-		return false
-	io.record_client_command(self, param)
+	match name:
+		"command":
+			io.record_client_command(self, param)
+		_:
+			return false
 	return true

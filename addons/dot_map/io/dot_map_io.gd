@@ -110,7 +110,13 @@ func _init() -> void:
 		"func_physbox": DotMapPhysbox, "func_physbox_multiplayer": DotMapPhysbox,
 		"env_soundscape": DotMapSoundscape, "env_soundscape_proxy": DotMapSoundscape,
 		"env_soundscape_triggerable": DotMapSoundscape, "trigger_soundscape": DotMapTriggerSoundscape, "trigger_hurt": DotMapHurt, "trigger_push": DotMapPush, "ambient_generic": DotMapSound,
+		"game_text": DotMapGameText, "point_tesla": DotMapTesla, "prop_dynamic": DotMapPropDynamic,
+		"prop_dynamic_override": DotMapPropDynamic, "env_tonemap_controller": DotMapTonemap,
 	}
+	for cls in ["npc_metropolice", "npc_combine_s", "npc_citizen"]:
+		_classes[cls] = DotMapNpcStub
+	for cls in ["phys_ballsocket", "phys_hinge", "phys_constraint", "phys_lengthconstraint", "phys_slideconstraint"]:
+		_classes[cls] = DotMapConstraint
 	for cls in ["filter_activator_name", "filter_activator_class", "filter_activator_team", "filter_damage_type", "filter_multi"]:
 		_classes[cls] = DotMapFilter
 	for cls in ["func_door", "func_door_rotating", "func_movelinear", "func_rotating", "func_tracktrain",
