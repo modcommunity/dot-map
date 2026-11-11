@@ -3,8 +3,8 @@ extends "suite_base.gd"
 ## [DotMapIO] on synthetic maps (delays, fire-once counts, cycles, logic classes, the extension points) and
 ## on the Office course's real timed hazards.
 
-const CHECKS := 197
-const SECTIONS := 15
+const CHECKS := 212
+const SECTIONS := 16
 const OFFICE := "res://examples/io/office_io.doc.json"
 
 
@@ -28,6 +28,7 @@ func _run() -> void:
 	_test_score_ui_and_pairs()
 	_test_filters_and_equip()
 	_test_beats_and_winlose()
+	_test_dm_inputs()
 	var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(OFFICE))
 	if doc is Dictionary:
 		_test_office_start(doc)
@@ -52,6 +53,59 @@ func _when(io: DotMapIO, tname: String, key: String, value: Variant) -> Array:
 		if h["name"] == tname and h["key"] == key and h["value"] == value:
 			out.append(h["tick"])
 	return out
+
+
+func _test_dm_inputs() -> void:
+	_section("DM-map inputs: SetParent, game_text, tesla, npc health, animation, motion, tonemap, constraints")
+	var io := _io([
+		_rec(0, "func_door", "door"), _rec(1, "info_target", "tgt"),
+		_rec(2, "game_text", "gt", [["message", "Hello"], ["channel", "2"], ["spawnflags", "1"]]),
+		_rec(3, "point_tesla", "tes", [["m_flradius", "100"], ["origin", "0 0 0"]]),
+		_rec(4, "npc_metropolice", "cop"), _rec(5, "prop_dynamic", "pd"),
+		_rec(6, "prop_physics", "pp", [["health", "10"]]), _rec(7, "env_tonemap_controller", "tm"),
+		_rec(8, "phys_ballsocket", "bs", [], [["OnBreak", "log", "FireUser1"]]), _rec(9, "logic_relay", "log"),
+		_rec(10, "point_clientcommand", "cc"),
+		_rec(11, "logic_relay", "r", [], [["OnTrigger", "tgt", "SetParent", "door"], ["OnTrigger", "gt", "Display", "", 0.1],
+				["OnTrigger", "tes", "DoSpark"], ["OnTrigger", "cop", "SetHealth", "40"], ["OnTrigger", "pd", "SetAnimation", "open"],
+				["OnTrigger", "pp", "EnableMotion"], ["OnTrigger", "pp", "Ignite"], ["OnTrigger", "tm", "SetBloomScale", "2.5"],
+				["OnTrigger", "tm", "SetAutoExposureMax", "3"], ["OnTrigger", "tm", "SetAutoExposureMin", "0.5"],
+				["OnTrigger", "bs", "Break"], ["OnTrigger", "cc", "Command", "say hi"]]),
+	])
+	var ev: Array = []
+	io.event_fn = func(kind: String, data: Dictionary) -> void:
+		ev.append([kind, data])
+	io.send("r", "Trigger")
+	io.advance(10)
+	var kinds: Array = []
+	for e: Array in ev:
+		kinds.append(e[0])
+	_check(io.unhandled.is_empty(), "every input of the list is answered: %s" % io.unhandled)
+	_check((io.find("tgt")[0] as DotMapEntity).parentname == "door", "SetParent sets the parent name")
+	_check(kinds.has("game_text") and ev[kinds.find("game_text")][1]["message"] == "Hello" and ev[kinds.find("game_text")][1]["all_players"], "Display sends game_text with its keys")
+	_check(kinds.has("tesla_spark") and kinds.has("npc_health") and kinds.has("prop_animation"), "spark, npc health and animation are events")
+	_check(ev[kinds.find("npc_health")][1]["health"] == 40.0 and ev[kinds.find("prop_animation")][1]["animation"] == "open", "with their values")
+	var tm := io.find("tm")[0] as DotMapTonemap
+	_check(tm.values == {"bloom_scale": 2.5, "auto_exposure_max": 3.0, "auto_exposure_min": 0.5}, "tonemap values kept")
+	_check(kinds.count("tonemap") == 3 and kinds.has("constraint_break"), "tonemap and constraint events")
+	_check((io.find("bs")[0] as DotMapConstraint).broken, "the constraint is broken")
+	_check(io.commands.size() == 1 and io.commands[0]["kind"] == "clientcommand", "point_clientcommand still records")
+	io.send("bs", "Break")
+	io.advance(5)
+	_check(kinds.count("constraint_break") == 1 and ev.size() == kinds.size(), "a second Break does nothing")
+	io.send("tgt", "ClearParent")
+	_check((io.find("tgt")[0] as DotMapEntity).parentname == "", "ClearParent clears it")
+	io.send("tgt", "SetParent", "door")
+	io.send("door", "KillHierarchy")
+	io.advance(2)
+	_check(not io.entity_of(1).alive, "KillHierarchy follows a SetParent")
+	var tes := io.find("tes")[0] as DotMapEntity
+	tes.set_enabled(io, false)
+	var before := ev.size()
+	io.send("tes", "DoSpark")
+	io.advance(2)
+	_check(ev.size() == before, "a disabled tesla does not spark")
+	_check(io.find("pp").size() == 1, "prop_physics without a body: EnableMotion and Ignite are harmless")
+	_done()
 
 
 func _test_delay_and_times() -> void:

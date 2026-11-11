@@ -88,12 +88,50 @@ func accept(io: DotMapIO, input: String, param: String, activator: Variant, call
 			set_enabled(io, false)
 		"toggle":
 			set_enabled(io, not enabled)
+		"setparent":
+			set_parent(io, param)
+		"clearparent":
+			set_parent(io, "")
 		"color":
 			color = param.strip_edges()
 			io.report_state(self, "color", color)
 		_:
 			return false
 	return true
+
+
+## [code]SetParent[/code] / [code]ClearParent[/code]: the parent's name is what [code]KillHierarchy[/code] and
+## [method DotMapIO.kill_hierarchy] follow, and a drawn node moves under the parent's drawn node when both
+## are bound (a mover then carries it). The attachment point after the name is ignored. No per-frame cost.
+func set_parent(io: DotMapIO, param: String) -> void:
+	var target := param.strip_edges().split(" ", false, 1)[0] if not param.strip_edges().is_empty() else ""
+	if target.begins_with("!"):
+		target = ""
+	if target.to_lower() == parentname.to_lower():
+		return
+	parentname = target
+	_reparent_node(io)
+	io.report_state(self, "parent", parentname)
+
+
+func _reparent_node(io: DotMapIO) -> void:
+	if node == null or not node.is_inside_tree() or node is RigidBody3D:
+		return
+	var np: Node = null
+	if not parentname.is_empty():
+		for p: DotMapEntity in io.resolve(parentname, self, null):
+			if p != self and p.node != null and p.node.is_inside_tree() and not node.is_ancestor_of(p.node):
+				np = p.node
+				break
+	if np == null:
+		var home: Variant = node.get_meta(&"dm_home_parent", null)
+		if home is Node and is_instance_valid(home) and (home as Node).is_inside_tree() and node.get_parent() != home:
+			node.reparent(home, true)
+		return
+	if not node.has_meta(&"dm_home_parent") and node.get_parent() != null:
+		node.set_meta(&"dm_home_parent", node.get_parent())
+	if node.get_parent() != np:
+		node.reparent(np, true)
 
 
 ## Fires an output: queues every link of that name on the runtime.
@@ -159,6 +197,9 @@ func apply_state(io: DotMapIO, key: String, value: Variant, tick: int) -> bool:
 			alive = bool(value)
 		"color":
 			color = str(value)
+		"parent":
+			parentname = str(value)
+			_reparent_node(io)
 		_:
 			if not _apply(io, key, value, tick):
 				return false
@@ -259,7 +300,10 @@ func _key_changed(_io: DotMapIO, _name: String, _value: String) -> void:
 
 ## Per-entity state a client would need; logic classes add their own values.
 func state() -> Dictionary:
-	return {"enabled": enabled, "alive": alive, "color": color}
+	var st := {"enabled": enabled, "alive": alive, "color": color}
+	if parentname != str(record.get("parentname", "")):
+		st["parent"] = parentname
+	return st
 
 
 func describe() -> Dictionary:

@@ -45,6 +45,14 @@ Work package 7. `DotMapVolumes.build(entities, io)` joins each manifest volume t
 
 | Class | Does |
 | --- | --- |
+| `game_text` (`DotMapGameText`) | `Display` sends a `game_text` event (message, channel, x/y, colours, timing, effect, `all_players`); `SetText`. Nothing is drawn |
+| `point_tesla` (`DotMapTesla`) | `DoSpark` sends a `tesla_spark` event (origin, radius, beams, lifetime, colour); nothing when disabled |
+| `npc_metropolice`, `npc_combine_s`, `npc_citizen` (`DotMapNpcStub`) | `SetHealth` stores the value, reports `health` and sends `npc_health`; no AI here |
+| `prop_dynamic`, `prop_dynamic_override` (`DotMapPropDynamic`) | `SetAnimation` / `SetDefaultAnimation` send `prop_animation`; the stand-in models have no animation, so the view only changes if the game answers |
+| `prop_physics*` (`DotMapBreakable`) | `EnableMotion` / `DisableMotion` free or hold a bound `RigidBody3D`; `Ignite` is a documented no-op (no fire model), answered but still listed in the converter's `inputs_unimplemented` |
+| `env_tonemap_controller` (`DotMapTonemap`) | `SetAutoExposureMin`, `SetAutoExposureMax`, `SetBloomScale` keep the value and send a `tonemap` event |
+| `phys_ballsocket`, `phys_hinge`, `phys_constraint`, `phys_lengthconstraint`, `phys_slideconstraint` (`DotMapConstraint`) | `Break` once: `OnBreak`, a `constraint_break` event, a bound `Joint3D` lets go |
+| every class | `SetParent` / `ClearParent` set the parent name (what `KillHierarchy` follows, replicated as the `parent` state) and, when both drawn nodes are bound and the child is not a `RigidBody3D`, reparent the child's node under the parent's keeping its transform; no per-frame work |
 | `trigger_hurt` (`DotMapHurt`) | `damage` a second times `hurtrate` (0.5) per hit, the first on entry, through `damage_fn(body, amount, kind, attacker)`; `damagetype` bit to kind; `damagemodel` 1 doubles to `damagecap`; OnHurt, OnHurtPlayer, SetDamage |
 | `trigger_multiple` / `trigger_once` (`DotMapTrigger`) | OnStartTouch on entry, OnTrigger then the `wait` (again after it while the body stays), OnEndTouch, OnStartTouchAll / OnEndTouchAll, spawnflags by body kind, `filter_activator_name`, `filter_activator_class` and `filter_activator_team` (the body's `team`; a body without one is admitted and counted) (other filter classes admit everyone and are counted in `unhandled`) |
 | `trigger_push` (`DotMapPush`) | the push velocity (a `Vector3`, m/s) to `move_fn` each step; SetPushSpeed (source units), SetPushDirection |

@@ -79,6 +79,10 @@ func hurt(io: DotMapIO, amount: float, at: Vector3 = Vector3.ZERO, by: Variant =
 
 
 func _input(io: DotMapIO, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+	# Ignite has no fire model: a documented no-op, answered here (outside the match) so it is not counted as missing at
+	# run time but stays in the converter's inputs_unimplemented list.
+	if name == "ignite" or name == "ignitelifetime" or name == "ignitenumhitpoints":
+		return true
 	match name:
 		"break", "shatter":
 			_break(io, activator, Vector3.ZERO)
@@ -95,6 +99,10 @@ func _input(io: DotMapIO, name: String, param: String, activator: Variant, _call
 			io.report_state(self, "health", health)
 		"removehealth":
 			hurt(io, param.to_float(), Vector3.ZERO, activator)
+		"enablemotion", "disablemotion":
+			# A drawn rigid body is freed or held; with no body bound this is a no-op (nothing to move).
+			if node is RigidBody3D:
+				(node as RigidBody3D).freeze = name == "disablemotion"
 		"enable":
 			_damage_blocked = false
 			return true
