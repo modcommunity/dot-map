@@ -2,13 +2,13 @@ extends "bsp_mesh_parts/tests_image.gd"
 
 ## [DotMapBspMesh]: the converter's fixture read, built, and ray-cast.
 
-const CHECKS := 164
+const CHECKS := 166
 const SECTIONS := 14
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
 const TERRAIN := "res://examples/bsp_mesh/terrain_fixture.json"
 const U := 0.01905
-
+const ErrorCatcher := preload("res://examples/error_catcher.gd")
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
@@ -333,6 +333,21 @@ func _test_async_build(world: DotMapBspMesh) -> void:
 	_check(not slice.due() or slice.budget_ms == 0, "the slice reports itself due only past its budget")
 	sync_root.free()
 	async_root.free()
+	var gone := Node3D.new()
+	var out: Array = [false, null]
+	var attach := func() -> void:
+		out[1] = await DotMapDrawnWorld.attach_async(gone, world, {"probes": 0}, slice)
+		out[0] = true
+	var catcher := ErrorCatcher.new()
+	OS.add_logger(catcher)
+	attach.call()
+	await get_tree().process_frame
+	gone.free()
+	while not out[0]:
+		await get_tree().process_frame
+	OS.remove_logger(catcher)
+	_check(out[1] == null, "a parent freed during the sliced build gets nothing attached")
+	_check(catcher.errors.is_empty(), "and raises no engine error: %s" % [catcher.errors])
 	_done()
 
 
@@ -703,3 +718,4 @@ func _test_drawn(world: DotMapBspMesh, lit_world: DotMapBspMesh) -> void:
 	_check(drawn.root == null and not is_instance_valid(drawn.lit), "detach lets go of the node")
 	host.queue_free()
 	_done()
+

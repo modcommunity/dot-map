@@ -38,10 +38,16 @@ static func attach(parent: Node3D, world: DotMapBspMesh, options: Dictionary = {
 
 
 ## [method attach] that pauses on [param slice] while the meshes are built (the bulk of the cost), so a loading cover keeps animating.
+## Null when [param parent] was freed during the build (the map was swapped away); the built meshes are freed with it.
 static func attach_async(parent: Node3D, world: DotMapBspMesh, options: Dictionary, slice: DotFrameSlice) -> DotMapDrawnWorld:
 	var surfaces := _surfaces_for(world, options)
 	var node: Node3D = await world.build_node_async(
 			surfaces.world_material_for(world, world.source_path.get_base_dir()), true, false, slice)
+	if not is_instance_valid(parent):
+		DotLog.debug(CHANNEL, "the world's parent went away during the build; dropped", {"name": str(world.manifest.get("name", ""))})
+		if node != null:
+			node.free()
+		return null
 	return _finish(parent, world, options, surfaces, node)
 
 

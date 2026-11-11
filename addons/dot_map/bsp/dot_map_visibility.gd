@@ -510,9 +510,14 @@ func _all_lights() -> Array[Light3D]:
 
 func _enter_tree() -> void:
 	_watch_lights()
+	if _occluder != null:
+		_apply_mode()
 
 
+## Off the tree (a world built before its root is added) there is nothing to watch yet; [method _enter_tree] calls it again.
 func _watch_lights() -> void:
+	if not is_inside_tree():
+		return
 	var tree := get_tree()
 	if tree == null or tree == _lights_tree:
 		return
