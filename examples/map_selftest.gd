@@ -3,12 +3,12 @@ extends "map_selftest_parts/tests_data_remote.gd"
 ## Proves the catalogue, the rotation, the vote and the map change do what a server depends on. The most
 ## important test here is [method _test_change_survives_a_failure].
 
-const CHECKS := 474
+const CHECKS := 494
 
 ## Sections entered against sections that ran to their last line, and against this. A runtime error inside a
 ## section aborts that function and nothing says so; a section that bailed out early after a failed guard is
 ## counted as not finished on purpose. The CHECKS total is the other half — see docs/testing.md.
-const SECTIONS := 47
+const SECTIONS := 48
 
 
 func _ready() -> void:
@@ -55,6 +55,7 @@ func _run() -> void:
 	_test_zero_config_rotation()
 	_test_rotation_exempt()
 	_test_rotation_play()
+	_test_rotation_profile()
 	_test_map_config()
 	_test_model_texture_max()
 	_test_supports()
@@ -557,6 +558,94 @@ func _test_rotation_play() -> void:
 	_check(f.settings_for(cat, &"other") == {"waves": "hard", "profile": "night"}, "settings_for on the file answers per id")
 	_file([{"defaults": {"maps": ["zz_plain"]}}]).apply(rot)
 	_check(cat.get_map(&"zz_camp_a").play.is_empty(), "applying another rotation clears the settings")
+	_done()
+
+
+func _test_rotation_profile() -> void:
+	_section("rotation entries carry a mode/cfg profile")
+	var base := OS.get_temp_dir().path_join("dot_map_profile_%d" % Time.get_ticks_usec())
+	var pdir := base.path_join("server/addon/dot_map/cfg")
+	_put(pdir.path_join("ctf.yml"), "cvars:\n  timelimit: 20\n  nested:\n    a: 1\n")
+	_put(pdir.path_join("koth.yaml"), "capture_time: 5\nmode: ignored_for_an_id\n")
+	_put(pdir.path_join("night/fast.yml"), "mode: koth\ngravity: 600\n")
+	_put(base.path_join("abs_prof.yml"), "mode: ffa\nfraglimit: 30\n")
+	var cat := _named_catalogue(["p_a", "p_b", "g_one", "g_two", "p_plain", "p_path", "p_abs", "p_missing", "p_both"])
+	var rot := DotMapRotation.of(cat)
+	var tree: Variant = DotYaml.parse("""defaults:
+  mode: tdm
+  rotations:
+    main:
+      mode: cycle
+      cfg: siege
+      maps:
+        - map: p_a
+          mode: ctf
+        - p_b:
+            cfg: koth
+        - g_*:
+            mode: ffa
+        - p_plain
+        - map: p_path
+          cfg: night/fast
+        - map: p_abs
+          cfg: %s
+        - map: p_missing
+          cfg: nope/missing.yml
+        - map: p_both
+          mode: ctf
+          cfg: koth
+    other:
+      maps: [p_plain]
+""" % base.path_join("abs_prof.yml")).value
+	var f := _file([tree], "g")
+	f.config_dir = base
+	_check(f.warnings.is_empty(), "a game mode and cfg: in a rotation body are not read as the picking mode (%s)" % [f.warnings])
+	f.apply(rot, "main")
+	_check(rot.mode == DotMapRotation.Mode.SEQUENTIAL and rot.order.size() == 9, "mode: cycle still picks the order, and every entry plays")
+	var a := cat.get_map(&"p_a").profile
+	_check(a.get("mode") == "ctf" and a.get("values") == {"timelimit": 20} and str(a.get("cfg_path")).ends_with("cfg/ctf.yml"),
+		"the map:/mode: entry form names a mode, and cfg/ctf.yml gives its cvars (nested values skipped) (%s)" % [a])
+	var b := cat.get_map(&"p_b").profile
+	_check(b.get("mode") == "koth" and b.get("values") == {"capture_time": 5}, "the single-key form with cfg:, and a .yaml file (%s)" % [b])
+	_check(cat.get_map(&"g_one").profile.get("mode") == "ffa" and cat.get_map(&"g_two").profile.get("mode") == "ffa"
+		and (cat.get_map(&"g_one").profile.get("values") as Dictionary).is_empty(), "a glob carries its profile to every match; a mode with no file has no cvars")
+	_check(cat.get_map(&"p_plain").profile.get("mode") == "siege", "a plain entry takes the rotation's profile")
+	var p := cat.get_map(&"p_path").profile
+	_check(p.get("mode") == "koth" and p.get("values") == {"gravity": 600}, "a relative path reads cfg/<path>.yml, and its mode: (%s)" % [p])
+	var ab := cat.get_map(&"p_abs").profile
+	_check(ab.get("mode") == "ffa" and ab.get("values") == {"fraglimit": 30}, "an absolute path is read as is (%s)" % [ab])
+	var miss := cat.get_map(&"p_missing").profile
+	_check(miss.get("mode") == "" and (miss.get("values") as Dictionary).is_empty() and cat.get_map(&"p_missing").in_rotation,
+		"a missing file leaves the map in rotation with the game's default")
+	_check(f._warned.has("missing|nope/missing.yml"), "and warns")
+	var warned := f._warned.size()
+	f.apply(rot, "main")
+	_check(f._warned.size() == warned, "once")
+	_check(cat.get_map(&"p_both").profile.get("mode") == "ctf", "mode: wins over a different cfg:")
+	_check(f.profile_for(cat, &"p_a", "main").get("mode") == "ctf" and f.profile_value(cat, &"p_b", "main") == "koth", "the getters answer per id")
+	f.apply(rot, "other")
+	_check(cat.get_map(&"p_plain").profile.get("mode") == "tdm", "a rotation without one takes the section's")
+	_check(cat.get_map(&"p_a").profile.is_empty(), "a map out of rotation has no profile")
+	var seen: Array = []
+	f.profile_changed.connect(func(m: DotMapDef, prof: Dictionary) -> void: seen.append([m.id, prof.get("mode")]))
+	f.note_changed(cat.get_map(&"p_plain"))
+	_check(seen == [[&"p_plain", "tdm"]], "profile_changed reports the map's profile (%s)" % [seen])
+	_check(DotMapRotationFile.is_mode_id("ctf") and not DotMapRotationFile.is_mode_id("ctf.yml")
+		and not DotMapRotationFile.is_mode_id("a/b") and not DotMapRotationFile.is_mode_id("/x/y"), "what counts as a mode id")
+	var plain := _file([{"defaults": {"maps": ["p_a"]}}])
+	plain.apply(rot)
+	_check(cat.get_map(&"p_a").profile.is_empty(), "no mode or cfg: no profile")
+	var live := {"timelimit": 10, "gravity": 800}
+	var mc := DotMapConfig.new()
+	mc.allow("timelimit", {"type": "int"})
+	mc.get_fn = func(k: String) -> Variant: return live.get(k)
+	mc.set_fn = func(k: String, v: Variant) -> bool:
+		live[k] = v
+		return true
+	var got := mc.apply_values("p_a", {"timelimit": 20, "gravity": 100})
+	_check(got.ok and live["timelimit"] == 20 and live["gravity"] == 800, "apply_values sets a profile's allowed cvars only (%s)" % [live])
+	mc.apply_values("p_plain", {})
+	_check(live["timelimit"] == 10 and mc.applied().is_empty(), "and the next map puts them back")
 	_done()
 
 

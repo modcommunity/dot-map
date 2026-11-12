@@ -108,8 +108,30 @@ func apply(map_name: String) -> DotResult:
 	current_map = map_name
 	if not resolved.ok:
 		return resolved
+	return DotResult.success(_set_all(map_name, resolved.value["settings"]))
+
+
+## Like [method apply] with [param values] (key -> value) in place of the map's files: a rotation profile's cvars
+## ([member DotMapDef.profile]). Checked against [member schema], put back on the next apply or [method restore].
+func apply_values(map_name: String, values: Dictionary) -> DotResult:
+	if not get_fn.is_valid() or not set_fn.is_valid():
+		return DotResult.fail(DotError.CODE_STATE, "DotMapConfig needs get_fn and set_fn before apply_values().")
+	restore()
+	current_map = map_name
+	var settings := {}
+	for k: Variant in values:
+		var key := _norm(k)
+		var checked := _check(key, values[k])
+		if checked.ok:
+			settings[key] = checked.value
+		else:
+			_warn_once("%s:%s:values" % [map_name, key], "a map setting was not applied", {
+				"map": map_name, "key": key, "why": checked.error.message, "from": "profile"})
+	return DotResult.success(_set_all(map_name, settings))
+
+
+func _set_all(map_name: String, settings: Dictionary) -> PackedStringArray:
 	var done := PackedStringArray()
-	var settings: Dictionary = resolved.value["settings"]
 	for key: String in settings:
 		var before: Variant = get_fn.call(key)
 		if set_fn.call(key, settings[key]) == false:
@@ -119,7 +141,7 @@ func apply(map_name: String) -> DotResult:
 		_applied[key] = {"before": before, "set": settings[key], "after": get_fn.call(key)}
 		done.append(key)
 	DotLog.info(CHANNEL, "map settings applied", {"map": map_name, "keys": ", ".join(done)})
-	return DotResult.success(done)
+	return done
 
 
 ## Restores what [method apply] changed, except a key something else has changed since (an operator's later edit stays). Returns how many were put back.
