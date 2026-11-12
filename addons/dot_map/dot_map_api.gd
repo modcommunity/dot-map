@@ -7,5 +7,6 @@ extends RefCounted
 # 1: everything before this file existed (absent means 1). 2: DotMapDef.from_content_key and
 # DotMapCatalogue.add_delivered. 3: a relative scene given to either is resolved onto the pack's mount. 4:
 # DotMapSurfaces, the surface-kind material library (and its textures in surfaces/).
-const LEVEL := 21
+# 22: DotMapDef.profile, DotMapRotationFile.profile_changed, DotMapConfig.apply_values (per-map mode/cfg profiles).
+const LEVEL := 22
 const OLDEST := 1
