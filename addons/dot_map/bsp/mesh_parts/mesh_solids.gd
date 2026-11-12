@@ -292,6 +292,15 @@ static func _body_for(box: Dictionary) -> StaticBody3D:
 	return body
 
 
+## A [method _body_for] of [param box] under [param root], handed to [param collide_fn]; none for an empty box.
+static func _add_box_body(root: Node3D, box: Dictionary, collide_fn: Callable) -> void:
+	if box.is_empty():
+		return
+	var body := _body_for(box)
+	root.add_child(body)
+	collide_fn.call(body)
+
+
 static var _support_material: StandardMaterial3D = null
 static var _tinted: Dictionary = {}
 

@@ -227,45 +227,39 @@ func material(kind: StringName, tint: Color = Color.WHITE) -> StandardMaterial3D
 func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 	var sets := _note_sets(world, dir)
 	_prefetch(world, sets["generated"], sets["library"])
-	return _material_callable(world, sets["generated"], sets["library"], sets["stand_in"], {})
+	return _material_callable(world, sets["generated"], sets["library"], sets["stand_in"])
 
 
 ## [method world_material_for] whose texture decode yields a frame whenever [param slice_ms] has passed ([method prefetch]), so the decode never holds one frame.
-## Each of the world's materials is then made here too, a frame yielded before one that might not fit in what is left of [param slice_ms] (the dearest yet is the guess): making one uploads its textures (6-12 ms for a large set), and the mesh build that follows finds them all made.
+## Each surface's material is then made here, a frame yielded before one that might not fit in what is left of [param slice_ms] (the dearest yet is the guess): making one uploads its textures (6-12 ms for a large set), and the mesh build that follows finds them all made.
 func world_material_for_async(world: DotMapBspMesh, dir: String, slice_ms: int = 8) -> Callable:
 	var sets := _note_sets(world, dir)
 	await _prefetch_async(world, sets["generated"], sets["library"], slice_ms)
-	var cache := {}
-	var material_for := _material_callable(world, sets["generated"], sets["library"], sets["stand_in"], cache)
-	await _make_materials_async(world, sets, cache, material_for, slice_ms)
+	var material_for := _material_callable(world, sets["generated"], sets["library"], sets["stand_in"])
+	await _make_materials_async(world, material_for, slice_ms)
 	return material_for
 
 
-func _make_materials_async(world: DotMapBspMesh, sets: Dictionary, cache: Dictionary, material_for: Callable, slice_ms: int) -> void:
+## Calls [param material_for] on each surface ahead of the mesh build. One already made is a cache hit: it costs microseconds and never raises the guess.
+func _make_materials_async(world: DotMapBspMesh, material_for: Callable, slice_ms: int) -> void:
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree == null:
 		return
 	var since := Time.get_ticks_usec() - slice_ms * 1000    # the decode before used this frame: the first one starts a new one
 	var guess := 0    # the dearest material yet, the guess for the next one
-	var made := 0
 	for rec: Dictionary in world.surfaces:
 		if rec.has("glass") or rec.get("water", false):
 			continue    # glass is the mesh's own; water is shared
-		var free := str(rec.get("free", ""))
-		var stand_in: Dictionary = sets["stand_in"]
-		var parts := _stand_in_parts(world, rec, stand_in[free]) if stand_in.has(free) else _material_parts(world, rec, sets["generated"], sets["library"])
-		if cache.has(parts["key"]):
-			continue
-		if Time.get_ticks_usec() - since + guess > slice_ms * 1000:
+		var spent := Time.get_ticks_usec() - since
+		# Over 1 ms spent: when the guess alone is over the budget, a run of cache hits must not pause before each.
+		if spent > 1000 and spent + guess >= slice_ms * 1000:
 			await tree.process_frame
 			since = Time.get_ticks_usec()
 		var t := Time.get_ticks_usec()
 		material_for.call(rec)
 		guess = maxi(guess, Time.get_ticks_usec() - t)
-		made += 1
-	if made > 0:
-		await tree.process_frame    # the mesh build that follows starts a frame of its own
-	DotLog.debug(CHANNEL, "world materials made ahead", {"materials": made, "dearest_ms": guess / 1000.0})
+	await tree.process_frame    # the mesh build that follows starts a frame of its own
+	DotLog.debug(CHANNEL, "world materials made ahead", {"surfaces": world.surfaces.size(), "dearest_ms": guess / 1000.0})
 
 
 func _note_sets(world: DotMapBspMesh, dir: String) -> Dictionary:
@@ -303,34 +297,24 @@ func _resolve_sets(world: DotMapBspMesh, dir: String) -> Dictionary:
 	return {"generated": generated, "library": library, "stand_in": stand_in, "missing": missing}
 
 
-## What [method _material_callable] makes a surface's material from: {lit, free, free2, tint, key}, the key naming the material in its cache.
-func _material_parts(world: DotMapBspMesh, rec: Dictionary, generated: Dictionary, library: Dictionary) -> Dictionary:
-	var lit := use_lightmap and world.has_lightmap() and rec.has("lightmap_page") and not rec.has("glass")
-	var free := str(rec.get("free", ""))
-	var tint := Color.WHITE
-	# A blend's average is two textures' (grass and rock), never the one drawn: left untinted.
-	var blend := str(rec.get("material", "")).get_file().to_lower().begins_with("blend")
-	if match_original and not generated.has(free) and not library.has(free) and not blend:
-		tint = original_tint(StringName(free.get_slice(":", 0)), rec.get("colour", []))
-	var free2 := str(rec.get("free2", ""))
-	if not library.has(free2):
-		free2 = ""
-	var key := "%s|%s|%s|%s|%s" % [free, free2, tint.to_html(), rec.get("lightmap_page", -1) if lit else -1, rec.get("emissive", false)]
-	return {"lit": lit, "free": free, "free2": free2, "tint": tint, "key": key}
-
-
-func _material_callable(world: DotMapBspMesh, generated: Dictionary, library: Dictionary, stand_in: Dictionary, cache: Dictionary) -> Callable:
+func _material_callable(world: DotMapBspMesh, generated: Dictionary, library: Dictionary, stand_in: Dictionary) -> Callable:
+	var cache := {}
 	return func(rec: Dictionary) -> Material:
 		if rec.get("water", false):
 			return water_material if water_material != null else liquid_material(liquid_kind(str(rec.get("material", ""))))
-		var parts := _material_parts(world, rec, generated, library)
-		var lit: bool = parts["lit"]
-		var free: String = parts["free"]
-		var free2: String = parts["free2"]
-		var tint: Color = parts["tint"]
+		var lit := use_lightmap and world.has_lightmap() and rec.has("lightmap_page") and not rec.has("glass")
+		var free := str(rec.get("free", ""))
+		var tint := Color.WHITE
+		# A blend's average is two textures' (grass and rock), never the one drawn: left untinted.
+		var blend := str(rec.get("material", "")).get_file().to_lower().begins_with("blend")
+		if match_original and not generated.has(free) and not library.has(free) and not blend:
+			tint = original_tint(StringName(free.get_slice(":", 0)), rec.get("colour", []))
 		if stand_in.has(free):
 			return _stand_in_material(world, rec, stand_in[free], cache)
-		var key: String = parts["key"]
+		var free2 := str(rec.get("free2", ""))
+		if not library.has(free2):
+			free2 = ""
+		var key := "%s|%s|%s|%s|%s" % [free, free2, tint.to_html(), rec.get("lightmap_page", -1) if lit else -1, rec.get("emissive", false)]
 		if cache.has(key):
 			return cache[key]
 		var m: Material
@@ -500,8 +484,7 @@ func _pack_fallback(dir: String, key: String, licence: Dictionary) -> Dictionary
 
 
 ## A face whose PBR set is missing: the pack's small albedo, else the stand-in kind tinted to the face's average colour, else that colour flat; lit by the map's lightmap when it has one.
-## What [method _stand_in_material] makes a stand-in from: {kind, tint, lit, key}, the key naming it in the cache.
-func _stand_in_parts(world: DotMapBspMesh, rec: Dictionary, fb: Dictionary) -> Dictionary:
+func _stand_in_material(world: DotMapBspMesh, rec: Dictionary, fb: Dictionary, cache: Dictionary) -> Material:
 	var colour: Variant = rec.get("colour", fb.get("colour", []))
 	if not colour is Array or (colour as Array).size() < 3:
 		colour = [0.5, 0.5, 0.5]
@@ -514,15 +497,6 @@ func _stand_in_parts(world: DotMapBspMesh, rec: Dictionary, fb: Dictionary) -> D
 			tint = Color(g, g, g)
 	var lit := use_lightmap and world.has_lightmap() and rec.has("lightmap_page") and not rec.has("glass")
 	var key := "stand_in|%s|%s|%s|%s" % [fb.get("file", kind), tint.to_html(), rec.get("lightmap_page", -1) if lit else -1, rec.get("emissive", false)]
-	return {"kind": kind, "tint": tint, "lit": lit, "key": key}
-
-
-func _stand_in_material(world: DotMapBspMesh, rec: Dictionary, fb: Dictionary, cache: Dictionary) -> Material:
-	var parts := _stand_in_parts(world, rec, fb)
-	var kind: StringName = parts["kind"]
-	var tint: Color = parts["tint"]
-	var lit: bool = parts["lit"]
-	var key: String = parts["key"]
 	if cache.has(key):
 		return cache[key]
 	var m: Material
