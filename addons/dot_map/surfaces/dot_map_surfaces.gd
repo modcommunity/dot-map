@@ -225,18 +225,26 @@ func material(kind: StringName, tint: Color = Color.WHITE) -> StandardMaterial3D
 ## textures: a surface's `free` key names a surface kind, or a generated flat colour the pack carries as a file
 ## beside [param dir] (the pack's directory).
 func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
+	var sets := _note_sets(world, dir)
+	_prefetch(world, sets["generated"], sets["library"])
+	return _material_callable(world, sets["generated"], sets["library"], sets["stand_in"])
+
+
+## [method world_material_for] whose texture decode yields a frame whenever [param slice_ms] has passed ([method prefetch]), so the decode never holds one frame.
+func world_material_for_async(world: DotMapBspMesh, dir: String, slice_ms: int = 8) -> Callable:
+	var sets := _note_sets(world, dir)
+	await _prefetch_async(world, sets["generated"], sets["library"], slice_ms)
+	return _material_callable(world, sets["generated"], sets["library"], sets["stand_in"])
+
+
+func _note_sets(world: DotMapBspMesh, dir: String) -> Dictionary:
 	var sets := _resolve_sets(world, dir)
-	var generated: Dictionary = sets["generated"]
-	var library: Dictionary = sets["library"]
-	var stand_in: Dictionary = sets["stand_in"]
-	var missing: Array = sets["missing"]
-	for key: String in missing:
+	for key: String in sets["missing"]:
 		if not missing_sets.has(key):
 			missing_sets.append(key)
-	if not stand_in.is_empty():
-		DotLog.debug(CHANNEL, "PBR sets not installed; each is drawn as a stand-in kind in its faces' own colour", {"sets": stand_in.size()})
-	_prefetch(world, generated, library)
-	return _material_callable(world, generated, library, stand_in)
+	if not (sets["stand_in"] as Dictionary).is_empty():
+		DotLog.debug(CHANNEL, "PBR sets not installed; each is drawn as a stand-in kind in its faces' own colour", {"sets": (sets["stand_in"] as Dictionary).size()})
+	return sets
 
 
 ## Reads the map's textures ahead of [method world_material_for] without holding the main thread: decoded in batches on workers, a frame yielded whenever [param slice_ms] has passed, so dot-cloud's fetch callbacks and the loading cover keep running. The later [method world_material_for] finds them cached. Inline (no yield) when there are no workers.
@@ -358,6 +366,11 @@ func _prefetch_async(world: DotMapBspMesh, generated: Dictionary, library: Dicti
 	var plan := _prefetch_plan(world, generated, library)
 	var started := Time.get_ticks_msec()
 	_textures.merge(await DotMapParallelBuild.textures_async(plan["disk"], load_threads, max_texture_size, half_res_masks, slice_ms, half_res_normals))
+	# load_threaded_get blocks until its load is done: wait for the imported ones a frame at a time instead.
+	var tree := Engine.get_main_loop() as SceneTree
+	for p: String in plan["imported"]:
+		while tree != null and ResourceLoader.load_threaded_get_status(p) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			await tree.process_frame
 	_prefetch_done(plan, Time.get_ticks_msec() - started)
 
 

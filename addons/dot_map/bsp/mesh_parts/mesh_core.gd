@@ -66,11 +66,38 @@ static func load_prefix(prefix: String) -> DotResult:
 	var json_path := prefix + ".json"
 	if not FileAccess.file_exists(json_path):
 		return DotResult.fail(DotError.CODE_IO, "no mesh manifest", json_path)
-	var stamp := str(FileAccess.get_modified_time(json_path)) + ":" + str(FileAccess.get_modified_time(prefix + ".bin"))
+	var stamp := _stamp(prefix, json_path)
 	var hit: Dictionary = _cache.get(prefix, {})
 	if cache_meshes and hit.get("stamp") == stamp:
 		return DotResult.success(hit["mesh"])
-	var res := _read_prefix(prefix, json_path)
+	return _remember(prefix, stamp, _read_prefix(prefix, json_path, _read_raw(prefix, json_path)))
+
+
+## [method load_prefix] with the file reads, the JSON parse, the hash and the decompress on a worker thread, this one
+## awaiting frames until they are done: on a large pack they are 125 ms (docs/load-threads.md), one frozen frame of a
+## client's map load. Inline where [method DotParallel.available] is false (the web). A coroutine: `await` it.
+static func load_prefix_async(prefix: String) -> DotResult:
+	var json_path := prefix + ".json"
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null or not DotParallel.available() or not FileAccess.file_exists(json_path):
+		return load_prefix(prefix)
+	var stamp := _stamp(prefix, json_path)
+	var hit: Dictionary = _cache.get(prefix, {})
+	if cache_meshes and hit.get("stamp") == stamp:
+		return DotResult.success(hit["mesh"])
+	var raw := {}
+	var task := WorkerThreadPool.add_task(func() -> void: raw.merge(_read_raw(prefix, json_path)), false, "dot-map read")
+	while not WorkerThreadPool.is_task_completed(task):
+		await tree.process_frame
+	WorkerThreadPool.wait_for_task_completion(task)
+	return _remember(prefix, stamp, _read_prefix(prefix, json_path, raw))
+
+
+static func _stamp(prefix: String, json_path: String) -> String:
+	return str(FileAccess.get_modified_time(json_path)) + ":" + str(FileAccess.get_modified_time(prefix + ".bin"))
+
+
+static func _remember(prefix: String, stamp: String, res: DotResult) -> DotResult:
 	if res.ok and cache_meshes:
 		if _cache.size() >= cache_limit and not _cache.has(prefix):
 			_cache.erase(_cache.keys()[0])
@@ -78,41 +105,68 @@ static func load_prefix(prefix: String) -> DotResult:
 	return res
 
 
-static func _read_prefix(prefix: String, json_path: String) -> DotResult:
-	var text := FileAccess.get_file_as_string(json_path)
-	var parsed: Variant = JSON.parse_string(text)
+## The pure part of a read: the parsed manifest ([code]doc[/code]), the .bin's path, its stored bytes and what
+## [method _unpack] makes of them. No log, node or shared state, so it runs on a worker ([method load_prefix_async]).
+static func _read_raw(prefix: String, json_path: String) -> Dictionary:
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(json_path))
+	var out := {"doc": parsed}
 	if not parsed is Dictionary:
+		return out
+	var doc: Dictionary = parsed
+	var bin_path := prefix.get_base_dir().path_join(str(doc.get("bin", {}).get("file", prefix.get_file() + ".bin")))
+	out["bin_path"] = bin_path
+	if FileAccess.file_exists(bin_path):
+		var stored := FileAccess.get_file_as_bytes(bin_path)
+		out["stored"] = stored
+		out.merge(_unpack(doc, stored))
+	return out
+
+
+static func _read_prefix(prefix: String, json_path: String, raw: Dictionary) -> DotResult:
+	if not raw.get("doc") is Dictionary:
 		return DotResult.fail(DotError.CODE_PARSE, "mesh manifest is not a JSON object", json_path)
-	var bin_name: String = str((parsed as Dictionary).get("bin", {}).get("file", prefix.get_file() + ".bin"))
-	var bin_path := prefix.get_base_dir().path_join(bin_name)
-	if not FileAccess.file_exists(bin_path):
-		return DotResult.fail(DotError.CODE_IO, "no mesh data", bin_path)
-	var res := from_data(parsed, FileAccess.get_file_as_bytes(bin_path))
+	if not raw.has("stored"):
+		return DotResult.fail(DotError.CODE_IO, "no mesh data", str(raw.get("bin_path", "")))
+	var res := from_data(raw["doc"], raw["stored"], raw)
 	if res.ok:
 		(res.value as DotMapBspMesh).source_path = prefix
 	return res if res.ok else res.wrap("loading " + prefix)
 
 
-## Builds from a parsed manifest and the stored .bin bytes (as delivered: gzip'd or not).
-static func from_data(doc: Dictionary, stored: PackedByteArray) -> DotResult:
+## The stored bytes' SHA-256 ([code]sha[/code]) when the manifest names one, and the data ([code]blob[/code]), gunzipped
+## when the manifest says so and the hash matches. Pure.
+static func _unpack(doc: Dictionary, stored: PackedByteArray) -> Dictionary:
+	var info: Dictionary = doc.get("bin", {})
+	var want := str(info.get("sha256", ""))
+	var out := {"blob": stored}
+	if not want.is_empty():
+		var ctx := HashingContext.new()
+		ctx.start(HashingContext.HASH_SHA256)
+		ctx.update(stored)
+		out["sha"] = ctx.finish().hex_encode()
+		if out["sha"] != want:
+			return out
+	if str(info.get("compression", "")) == "gzip":
+		out["blob"] = stored.decompress_dynamic(-1, FileAccess.COMPRESSION_GZIP)
+	return out
+
+
+## Builds from a parsed manifest and the stored .bin bytes (as delivered: gzip'd or not). [param unpacked] is
+## [method _unpack]'s result when a worker already made it.
+static func from_data(doc: Dictionary, stored: PackedByteArray, unpacked: Dictionary = {}) -> DotResult:
 	if str(doc.get("format", "")) != FORMAT:
 		return DotResult.fail(DotError.CODE_INVALID, "not a %s manifest" % FORMAT, str(doc.get("format", "")))
 	if int(doc.get("version", 0)) > VERSION:
 		return DotResult.fail(DotError.CODE_VERSION, "mesh manifest is newer than this reader",
 				"%s > %d" % [doc.get("version"), VERSION])
+	if not unpacked.has("blob"):
+		unpacked = _unpack(doc, stored)
 	var info: Dictionary = doc.get("bin", {})
 	var want := str(info.get("sha256", ""))
-	if not want.is_empty():
-		var ctx := HashingContext.new()
-		ctx.start(HashingContext.HASH_SHA256)
-		ctx.update(stored)
-		var got := ctx.finish().hex_encode()
-		if got != want:
-			return DotResult.fail(DotError.CODE_INTEGRITY, "mesh data does not match its manifest",
-					"%s != %s" % [got, want])
-	var blob := stored
-	if str(info.get("compression", "")) == "gzip":
-		blob = stored.decompress_dynamic(-1, FileAccess.COMPRESSION_GZIP)
+	if not want.is_empty() and str(unpacked.get("sha", "")) != want:
+		return DotResult.fail(DotError.CODE_INTEGRITY, "mesh data does not match its manifest",
+				"%s != %s" % [unpacked.get("sha", ""), want])
+	var blob: PackedByteArray = unpacked["blob"]
 	if blob.size() != int(info.get("bytes", blob.size())):
 		return DotResult.fail(DotError.CODE_PARSE, "mesh data is the wrong size",
 				"%d != %s" % [blob.size(), info.get("bytes")])
@@ -345,7 +399,7 @@ func build_meshes(model: int, material_for: Callable = Callable()) -> Array[Dict
 
 ## [method build_meshes] that awaits [method DotFrameSlice.pause] between batches, so a cover keeps drawing.
 func build_meshes_async(model: int, material_for: Callable, slice: DotFrameSlice) -> Array[Dictionary]:
-	var planned := _mesh_plan(model, material_for)
+	var planned: Dictionary = await _mesh_plan_async(model, material_for, slice)
 	var out: Array[Dictionary] = []
 	var state := {"mesh": null, "key": ""}
 	var step := DotMapParallelBuild.batch_size(load_threads)
@@ -358,6 +412,34 @@ func build_meshes_async(model: int, material_for: Callable, slice: DotFrameSlice
 
 ## Groups a model's surface records by chunk and material: {plan: [[group key, entry]], groups}.
 func _mesh_plan(model: int, material_for: Callable) -> Dictionary:
+	var groups := _chunk_groups(model)
+	var plan: Array = []    # [group key, entry]
+	for key: String in groups:
+		# Material instance id -> {material, recs}, in first-seen order so the build is stable.
+		var by_material := {}
+		for rec: Dictionary in groups[key]:
+			_plan_rec(by_material, rec, material_for)
+		for entry: Dictionary in by_material.values():
+			plan.append([key, entry])
+	return {"plan": plan, "groups": groups}
+
+
+## [method _mesh_plan] that awaits [method DotFrameSlice.pause] between records: a record's first material reads and uploads its textures.
+func _mesh_plan_async(model: int, material_for: Callable, slice: DotFrameSlice) -> Dictionary:
+	var groups := _chunk_groups(model)
+	var plan: Array = []
+	for key: String in groups:
+		var by_material := {}
+		for rec: Dictionary in groups[key]:
+			if slice.due():
+				await slice.pause()
+			_plan_rec(by_material, rec, material_for)
+		for entry: Dictionary in by_material.values():
+			plan.append([key, entry])
+	return {"plan": plan, "groups": groups}
+
+
+func _chunk_groups(model: int) -> Dictionary:
 	var groups := {}
 	for rec: Dictionary in surfaces:
 		if int(rec["model"]) != model:
@@ -366,26 +448,22 @@ func _mesh_plan(model: int, material_for: Callable) -> Dictionary:
 		if not groups.has(key):
 			groups[key] = []
 		(groups[key] as Array).append(rec)
-	var plan: Array = []    # [group key, entry]
-	for key: String in groups:
-		# Material instance id -> {material, recs}, in first-seen order so the build is stable.
-		var by_material := {}
-		for rec: Dictionary in groups[key]:
-			var mat: Material = null
-			if rec.has("glass"):
-				mat = _glass_for(rec)
-			elif material_for.is_valid():
-				var m: Variant = material_for.call(rec)
-				mat = m as Material if m is Material else null
-				if mat != null and rec.get("two_sided", false):
-					mat = _two_sided(mat)
-			var id := mat.get_instance_id() if mat != null else 0
-			if not by_material.has(id):
-				by_material[id] = {"material": mat, "recs": []}
-			(by_material[id]["recs"] as Array).append(rec)
-		for entry: Dictionary in by_material.values():
-			plan.append([key, entry])
-	return {"plan": plan, "groups": groups}
+	return groups
+
+
+func _plan_rec(by_material: Dictionary, rec: Dictionary, material_for: Callable) -> void:
+	var mat: Material = null
+	if rec.has("glass"):
+		mat = _glass_for(rec)
+	elif material_for.is_valid():
+		var m: Variant = material_for.call(rec)
+		mat = m as Material if m is Material else null
+		if mat != null and rec.get("two_sided", false):
+			mat = _two_sided(mat)
+	var id := mat.get_instance_id() if mat != null else 0
+	if not by_material.has(id):
+		by_material[id] = {"material": mat, "recs": []}
+	(by_material[id]["recs"] as Array).append(rec)
 
 
 ## Builds plan entries [param from] to [param from] + [param step] into [param out]; [param state] carries the open mesh between batches.
