@@ -325,8 +325,7 @@ func _prop_one(build: Dictionary, rec: Dictionary) -> void:
 		if solid:
 			_add_box_body(root, _solid_shape(rec, null), collide_fn)
 		return
-	var longest_of: Dictionary = build["longest_of"]
-	var n := _place_prop(rec, build["scene_for"], build["cache"], longest_of)
+	var n := _place_prop(rec, build["scene_for"], build["cache"], build["longest_of"])
 	if n == null and str(rec.get("stand_in", "")).begins_with("lib/"):
 		missing_models += 1
 		n = _proxy_for(rec)
@@ -341,7 +340,7 @@ func _prop_one(build: Dictionary, rec: Dictionary) -> void:
 	if n == null:
 		return
 	if prop_view_per_metre > 0.0:
-		var end := maxf(prop_view_min, float(longest_of[str(rec.get("stand_in", ""))]) * n.scale.x * prop_view_per_metre)
+		var end := maxf(prop_view_min, float(build["longest_of"][str(rec.get("stand_in", ""))]) * n.scale.x * prop_view_per_metre)
 		for g in n.find_children("*", "GeometryInstance3D", true, false):
 			(g as GeometryInstance3D).visibility_range_end = end
 			(g as GeometryInstance3D).visibility_range_end_margin = end * 0.1
@@ -349,14 +348,6 @@ func _prop_one(build: Dictionary, rec: Dictionary) -> void:
 	if solid:
 		for box in _solid_boxes(rec, n):
 			_add_box_body(root, box, collide_fn)
-
-
-func _add_box_body(root: Node3D, box: Dictionary, collide_fn: Callable) -> void:
-	if box.is_empty():
-		return
-	var body := _body_for(box)
-	root.add_child(body)
-	collide_fn.call(body)
 
 
 func _props_end(build: Dictionary) -> Node3D:
