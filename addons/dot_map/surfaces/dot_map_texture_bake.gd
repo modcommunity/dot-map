@@ -31,7 +31,7 @@ static func bake_file(src: String, out_base: String, max_size: int) -> DotResult
 	var written := PackedStringArray()
 	for variant: String in VARIANTS:
 		var img := first.duplicate() as Image
-		DotMapSurfaces.prepare_image(img, src, max_size, false, VARIANTS[variant])
+		DotMapImagePrep.prepare_image(img, src, max_size, false, VARIANTS[variant])
 		var out := "%s.%s.res" % [out_base, variant]
 		var tex := ImageTexture.create_from_image(img)
 		tex.set_meta(META, {"size": _length(src), "md5": FileAccess.get_md5(src), "w": first.get_width(), "h": first.get_height(), "max": max_size, "variant": variant})

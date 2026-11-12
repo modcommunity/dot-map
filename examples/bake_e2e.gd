@@ -136,7 +136,7 @@ func _test_real_textures() -> void:
 		var got := tex.get_image()
 		last_size = [got.get_width(), got.get_height(), got.get_format(), got.has_mipmaps()]
 		var want := Image.load_from_file(p)
-		DotMapSurfaces.prepare_image(want, p, CAP, false, DotMapTextureBake.VARIANTS[variant])
+		DotMapImagePrep.prepare_image(want, p, CAP, false, DotMapTextureBake.VARIANTS[variant])
 		exact = exact and got.get_format() == want.get_format() and got.get_mipmap_count() == want.get_mipmap_count() and got.get_data() == want.get_data()
 		got.decompress()
 		var err := _mean_error(got, _downscaled(p, CAP))
