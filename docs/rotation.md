@@ -75,3 +75,48 @@ exempt: [dm_old_map, "dm_test_*", alice/some_map]
 ## Per-map settings
 
 A rotation entry may be a mapping, `- "zz_camp_*": {waves: camp_nights}` or `- {map: other, waves: hard}` (dot-core's `DotRotationSpec`, which stays a plain id list for everything else). `DotMapRotationFile.apply` copies each in-rotation map's settings into `DotMapDef.play` (runtime, never saved, opaque to dot-map; empty for a bare string, and cleared when another rotation is applied). `DotMapRotationFile.settings_for(catalogue, id)` answers the same for one id. `DotMapDef.play_candidates(key, override, fallback)` returns the values to try in order: a server command's (`sv_waves`), the entry's, then the map document's or the game's default; the game tries each and warns on one it does not know. The `sv_waves` command itself belongs to the game, since dot-map does not know what a wave is.
+
+## Per-map profiles
+
+Any map can run in any mode the game supports, per rotation. A rotation entry, a rotation or a whole section may name a profile with `mode:` or `cfg:`; the two keys are aliases (when both are written and differ, `mode:` wins with one WARN). The rotation file is read by dot-core's `DotYaml`, which refuses flow mappings (`{...}`), so write entries in block form:
+
+```yaml
+defaults:
+  mode: tdm                  # section default: every rotation below, unless it names its own
+  rotations:
+    main:
+      mode: cycle            # cycle/random/sequential still picks the order; use cfg: for the profile
+      cfg: ctf               # rotation default for its entries
+      maps:
+        - cp_orange_x3       # plays ctf (the rotation's)
+        - map: dm_arena      # entry form
+          mode: ffa
+        - cp_well:           # single-key form
+            cfg: koth
+        - owner/coll/*:      # a glob or collection: applied to every match
+            mode: tdm
+        - map: ctf_night
+          cfg: night/fast    # a path: cfg/night/fast.yml
+```
+
+Precedence is entry, then rotation, then section; a stronger file layer replaces a weaker one's default.
+
+What the value means (`DotMapRotationFile.resolve_profile`):
+
+- A bare word (no `/`, not ending in `.yml`/`.yaml`) is a **mode id**. If `cfg/<id>.yml` (or `.yaml`) exists in the dot_map config tiers (`cfg/server/addon/dot_map/cfg/ctf.yml` for an operator, with the same `--config` and tier rules as `maps.yml`), its cvars apply too. No file is fine: the mode alone.
+- A relative path is a file under that same `cfg/` directory; the extension may be left off. Its own `mode:` key names the mode.
+- An absolute path (`/`, `res://`, `user://`) is read as is.
+- A path that is not found, or does not parse, logs ONE WARN and the entry still plays, with the game's default mode and cvars. A profile never removes a map from the rotation.
+
+A profile file is a map of cvars, either top-level `key: value` lines or under `cvars:` (nested values are skipped):
+
+```yaml
+mode: ctf          # only read when the file is named by path
+cvars:
+  timelimit: 20
+  capturelimit: 3
+```
+
+The resolved profile lands on `DotMapDef.profile` as `{value, mode, cfg_path, values}` (runtime, never saved, empty for none), set by `DotMapRotationFile.apply` next to `DotMapDef.play`. `profile_for(catalogue, id, rotation)` and `profile_value(...)` answer per id, and `profile_changed(map, profile)` fires on each map change for a session the file is attached to (`note_changed(map)` emits it for a game that follows `DotMapSession.changed` itself). dot-map never reads the mode or the cvars: a game with modes applies them on the map change and restores its own values on the next; a game without modes ignores the profile.
+
+`DotMapConfig.apply_values(map_id, values)` applies such a `values` map the way `apply(map_id)` applies a map's own files: checked against the config's whitelist, and put back on the next `apply`/`apply_values`/`restore`, except a key an operator changed meanwhile.

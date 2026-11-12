@@ -89,6 +89,11 @@ var in_rotation: bool = true
 ## opaque to dot-map. Runtime state set by [DotMapRotationFile.apply], never saved; empty for a bare entry.
 var play: Dictionary = {}
 
+## The profile the active rotation gives this map (`mode:`/`cfg:` on its entry, rotation or section), resolved:
+## `{value, mode, cfg_path, values}` where `mode` is a game mode id or "" and `values` the cvars to apply for this map.
+## Runtime state set by [DotMapRotationFile.apply]; empty when none. Games with no modes ignore it.
+var profile: Dictionary = {}
+
 
 ## The values to try for [param key], best first: [param override] (a server command such as
 ## `sv_waves`), then the rotation entry's, then [param fallback] (the map document's, the game's

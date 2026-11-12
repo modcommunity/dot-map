@@ -4,9 +4,19 @@ extends RefCounted
 ## The maps a server PLAYS, read from `cfg/addons/dot_map/maps.yml` and its tiers; the catalogue is what is merely installed. A map not in the rotation stays loadable by `map <id>` but is left out of the pool, ballots and nominations ([member DotMapDef.in_rotation]).
 ## Keys: `defaults:` and `games: <game>:` with `rotation`, `mode` (random with `cooldown`, or cycle), `maps` (patterns), `rotations: {name: {maps}}`. No file means every installed map rotates, sorted by id; `merge: true` adds to the shipped file. `exempt: [patterns]` (alias `remove:`; ids, `owner/map`, name globs) keeps maps out of the rotation, at the top of any layer or inside one rotation; a file with only `exempt:` rotates every installed map except those.
 ## Layers, weakest first: shipped file, server `defaults:`, server `games:`. Parsing and matching are dot-core's [DotRotationSpec]; patterns expand at [method apply], called on every map change and rescan.
+## A per-map PROFILE (`mode:` or its alias `cfg:` on an entry, a rotation or a section) is resolved by [method resolve_profile] and set on [member DotMapDef.profile]; dot-map never reads the mode or the cvars, the game does. See docs/rotation.md#per-map-profiles.
+
+## A map changed and this is the profile its rotation entry gave it (`{}` for none). Emitted by [method attach]'s handler, and by [method note_changed] for a game that follows the session itself.
+signal profile_changed(map: DotMapDef, profile: Dictionary)
 
 const CHANNEL := "map.rotation_file"
 const EXTENSIONS := ["yml", "yaml"]
+
+## A `mode:` with one of these values picks the next map (dot-core's [DotRotationSpec]); any other value is a profile.
+const SELECTION_MODES := ["random", "cycle", "sequential"]
+
+## Where a profile name is looked up, under each dot_map config tier (`cfg/server/addon/dot_map/cfg/ctf.yml`).
+const PROFILE_SUBDIR := "cfg"
 
 ## The game this server runs, as a section key matches it (`game-airdrift`).
 var game: String = ""
@@ -37,6 +47,15 @@ var removed: PackedStringArray:
 
 var warnings: PackedStringArray = PackedStringArray()
 var _warned: Dictionary = {}
+
+## Profile values written above the entries, layered (stronger wins): key "" for a whole section, else a rotation name.
+var profile_defaults: Dictionary = {}
+
+## The `--config` root profiles are read under; empty reads [method config_dir_arg].
+var config_dir: String = ""
+
+## Resolved profiles by written value, so a missing file warns once and is not looked for on every map change.
+var _profiles: Dictionary = {}
 var _last: PackedStringArray = PackedStringArray()
 var _last_name: String = ""
 
@@ -123,16 +142,70 @@ static func from_trees(trees: Array, p_game: String = "", p_sources: PackedStrin
 		var where := "maps.yml"
 		if tree.get("defaults") is Dictionary:
 			file._read_exempt(tree["defaults"])
-			layers.append(DotRotationSpec.normalize(tree["defaults"], "maps", file.warnings, where + " defaults"))
+			var section := file._take_profiles(tree["defaults"], where + " defaults")
+			layers.append(DotRotationSpec.normalize(section, "maps", file.warnings, where + " defaults"))
 		if tree.get("games") is Dictionary:
 			for key: Variant in (tree["games"] as Dictionary):
 				if DotRotationSpec.key_matches(str(key), p_game) and (tree["games"] as Dictionary)[key] is Dictionary:
 					file._read_exempt((tree["games"] as Dictionary)[key])
-					layers.append(DotRotationSpec.normalize((tree["games"] as Dictionary)[key], "maps", file.warnings, "%s games.%s" % [where, key]))
+					var at := "%s games.%s" % [where, key]
+					var section := file._take_profiles((tree["games"] as Dictionary)[key], at)
+					layers.append(DotRotationSpec.normalize(section, "maps", file.warnings, at))
 	file.spec = DotRotationSpec.layer(layers)
 	for w in file.warnings:
 		DotLog.warn(CHANNEL, w)
 	return DotResult.success(file)
+
+
+## [param section] without its profile keys, which go to [member profile_defaults]: a game-mode `mode:` would
+## otherwise reach [DotRotationSpec] and be read as "random" with a warning. The tree itself is not changed.
+func _take_profiles(section: Dictionary, where: String) -> Dictionary:
+	var out := section.duplicate()
+	var v := _take_profile_value(out, where)
+	if v != "":
+		profile_defaults[""] = v
+	if out.get("rotations") is Dictionary:
+		var rots := (out["rotations"] as Dictionary).duplicate()
+		for name: Variant in rots:
+			if rots[name] is Dictionary:
+				var body := (rots[name] as Dictionary).duplicate()
+				var rv := _take_profile_value(body, "%s rotations.%s" % [where, name])
+				if rv != "":
+					profile_defaults[str(name)] = rv
+				rots[name] = body
+		out["rotations"] = rots
+	return out
+
+
+## Erases a game-mode `mode:` and any `cfg:` from [param d] and returns the profile they name, or "".
+func _take_profile_value(d: Dictionary, where: String) -> String:
+	var m := ""
+	if d.has("mode") and not SELECTION_MODES.has(_text(d["mode"]).to_lower()):
+		m = _text(d["mode"])
+		d.erase("mode")
+	var c := ""
+	if d.has("cfg"):
+		c = _text(d["cfg"])
+		d.erase("cfg")
+	return _pick_profile(m, c, where)
+
+
+## `mode:` and `cfg:` are one setting; when both are written and differ, `mode:` wins and the operator hears once.
+func _pick_profile(m: String, c: String, where: String) -> String:
+	if m != "" and c != "" and m != c:
+		_warn_once("both|%s|%s|%s" % [where, m, c], "mode: and cfg: name different profiles; mode: is used",
+			{"where": where, "mode": m, "cfg": c})
+	return m if m != "" else c
+
+
+static func _text(v: Variant) -> String:
+	return "" if v == null else str(v).strip_edges()
+
+
+func _warn_once(key: String, message: String, fields: Dictionary) -> void:
+	if not _warned.has(key):
+		_warned[key] = true
+		DotLog.warn(CHANNEL, message, fields)
 
 
 ## Collects `exempt:`/`remove:` from one section (a file, `defaults:` or a game's entry) and from its rotations.
@@ -257,6 +330,122 @@ func settings_for(catalogue: DotMapCatalogue, id: StringName, name: String = "")
 	return DotRotationSpec.settings_for(spec, use, String(id), _candidates(catalogue), collections)
 
 
+## The profile value (a mode id or a path, as written) the rotation [param name] gives [param id]: its entry's
+## `mode:`/`cfg:`, else the rotation's, else the section's. "" for none.
+func profile_value(catalogue: DotMapCatalogue, id: StringName, name: String = "") -> String:
+	var use := name if name != "" else active_name()
+	return _value_from(settings_for(catalogue, id, use), use, String(id))
+
+
+func _value_from(settings: Dictionary, rotation_name: String, id: String) -> String:
+	var v := _pick_profile(_text(settings.get("mode")), _text(settings.get("cfg")), "entry %s" % id)
+	if v == "":
+		v = str(profile_defaults.get(rotation_name, profile_defaults.get("", "")))
+	return v
+
+
+## The resolved profile for [param id] in rotation [param name]: see [method resolve_profile].
+func profile_for(catalogue: DotMapCatalogue, id: StringName, name: String = "") -> Dictionary:
+	return resolve_profile(profile_value(catalogue, id, name))
+
+
+## What a written profile value means: `{value, mode, cfg_path, values}`, or `{}` for "".
+## A bare word (no `/`, not ending `.yml`/`.yaml`) is a mode id, and `cfg/<id>.yml` (or `.yaml`) supplies its cvars when present.
+## Anything else is a file: absolute (`/`, `res://`, `user://`) as is, else under `cfg/` of the dot_map tiers; missing, it WARNs once and gives no mode and no cvars.
+func resolve_profile(value: String) -> Dictionary:
+	if value == "":
+		return {}
+	if _profiles.has(value):
+		return (_profiles[value] as Dictionary).duplicate(true)
+	var out := {"value": value, "mode": "", "cfg_path": "", "values": {}}
+	var is_id := is_mode_id(value)
+	if is_id:
+		out["mode"] = value
+	var path := _profile_path(value, is_id)
+	if path == "" and not is_id:
+		_warn_once("missing|" + value, "a rotation profile file was not found; the map plays with the game's default",
+			{"profile": value, "dir": "cfg/server/addon/dot_map/" + PROFILE_SUBDIR})
+	elif path != "":
+		var read := read_profile(path)
+		if not read.ok:
+			_warn_once("bad|" + path, "a rotation profile file could not be read; the map plays with the game's default",
+				{"path": path, "why": read.error.message})
+			if not is_id:
+				out["mode"] = ""
+		else:
+			var got := read.value as Dictionary
+			out["cfg_path"] = path
+			out["values"] = got["values"]
+			if not is_id:
+				out["mode"] = got["mode"]
+	_profiles[value] = out
+	return out.duplicate(true)
+
+
+## Whether a profile value names a mode rather than a file.
+static func is_mode_id(value: String) -> bool:
+	return not value.contains("/") and not value.contains("\\") and not EXTENSIONS.has(value.get_extension().to_lower())
+
+
+func _profile_path(value: String, is_id: bool) -> String:
+	var names := PackedStringArray()
+	if is_id or value.get_extension() == "":
+		for e: String in EXTENSIONS:
+			names.append("%s.%s" % [value, e])
+	if not is_id:
+		names.append(value)
+	if value.begins_with("/") or value.begins_with("res://") or value.begins_with("user://"):
+		for n in names:
+			if FileAccess.file_exists(n):
+				return n
+		return ""
+	var had := DotAddonConfig.game
+	if had == "" and game != "":
+		DotAddonConfig.game = game
+	var found := ""
+	for n in names:
+		found = _strongest(DotAddonConfig.file_layers("dot-map", PROFILE_SUBDIR.path_join(n), config_dir))
+		if found != "":
+			break
+	DotAddonConfig.game = had
+	return found
+
+
+## One profile file: `{mode, values}`. `values` is `cvars:` when the file has that map, else every other
+## top-level scalar (`mode:` aside). A nested value is not a cvar and is skipped.
+static func read_profile(path: String) -> DotResult:
+	var parsed := DotYaml.parse_file(path)
+	if not parsed.ok:
+		return parsed
+	if parsed.value == null:
+		return DotResult.success({"mode": "", "values": {}})
+	if not parsed.value is Dictionary:
+		return DotResult.fail(DotError.CODE_INVALID, "A profile file must be a map of cvar: value.")
+	var d := parsed.value as Dictionary
+	var nested := d.get("cvars") is Dictionary
+	var src: Dictionary = d["cvars"] if nested else d
+	var values := {}
+	for k: Variant in src:
+		if not nested and (str(k) == "mode" or str(k) == "cvars"):
+			continue
+		var v: Variant = src[k]
+		if v is Dictionary or v is Array or v == null:
+			continue
+		values[str(k)] = v
+	return DotResult.success({"mode": _text(d.get("mode")), "values": values})
+
+
+## The profile the map was given when the rotation was last applied ([member DotMapDef.profile]); `{}` for null.
+func profile_of(map: DotMapDef) -> Dictionary:
+	return {} if map == null else map.profile
+
+
+## Emits [signal profile_changed] for [param map]: for a game that follows the session's `changed` itself instead of [method attach].
+func note_changed(map: DotMapDef) -> void:
+	if map != null:
+		profile_changed.emit(map, map.profile)
+
+
 ## Marks every catalogue map in or out of rotation and sets the rotation's order, mode and
 ## cooldown. No file, an unknown rotation or an empty result leaves every map in (the whole
 ## catalogue): a rotation that empties the server must never leave it stuck.
@@ -282,6 +471,7 @@ func apply(rotation: DotMapRotation, name: String = "") -> DotResult:
 		else:
 			m.in_rotation = ids.has(String(m.id))
 		m.play = settings_for(rotation.catalogue, m.id, use) if m.in_rotation and not ids.is_empty() else {}
+		m.profile = resolve_profile(_value_from(m.play, use, String(m.id))) if m.in_rotation and not ids.is_empty() else {}
 	rotation.order = order
 	if has_rotations() and use != "" and (spec["rotations"] as Dictionary).has(use):
 		rotation.mode = DotMapRotation.Mode.SEQUENTIAL if DotRotationSpec.mode_of(spec, use) == "cycle" \
@@ -336,7 +526,8 @@ func switch(rotation: DotMapRotation, name: String) -> DotResult:
 
 ## Re-applies after every map change, so a map installed meanwhile that matches joins.
 func attach(session: DotMapSession) -> void:
-	session.changed.connect(func(_map: DotMapDef, _world: Node) -> void:
+	session.changed.connect(func(map: DotMapDef, _world: Node) -> void:
+		note_changed(map)
 		if session.rotation != null:
 			apply(session.rotation))
 
@@ -353,6 +544,7 @@ func describe_lines() -> PackedStringArray:
 	for n in rotation_names():
 		var mark := "*" if n == (_last_name if _last_name != "" else active_name()) else " "
 		var entries: PackedStringArray = (spec["rotations"] as Dictionary)[n]["entries"]
-		lines.append("%s %s (%s, cooldown %d): %s" % [mark, n, DotRotationSpec.mode_of(spec, n),
-			DotRotationSpec.cooldown_of(spec, n, 0), ", ".join(entries)])
+		var prof := str(profile_defaults.get(n, profile_defaults.get("", "")))
+		lines.append("%s %s (%s, cooldown %d%s): %s" % [mark, n, DotRotationSpec.mode_of(spec, n),
+			DotRotationSpec.cooldown_of(spec, n, 0), (", profile " + prof) if prof != "" else "", ", ".join(entries)])
 	return lines
