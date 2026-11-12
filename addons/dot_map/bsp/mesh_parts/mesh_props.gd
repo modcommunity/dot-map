@@ -284,11 +284,27 @@ static var _models_warned: Dictionary = {}
 ## scene_for] takes the stand-in id and returns a [PackedScene] (default: [constant DEFAULT_PROP_DIRS],
 ## [code].glb[/code]).
 func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callable()) -> Node3D:
+	var build := _props_begin(scene_for, collide_fn)
+	for rec: Dictionary in manifest.get("props", []):
+		_prop_one(build, rec)
+	return _props_end(build)
+
+
+## [method build_props] that awaits [method DotFrameSlice.pause] between props, so a cover keeps drawing.
+func build_props_async(slice: DotFrameSlice, scene_for: Callable = Callable(), collide_fn: Callable = Callable()) -> Node3D:
+	var build := _props_begin(scene_for, collide_fn)
+	for rec: Dictionary in manifest.get("props", []):
+		if slice.due():
+			await slice.pause()
+		_prop_one(build, rec)
+	return _props_end(build)
+
+
+func _props_begin(scene_for: Callable, collide_fn: Callable) -> Dictionary:
 	apply_config()
 	var root := Node3D.new()
 	root.name = "Props"
 	var cache := {}
-	var longest_of := {}
 	missing_models = 0
 	missing_proxied = 0
 	_unseen.clear()
@@ -297,52 +313,60 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 		if not rec.has("box") and str(rec.get("stand_in", "")).begins_with("lib/"):
 			lib_ids[str(rec["stand_in"])] = true
 	_preload_library_models(lib_ids.keys(), scene_for, cache)
-	for rec: Dictionary in manifest.get("props", []):
-		if rec.has("box"):
-			var block := _support_block(rec)
-			root.add_child(block)
-			if collide_fn.is_valid() and int(rec.get("solid", 0)) in SOLID_BOX:
-				var cb := _solid_shape(rec, null)
-				if not cb.is_empty():
-					var bb := _body_for(cb)
-					root.add_child(bb)
-					collide_fn.call(bb)
-			continue
-		var n := _place_prop(rec, scene_for, cache, longest_of)
-		if n == null and str(rec.get("stand_in", "")).begins_with("lib/"):
-			missing_models += 1
-			n = _proxy_for(rec)
-			if n == null:
-				_unseen.append(rec)
-			else:
-				missing_proxied += 1
-				root.add_child(n)
-				if collide_fn.is_valid() and int(rec.get("solid", 0)) in SOLID_BOX:
-					var pb := _solid_shape(rec, null)
-					if not pb.is_empty():
-						var body := _body_for(pb)
-						root.add_child(body)
-						collide_fn.call(body)
-			continue
+	return {"root": root, "cache": cache, "longest_of": {}, "scene_for": scene_for, "collide_fn": collide_fn}
+
+
+func _prop_one(build: Dictionary, rec: Dictionary) -> void:
+	var root: Node3D = build["root"]
+	var collide_fn: Callable = build["collide_fn"]
+	var solid: bool = collide_fn.is_valid() and int(rec.get("solid", 0)) in SOLID_BOX
+	if rec.has("box"):
+		root.add_child(_support_block(rec))
+		if solid:
+			_add_box_body(root, _solid_shape(rec, null), collide_fn)
+		return
+	var longest_of: Dictionary = build["longest_of"]
+	var n := _place_prop(rec, build["scene_for"], build["cache"], longest_of)
+	if n == null and str(rec.get("stand_in", "")).begins_with("lib/"):
+		missing_models += 1
+		n = _proxy_for(rec)
 		if n == null:
-			continue
-		if prop_view_per_metre > 0.0:
-			var end := maxf(prop_view_min, float(longest_of[str(rec.get("stand_in", ""))]) * n.scale.x * prop_view_per_metre)
-			for g in n.find_children("*", "GeometryInstance3D", true, false):
-				(g as GeometryInstance3D).visibility_range_end = end
-				(g as GeometryInstance3D).visibility_range_end_margin = end * 0.1
+			_unseen.append(rec)
+			return
+		missing_proxied += 1
 		root.add_child(n)
-		if collide_fn.is_valid() and int(rec.get("solid", 0)) in SOLID_BOX:
-			for box in _solid_boxes(rec, n):
-				var body := _body_for(box)
-				root.add_child(body)
-				collide_fn.call(body)
+		if solid:
+			_add_box_body(root, _solid_shape(rec, null), collide_fn)
+		return
+	if n == null:
+		return
+	if prop_view_per_metre > 0.0:
+		var end := maxf(prop_view_min, float(longest_of[str(rec.get("stand_in", ""))]) * n.scale.x * prop_view_per_metre)
+		for g in n.find_children("*", "GeometryInstance3D", true, false):
+			(g as GeometryInstance3D).visibility_range_end = end
+			(g as GeometryInstance3D).visibility_range_end_margin = end * 0.1
+	root.add_child(n)
+	if solid:
+		for box in _solid_boxes(rec, n):
+			_add_box_body(root, box, collide_fn)
+
+
+func _add_box_body(root: Node3D, box: Dictionary, collide_fn: Callable) -> void:
+	if box.is_empty():
+		return
+	var body := _body_for(box)
+	root.add_child(body)
+	collide_fn.call(body)
+
+
+func _props_end(build: Dictionary) -> Node3D:
+	var cache: Dictionary = build["cache"]
 	DotLog.info(CHANNEL, "props built", {"models": cache.get(OWNED_KEY, []).size(), "model_ms": cache.get("__ms", 0), "static_mb": OS.get_static_memory_usage() / 1048576})
 	_free_templates(cache)
 	_decompose_cache.clear()
 	clear_slim_cache()
 	_warn_missing_models()
-	return root
+	return build["root"]
 
 
 ## A low-detail box of a missing library model's measured bounds (`collide`, else `bounds`), or null without them.

@@ -49,7 +49,7 @@ static func attach_async(parent: Node3D, world: DotMapBspMesh, options: Dictiona
 			node.free()
 		return null
 	var drawn := DotMapDrawnWorld.new()
-	for step: Callable in _finish_steps(parent, world, options, surfaces, node, drawn):
+	for step: Callable in _finish_steps(parent, world, options, surfaces, node, drawn, slice):
 		if slice.due():
 			await slice.pause()
 		if not is_instance_valid(parent):
@@ -57,7 +57,9 @@ static func attach_async(parent: Node3D, world: DotMapBspMesh, options: Dictiona
 			if is_instance_valid(node) and node.get_parent() == null:
 				node.free()
 			return null
-		step.call()
+		await step.call()
+	if not is_instance_valid(parent):
+		return null
 	_log_drawn(drawn)
 	return drawn
 
@@ -82,11 +84,12 @@ static func _finish(parent: Node3D, world: DotMapBspMesh, options: Dictionary, s
 
 
 ## What follows the mesh build, one callable per step so [method attach_async] can yield between them: prune to the world and hang it under [param parent], the probes, the props, the lighting, the culling.
-static func _finish_steps(parent: Node3D, world: DotMapBspMesh, options: Dictionary, surfaces: DotMapSurfaces, node: Node3D, drawn: DotMapDrawnWorld) -> Array[Callable]:
+## With a [param slice] the props step also yields between props, so it must be awaited.
+static func _finish_steps(parent: Node3D, world: DotMapBspMesh, options: Dictionary, surfaces: DotMapSurfaces, node: Node3D, drawn: DotMapDrawnWorld, slice: DotFrameSlice = null) -> Array[Callable]:
 	return [
 		func() -> void: _hang(parent, world, options, node, drawn),
 		func() -> void: _add_probes(world, options, node),
-		func() -> void: _add_props(world, options, node),
+		func() -> void: await _add_props(world, options, node, slice),
 		func() -> void: _add_lit(parent, world, options, surfaces, node, drawn),
 		func() -> void: _add_culling(parent, world, options, node, drawn),
 	]
@@ -129,10 +132,17 @@ static func _add_probes(world: DotMapBspMesh, options: Dictionary, node: Node3D)
 	env_node.free()
 
 
-static func _add_props(world: DotMapBspMesh, options: Dictionary, node: Node3D) -> void:
+static func _add_props(world: DotMapBspMesh, options: Dictionary, node: Node3D, slice: DotFrameSlice = null) -> void:
 	if not bool(options.get("props", false)):
 		return
-	var props := world.build_props()
+	var props: Node3D
+	if slice == null:
+		props = world.build_props()
+	else:
+		props = await world.build_props_async(slice)
+	if not is_instance_valid(node):
+		props.free()
+		return
 	if props.get_child_count() > 0:
 		node.add_child(props)
 	else:
