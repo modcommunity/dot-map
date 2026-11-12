@@ -711,10 +711,10 @@ static func slot_halves(slot: int, masks: bool, normals: bool) -> bool:
 static func half_model_texture(tex: ImageTexture, max_size: int) -> ImageTexture:
 	var img := tex.get_image()
 	if img.is_compressed():
-		return DotMapSurfaces.without_top_mip(tex) as ImageTexture
+		return DotMapImagePrep.without_top_mip(tex) as ImageTexture
 	if mini(img.get_width(), img.get_height()) >= 8:
 		img.resize(img.get_width() / 2, img.get_height() / 2, Image.INTERPOLATE_LANCZOS)
-	DotMapSurfaces.prepare_image(img, "model.png", max_size)
+	DotMapImagePrep.prepare_image(img, "model.png", max_size)
 	return ImageTexture.create_from_image(img)
 
 
@@ -736,7 +736,7 @@ static func _slimmed_shared(tex: ImageTexture, img: Image, half: bool, max_size:
 		out = tex
 	else:
 		var copy := img.duplicate() as Image
-		DotMapSurfaces.prepare_image(copy, "model.png", max_size)  # a part-less name: every channel stays
+		DotMapImagePrep.prepare_image(copy, "model.png", max_size)  # a part-less name: every channel stays
 		out = ImageTexture.create_from_image(copy)
 	_slim_mutex.lock()
 	if _slim_shared.has(key):
