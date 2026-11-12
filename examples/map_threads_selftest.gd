@@ -215,7 +215,7 @@ func _test_textures() -> void:
 	for p in parts:
 		widths_n.append((half_n[p] as Texture2D).get_width())
 	_check(widths_n == [32, 16, 32, 32], "half_res_normals halves the normal map only (%s)" % str(widths_n))
-	_check(DotMapSurfaces.halves("normal", true, false) == false and DotMapSurfaces.halves("normal", false, true), "halves() reads each option for its own parts")
+	_check(DotMapImagePrep.halves("normal", true, false) == false and DotMapImagePrep.halves("normal", false, true), "halves() reads each option for its own parts")
 	_test_model_halving()
 	_completed += 1
 
@@ -327,6 +327,9 @@ func _test_bake() -> void:
 	var parts := ["albedo", "normal", "roughness", "ao"]
 	for i in 4:
 		_noise_webp("%s/set_a/1k/%s.webp" % [store, parts[i]], 256 if i == 0 else 64, i + 1)
+	for v in ["s3tc", "etc2"]:
+		for part in parts:
+			DirAccess.remove_absolute(ProjectSettings.globalize_path("%s/set_a/1k/%s.%s.res" % [out, part, v]))
 	var stats := DotMapTextureBake.bake_store(store, out, 128)
 	_check(stats["baked"] == 4 and stats["failed"] == 0, "four files baked into a scratch directory (%s)" % str(stats))
 	var again := DotMapTextureBake.bake_store(store, out, 128)
@@ -336,7 +339,7 @@ func _test_bake() -> void:
 	var tex := ResourceLoader.load(out + "/set_a/1k/albedo.s3tc.res") as Texture2D
 	_check(tex != null and tex.get_width() == 128, "the 256 px albedo is capped to 128 (%s)" % str(tex.get_width() if tex != null else -1))
 	var want := Image.load_from_file(store + "/set_a/1k/normal.webp")
-	DotMapSurfaces.prepare_image(want, "normal.webp", 128, false, Image.COMPRESS_S3TC)
+	DotMapImagePrep.prepare_image(want, "normal.webp", 128, false, Image.COMPRESS_S3TC)
 	var got := (ResourceLoader.load(out + "/set_a/1k/normal.s3tc.res") as Texture2D).get_image()
 	_check(got.is_compressed() and got.get_mipmap_count() == want.get_mipmap_count() and got.get_format() == want.get_format() and got.get_data() == want.get_data(), "a baked normal map is the runtime's own compressed, mip-mapped RG image (format %d)" % got.get_format())
 	DotMapTextureBake.bake_store(store, "", 128)
