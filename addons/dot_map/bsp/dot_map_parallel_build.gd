@@ -53,11 +53,11 @@ static func textures(paths: PackedStringArray, workers: int, max_size: int = 0, 
 		var images := DotParallel.run(func(i: int) -> Variant:
 			var img := Image.load_from_file(paths[from + i])
 			if img != null:
-				DotMapSurfaces.shrink_image(img, paths[from + i], max_size, half_masks, half_normals)
+				DotMapImagePrep.shrink_image(img, paths[from + i], max_size, half_masks, half_normals)
 			return img, n, &"map.textures", workers)
 		for i in n:
 			if images[i] != null:
-				DotMapSurfaces.compress_image(images[i])
+				DotMapImagePrep.compress_image(images[i])
 				out[paths[from + i]] = ImageTexture.create_from_image(images[i])
 	return out
 
@@ -73,11 +73,11 @@ static func textures_async(paths: PackedStringArray, workers: int, max_size: int
 		var images := DotParallel.run(func(i: int) -> Variant:
 			var img := Image.load_from_file(paths[from + i])
 			if img != null:
-				DotMapSurfaces.shrink_image(img, paths[from + i], max_size, half_masks, half_normals)
+				DotMapImagePrep.shrink_image(img, paths[from + i], max_size, half_masks, half_normals)
 			return img, n, &"map.textures", workers)
 		for i in n:
 			if images[i] != null:
-				DotMapSurfaces.compress_image(images[i])
+				DotMapImagePrep.compress_image(images[i])
 				out[paths[from + i]] = ImageTexture.create_from_image(images[i])
 		if tree != null and Time.get_ticks_msec() - slice_from >= slice_ms:
 			await tree.process_frame
