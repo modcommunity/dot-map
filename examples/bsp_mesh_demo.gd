@@ -2,7 +2,7 @@ extends "bsp_mesh_parts/tests_image.gd"
 
 ## [DotMapBspMesh]: the converter's fixture read, built, and ray-cast.
 
-const CHECKS := 166
+const CHECKS := 172
 const SECTIONS := 14
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
@@ -333,6 +333,15 @@ func _test_async_build(world: DotMapBspMesh) -> void:
 	_check(not slice.due() or slice.budget_ms == 0, "the slice reports itself due only past its budget")
 	sync_root.free()
 	async_root.free()
+	DotMapBspMesh.clear_cache()
+	var read: DotResult = await DotMapBspMesh.load_prefix_async(FIXTURE)
+	var plain_read := DotMapBspMesh.load_prefix(FIXTURE)
+	_check(read.ok and plain_read.ok and read.value == plain_read.value, "the worker read is cached like a plain one")
+	DotMapBspMesh.clear_cache()
+	plain_read = DotMapBspMesh.load_prefix(FIXTURE)
+	_check(read.ok and plain_read.ok and (read.value as DotMapBspMesh)._blob == (plain_read.value as DotMapBspMesh)._blob
+			and (read.value as DotMapBspMesh).surfaces == (plain_read.value as DotMapBspMesh).surfaces,
+			"the worker read matches the plain one")
 	var gone := Node3D.new()
 	var out: Array = [false, null]
 	var attach := func() -> void:
@@ -348,6 +357,22 @@ func _test_async_build(world: DotMapBspMesh) -> void:
 	OS.remove_logger(catcher)
 	_check(out[1] == null, "a parent freed during the sliced build gets nothing attached")
 	_check(catcher.errors.is_empty(), "and raises no engine error: %s" % [catcher.errors])
+	# The whole sliced attach (materials, meshes, finishing steps) draws what the one-frame attach draws.
+	var one_parent := Node3D.new()
+	var one := DotMapDrawnWorld.attach(one_parent, world, {"probes": 0})
+	var sliced_parent := Node3D.new()
+	frames[0] = 0
+	counter.call()
+	var sliced: DotMapDrawnWorld = await DotMapDrawnWorld.attach_async(sliced_parent, world, {"probes": 0}, DotFrameSlice.new(0))
+	seen = frames[0]
+	frames[0] = -1
+	_check(sliced != null and sliced.root != null and sliced.root.get_parent() == sliced_parent, "the sliced attach hangs the world under its parent")
+	_check(seen > 1, "and spreads it over frames: %d" % seen)
+	if sliced != null and sliced.root != null:
+		_check(count.call(sliced.root) == count.call(one.root), "same drawn meshes as the one-frame attach: %d vs %d" % [count.call(sliced.root), count.call(one.root)])
+		_check(sliced.credits == one.credits and sliced.world == one.world, "same pack and credits line")
+	one_parent.free()
+	sliced_parent.free()
 	_done()
 
 

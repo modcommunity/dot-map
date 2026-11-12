@@ -37,18 +37,29 @@ static func attach(parent: Node3D, world: DotMapBspMesh, options: Dictionary = {
 	return _finish(parent, world, options, surfaces, node)
 
 
-## [method attach] that pauses on [param slice] while the meshes are built (the bulk of the cost), so a loading cover keeps animating.
+## [method attach] that pauses on [param slice] throughout: the texture decode, each surface's material, the mesh batches and each finishing step (probes, props, lighting, culling) yield a frame once the budget is spent, so a loading cover keeps animating and no one frame holds the build.
 ## Null when [param parent] was freed during the build (the map was swapped away); the built meshes are freed with it.
 static func attach_async(parent: Node3D, world: DotMapBspMesh, options: Dictionary, slice: DotFrameSlice) -> DotMapDrawnWorld:
 	var surfaces := _surfaces_for(world, options)
-	var node: Node3D = await world.build_node_async(
-			surfaces.world_material_for(world, world.source_path.get_base_dir()), true, false, slice)
+	var material_for: Callable = await surfaces.world_material_for_async(world, world.source_path.get_base_dir(), slice.budget_ms)
+	var node: Node3D = await world.build_node_async(material_for, true, false, slice)
 	if not is_instance_valid(parent):
 		DotLog.debug(CHANNEL, "the world's parent went away during the build; dropped", {"name": str(world.manifest.get("name", ""))})
 		if node != null:
 			node.free()
 		return null
-	return _finish(parent, world, options, surfaces, node)
+	var drawn := DotMapDrawnWorld.new()
+	for step: Callable in _finish_steps(parent, world, options, surfaces, node, drawn):
+		if slice.due():
+			await slice.pause()
+		if not is_instance_valid(parent):
+			DotLog.debug(CHANNEL, "the world's parent went away while it was finished; dropped", {"name": str(world.manifest.get("name", ""))})
+			if is_instance_valid(node) and node.get_parent() == null:
+				node.free()
+			return null
+		step.call()
+	_log_drawn(drawn)
+	return drawn
 
 
 static func _surfaces_for(world: DotMapBspMesh, options: Dictionary) -> DotMapSurfaces:
@@ -64,6 +75,24 @@ static func _surfaces_for(world: DotMapBspMesh, options: Dictionary) -> DotMapSu
 
 static func _finish(parent: Node3D, world: DotMapBspMesh, options: Dictionary, surfaces: DotMapSurfaces, node: Node3D) -> DotMapDrawnWorld:
 	var drawn := DotMapDrawnWorld.new()
+	for step: Callable in _finish_steps(parent, world, options, surfaces, node, drawn):
+		step.call()
+	_log_drawn(drawn)
+	return drawn
+
+
+## What follows the mesh build, one callable per step so [method attach_async] can yield between them: prune to the world and hang it under [param parent], the probes, the props, the lighting, the culling.
+static func _finish_steps(parent: Node3D, world: DotMapBspMesh, options: Dictionary, surfaces: DotMapSurfaces, node: Node3D, drawn: DotMapDrawnWorld) -> Array[Callable]:
+	return [
+		func() -> void: _hang(parent, world, options, node, drawn),
+		func() -> void: _add_probes(world, options, node),
+		func() -> void: _add_props(world, options, node),
+		func() -> void: _add_lit(parent, world, options, surfaces, node, drawn),
+		func() -> void: _add_culling(parent, world, options, node, drawn),
+	]
+
+
+static func _hang(parent: Node3D, world: DotMapBspMesh, options: Dictionary, node: Node3D, drawn: DotMapDrawnWorld) -> void:
 	drawn.world = world
 	drawn.credits = DotMapCredits.line(world.manifest)
 	node.name = "World"
@@ -85,40 +114,53 @@ static func _finish(parent: Node3D, world: DotMapBspMesh, options: Dictionary, s
 	parent.add_child(node)
 	drawn.root = node
 
+
+static func _add_probes(world: DotMapBspMesh, options: Dictionary, node: Node3D) -> void:
 	var probes := int(options.get("probes", 8))
-	if probes > 0:
-		var env_node := world.build_environment(probes, false)
-		if env_node != null:
-			var found := env_node.get_node_or_null("Probes")
-			if found != null:
-				env_node.remove_child(found)
-				node.add_child(found)
-			env_node.free()
+	if probes <= 0:
+		return
+	var env_node := world.build_environment(probes, false)
+	if env_node == null:
+		return
+	var found := env_node.get_node_or_null("Probes")
+	if found != null:
+		env_node.remove_child(found)
+		node.add_child(found)
+	env_node.free()
 
-	if bool(options.get("props", false)):
-		var props := world.build_props()
-		if props.get_child_count() > 0:
-			node.add_child(props)
-		else:
-			props.free()
 
+static func _add_props(world: DotMapBspMesh, options: Dictionary, node: Node3D) -> void:
+	if not bool(options.get("props", false)):
+		return
+	var props := world.build_props()
+	if props.get_child_count() > 0:
+		node.add_child(props)
+	else:
+		props.free()
+
+
+static func _add_lit(parent: Node3D, world: DotMapBspMesh, options: Dictionary, surfaces: DotMapSurfaces, node: Node3D, drawn: DotMapDrawnWorld) -> void:
 	var env: Environment = options.get("environment")
 	if env != null:
 		drawn.lit = DotMapLitWorld.attach(parent, world, env, options.get("lamps", []), surfaces.use_lightmap, node)
 
-	if bool(options.get("cull", true)) and DisplayServer.get_name() != "headless":
-		var vis := DotMapVisibility.new()
-		vis.name = "Visibility"
-		parent.add_child(vis)
-		var res := vis.setup(world, node)
-		if res.ok:
-			drawn.visibility = vis
-		else:
-			DotLog.debug(CHANNEL, "the world is drawn without culling", {"why": res.error.message})
-			vis.queue_free()
 
-	DotLog.debug(CHANNEL, "world drawn", {"name": str(world.manifest.get("name", "")), "lit": drawn.lit != null, "culled": drawn.visibility != null})
-	return drawn
+static func _add_culling(parent: Node3D, world: DotMapBspMesh, options: Dictionary, node: Node3D, drawn: DotMapDrawnWorld) -> void:
+	if not bool(options.get("cull", true)) or DisplayServer.get_name() == "headless":
+		return
+	var vis := DotMapVisibility.new()
+	vis.name = "Visibility"
+	parent.add_child(vis)
+	var res := vis.setup(world, node)
+	if res.ok:
+		drawn.visibility = vis
+	else:
+		DotLog.debug(CHANNEL, "the world is drawn without culling", {"why": res.error.message})
+		vis.queue_free()
+
+
+static func _log_drawn(drawn: DotMapDrawnWorld) -> void:
+	DotLog.debug(CHANNEL, "world drawn", {"name": str(drawn.world.manifest.get("name", "")), "lit": drawn.lit != null, "culled": drawn.visibility != null})
 
 
 ## Takes the drawn world out again: the node, the ambient driver and the culling.
