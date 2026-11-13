@@ -38,6 +38,8 @@ static func shrink_image(img: Image, path: String, max_size: int, half_masks: bo
 
 ## VRAM-compresses a [method shrink_image]d image for the build's format ([param mode_override] picks one); call it from the main thread, never from a pool task.
 static func compress_image(img: Image, mode_override: int = -1) -> void:
+	if OS.has_feature("web"):
+		return    # the web template ships no BC/ETC compressor (_image_compress_bc_func is null): every call only logs an error, so keep the raw mipmapped image
 	var mode := mode_override if mode_override >= 0 else (Image.COMPRESS_S3TC if OS.has_feature("s3tc") else (Image.COMPRESS_ETC2 if OS.has_feature("etc2") else -1))
 	if mode < 0 or (mode_override < 0 and OS.get_environment("NOCOMP") != "") or img.is_compressed() or img.get_width() < 4 or img.get_height() < 4:
 		return
