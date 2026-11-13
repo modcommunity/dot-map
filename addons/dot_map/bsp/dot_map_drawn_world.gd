@@ -39,16 +39,23 @@ static func attach(parent: Node3D, world: DotMapBspMesh, options: Dictionary = {
 
 ## [method attach] that pauses on [param slice] throughout: the texture decode, each surface's material, the mesh batches and each finishing step (probes, props, lighting, culling) yield a frame once the budget is spent, so a loading cover keeps animating and no one frame holds the build.
 ## Null when [param parent] was freed during the build (the map was swapped away); the built meshes are freed with it.
+## [code]options["mark"][/code], a [code]func(label: String)[/code], is told as each step ends ("drawn: materials", "drawn: meshes", "drawn: hang" ...) and of any one material dearer than [constant DotMapSurfaces.SLOW_MATERIAL_USEC], so a game's frame trace can name the step a long frame was spent in.
 static func attach_async(parent: Node3D, world: DotMapBspMesh, options: Dictionary, slice: DotFrameSlice) -> DotMapDrawnWorld:
+	var mark: Callable = options.get("mark", Callable())
 	var surfaces := _surfaces_for(world, options)
+	surfaces.on_step = mark
 	var material_for: Callable = await surfaces.world_material_for_async(world, world.source_path.get_base_dir(), slice.budget_ms)
+	_tell(mark, "drawn: materials")
 	var node: Node3D = await world.build_node_async(material_for, true, false, slice)
+	_tell(mark, "drawn: meshes")
 	if not is_instance_valid(parent):
 		DotLog.debug(CHANNEL, "the world's parent went away during the build; dropped", {"name": str(world.manifest.get("name", ""))})
 		if node != null:
 			node.free()
 		return null
 	var drawn := DotMapDrawnWorld.new()
+	var names := ["hang", "probes", "props", "lit", "culling"]
+	var at := 0
 	for step: Callable in _finish_steps(parent, world, options, surfaces, node, drawn, slice):
 		if slice.due():
 			await slice.pause()
@@ -58,10 +65,17 @@ static func attach_async(parent: Node3D, world: DotMapBspMesh, options: Dictiona
 				node.free()
 			return null
 		await step.call()
+		_tell(mark, "drawn: " + names[at])
+		at += 1
 	if not is_instance_valid(parent):
 		return null
 	_log_drawn(drawn)
 	return drawn
+
+
+static func _tell(mark: Callable, label: String) -> void:
+	if mark.is_valid():
+		mark.call(label)
 
 
 static func _surfaces_for(world: DotMapBspMesh, options: Dictionary) -> DotMapSurfaces:
