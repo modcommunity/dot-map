@@ -30,7 +30,7 @@ func _ready() -> void:
 	DotMapBspMesh.model_half_masks = not args.has("fullmodelmasks")
 	DotMapBspMesh.model_half_normals = not args.has("fullmodelnormals")
 	var dir := str(args["world"]).get_base_dir()
-	var surfaces := DotMapSurfaces.new()
+	var surfaces := DotMapLocalMaps.surfaces_for({"name": str(args["world"]).get_file()})    # an _orig pack shows its own textures
 	surfaces.use_lightmap = not args.has("nolight")
 	surfaces.half_res_masks = not args.has("fullmasks")
 	surfaces.half_res_normals = not args.has("fullnormals")
