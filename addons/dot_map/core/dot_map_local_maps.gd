@@ -10,6 +10,9 @@ const CHANNEL := "dot_map.local_maps"
 ## Appended to the map's own name for its id, so a local copy never replaces a shipped or delivered map of the same name.
 const ID_SUFFIX := "_local"
 
+## The name suffix of an internal original pack ([code]<map>_orig[/code]), drawn with its own textures when loaded locally.
+const ORIG_MARK := "_orig"
+
 ## Appended to the title a menu prints.
 const TAG := " (local)"
 
@@ -124,6 +127,20 @@ static func to_def(entry: Dictionary) -> DotMapDef:
 		def.version = version
 	def.description = "A local map from %s" % str(entry["dir"])
 	return def
+
+
+## True for an internal original pack: a map named [code]<map>_orig[/code] (what [code]dot-map-convert regen --orig-textures[/code] writes).
+## Only a local map can be one; a pack, a zip or a manifest never is, so original textures are never published.
+static func is_original(entry: Dictionary) -> bool:
+	return str(entry.get("name", "")).to_lower().ends_with(ORIG_MARK)
+
+
+## The surfaces builder to draw [param entry] with: the map's own textures ([member DotMapSurfaces.use_original_textures]) for an
+## [method is_original] pack, the free replacements for any other local map. Pass it to [method DotMapSurfaces.world_material_for].
+static func surfaces_for(entry: Dictionary) -> DotMapSurfaces:
+	var surfaces := DotMapSurfaces.new()
+	surfaces.use_original_textures = is_original(entry)
+	return surfaces
 
 
 ## The map's mesh ([method DotMapBspMesh.load_prefix]): the format, hash and size checks are that reader's.
