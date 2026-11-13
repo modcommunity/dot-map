@@ -1,7 +1,9 @@
 class_name DotMapLocalMaps
 extends RefCounted
 
-## Converted maps dropped into a game by hand: a raw [code]dot-bsp-mesh[/code] folder ([code]<name>.json[/code], [code]<name>.bin[/code], [code]textures/[/code]) copied under a root, offered as "(local)" with no pack, zip or manifest written.
+## Converted maps dropped into a game by hand: a raw [code]dot-bsp-mesh[/code] folder ([code]<name>.json[/code], [code]<name>.bin[/code], [code]textures/[/code]) copied under a root, offered as "(local)" with no pack or manifest written.
+## A [code].zip[/code] of such a folder under a root is unpacked once into [member zip_cache] (keyed by its hash) and offered the same way;
+## [method accept_dropped] copies a folder or zip dragged onto the window into [constant DROP_ROOT] ([method watch_drops] wires it).
 ## Every entry is a plain dictionary ([method scan]); [method to_def] makes the catalogue row and [method spawns] the start points, generated from the hulls when the map names none.
 ## Internal only: a local map is never in a pack, so a server never names it and a client never fetches it.
 
@@ -18,6 +20,18 @@ const TAG := " (local)"
 
 ## The folder the converter writes inside a map's source folder; looked into when a whole map folder was copied.
 const CONVERT_DIR := "convert"
+
+## A zip with more entries than this is refused, not unpacked.
+const ZIP_MAX_FILES := 20000
+
+## Where a dropped folder or zip is copied.
+const DROP_ROOT := "user://maps"
+
+## Where zips are unpacked, one folder per zip hash; a hidden folder, so [method scan] never lists it as a map.
+static var zip_cache := "user://maps/.zip_cache"
+
+## zip path -> [code][size, mtime, hash][/code], so a zip is hashed once per change, not once per scan.
+static var _zip_hashes := {}
 
 ## The id prefixes that say what a map is for; anything else is an arena map.
 const KIND_PREFIXES := {
@@ -40,8 +54,9 @@ static func roots() -> PackedStringArray:
 	return PackedStringArray(["res://addons/maps", "user://maps"])
 
 
-## Every local map under [param from] (default [method roots]), sorted by id. Each is
-## [code]{id, name, prefix, dir, root, title, kind}[/code]; nothing is parsed, so a broken copy is found here and fails in [method open].
+## Every local map under [param from] (default [method roots]), sorted by id: each folder ([method entry_at]) and each
+## [code].zip[/code] ([method entry_in_zip]); hidden names are skipped. Each is [code]{id, name, prefix, dir, root, title, kind}[/code]
+## (plus [code]zip[/code]); the mesh is not parsed, so a broken copy is found here and fails in [method open].
 static func scan(from: PackedStringArray = PackedStringArray()) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var seen := {}
@@ -50,8 +65,16 @@ static func scan(from: PackedStringArray = PackedStringArray()) -> Array[Diction
 			continue
 		var names := DirAccess.get_directories_at(root)
 		names.sort()
-		for folder in names:
-			var entry := entry_at(root.path_join(folder))
+		var zips := PackedStringArray()
+		for file in DirAccess.get_files_at(root):
+			if file.get_extension().to_lower() == "zip":
+				zips.append(file)
+		zips.sort()
+		for folder in names + zips:
+			if folder.begins_with("."):
+				continue
+			var path := root.path_join(folder)
+			var entry := entry_in_zip(path) if folder.get_extension().to_lower() == "zip" and FileAccess.file_exists(path) else entry_at(path)
 			if entry.is_empty() or seen.has(entry["id"]):
 				continue
 			entry["root"] = root
@@ -81,6 +104,85 @@ static func entry_at(folder: String) -> Dictionary:
 		return {"id": name + ID_SUFFIX, "name": name, "prefix": prefix, "dir": dir,
 				"title": _title(folder, dir, name) + TAG, "kind": kind_for(name)}
 	return {}
+
+
+## The entry for a [code].zip[/code] of a convert folder or a map folder (at its top or one folder down), unpacked into
+## [member zip_cache] the first time this zip's bytes are seen; [code]zip[/code] holds the zip's path. Empty when it is no such zip.
+static func entry_in_zip(zip_path: String) -> Dictionary:
+	var dir := _unpacked(zip_path)
+	if dir.is_empty():
+		return {}
+	var entry := _entry_under(dir)
+	if not entry.is_empty():
+		entry["zip"] = zip_path
+	return entry
+
+
+## Copies each dropped path into [param into]: a map folder, a convert folder, a [code].zip[/code] of either, or a
+## [code].json[/code]/[code].bin[/code] (its folder is taken). A copy replaces an earlier one of the same name.
+## Returns [code]{added: Array[Dictionary], errors: PackedStringArray}[/code]: the new entries, and one line per path that is
+## not a map (nothing is copied for those). The game rescans its catalogue after.
+static func accept_dropped(paths: PackedStringArray, into: String = DROP_ROOT) -> Dictionary:
+	var added: Array[Dictionary] = []
+	var errors := PackedStringArray()
+	for raw in paths:
+		var path := raw.simplify_path().rstrip("/")
+		var ext := path.get_extension().to_lower()
+		if FileAccess.file_exists(path) and (ext == "json" or ext == "bin"):
+			path = path.get_base_dir()
+			ext = ""
+		var shown := path.get_file() if path.get_file() != "" else (raw if raw != "" else "(empty)")
+		var entry := {}
+		if path.is_empty():
+			errors.append("%s: not a map folder or a .zip" % shown)
+			continue
+		if DirAccess.dir_exists_absolute(path):
+			if _entry_under(path).is_empty():
+				errors.append("%s: not a converted map (no <name>.json beside <name>.bin in it or in convert/)" % shown)
+				continue
+			var target := into.path_join(shown)
+			var into_abs := ProjectSettings.globalize_path(into).simplify_path()
+			var path_abs := ProjectSettings.globalize_path(path)
+			if (into_abs + "/").begins_with(path_abs + "/"):
+				errors.append("%s: holds the maps folder itself" % shown)
+				continue
+			if path_abs != ProjectSettings.globalize_path(target).simplify_path():
+				_wipe(target)
+				if _copy_tree(path, target) == 0:
+					errors.append("%s: could not be copied into %s" % [shown, into])
+					continue
+			entry = _entry_under(target)
+		elif FileAccess.file_exists(path) and ext == "zip":
+			var why := _zip_problem(path)
+			if not why.is_empty():
+				errors.append("%s: %s" % [shown, why])
+				continue
+			var target := into.path_join(shown)
+			DirAccess.make_dir_recursive_absolute(into)
+			if ProjectSettings.globalize_path(path) != ProjectSettings.globalize_path(target).simplify_path() and DirAccess.copy_absolute(path, target) != OK:
+				errors.append("%s: could not be copied into %s" % [shown, into])
+				continue
+			entry = entry_in_zip(target)
+			if entry.is_empty():
+				DirAccess.remove_absolute(target)
+		else:
+			errors.append("%s: not a map folder or a .zip" % shown)
+			continue
+		if entry.is_empty():
+			errors.append("%s: the copy in %s is not a map" % [shown, into])
+			continue
+		entry["root"] = into
+		added.append(entry)
+	for line in errors:
+		DotLog.warn(CHANNEL, "dropped %s" % line)
+	for e in added:
+		DotLog.info(CHANNEL, "dropped map added: %s" % str(e["id"]))
+	return {"added": added, "errors": errors}
+
+
+## Connects [param window]'s [signal Window.files_dropped] to [method accept_dropped]; [param on_result] gets its dictionary.
+static func watch_drops(window: Window, on_result: Callable) -> void:
+	window.files_dropped.connect(func(files: PackedStringArray) -> void: on_result.call(accept_dropped(files)))
 
 
 ## The mesh prefix in [param dir] ([code]<dir>/<name>[/code] for the first [code]<name>.bin[/code], by name, with a
@@ -176,6 +278,136 @@ static func describe_lines(entries: Array[Dictionary]) -> PackedStringArray:
 	for entry in entries:
 		out.append("%s  %s  [%s]  %s" % [entry["id"], entry["title"], entry["kind"], entry["prefix"]])
 	return out
+
+
+## [method entry_at] for [param dir], or for the first map folder one level below (a zip of a folder, a dropped parent of one).
+static func _entry_under(dir: String) -> Dictionary:
+	var entry := entry_at(dir)
+	if not entry.is_empty():
+		return entry
+	var subs := DirAccess.get_directories_at(dir)
+	subs.sort()
+	for sub in subs:
+		if sub.begins_with(".") or sub == "__MACOSX":
+			continue
+		entry = entry_at(dir.path_join(sub))
+		if not entry.is_empty():
+			return entry
+	return {}
+
+
+## The zip's folder in [member zip_cache] (unpacked now if new), or empty for a zip that cannot be read or is unsafe.
+static func _unpacked(zip_path: String) -> String:
+	var key := _zip_hash(zip_path)
+	if key.is_empty():
+		return ""
+	var dir := zip_cache.path_join(key)
+	if FileAccess.file_exists(dir.path_join(".unpacked")):
+		return dir
+	var why := _zip_problem(zip_path)
+	if not why.is_empty():
+		DotLog.warn(CHANNEL, "%s: %s" % [zip_path, why])
+		return ""
+	var part := dir + ".part"
+	_wipe(part)
+	_wipe(dir)
+	var zip := ZIPReader.new()
+	if zip.open(zip_path) != OK:
+		return ""
+	for name in zip.get_files():
+		if name.ends_with("/") or _skipped_in_zip(name):
+			continue
+		var out := part.path_join(name)
+		DirAccess.make_dir_recursive_absolute(out.get_base_dir())
+		var f := FileAccess.open(out, FileAccess.WRITE)
+		if f == null:
+			zip.close()
+			_wipe(part)
+			DotLog.warn(CHANNEL, "%s: cannot write %s" % [zip_path, out])
+			return ""
+		f.store_buffer(zip.read_file(name))
+		f.close()
+	zip.close()
+	var marker := FileAccess.open(part.path_join(".unpacked"), FileAccess.WRITE)
+	if marker == null:
+		_wipe(part)
+		return ""
+	marker.store_string(zip_path)
+	marker.close()
+	if DirAccess.rename_absolute(part, dir) != OK:
+		_wipe(part)
+		return ""
+	DotLog.info(CHANNEL, "unpacked %s into %s" % [zip_path, dir])
+	return dir
+
+
+## Why [param zip_path] is refused (it does not open, holds too many files, a name climbs out of its folder, or no mesh
+## pair), or empty when it is fine to unpack.
+static func _zip_problem(zip_path: String) -> String:
+	var zip := ZIPReader.new()
+	if zip.open(zip_path) != OK:
+		return "not a readable zip"
+	var names := zip.get_files()
+	zip.close()
+	if names.size() > ZIP_MAX_FILES:
+		return "%d files, more than %d" % [names.size(), ZIP_MAX_FILES]
+	var has := {}
+	for name in names:
+		if name.begins_with("/") or name.contains("\\") or name.contains(":") or name.split("/").has(".."):
+			return "unsafe path in the zip: %s" % name
+		if not _skipped_in_zip(name):
+			has[name] = true
+	for name: String in has:
+		if name.get_extension().to_lower() == "bin" and has.has(name.get_basename() + ".json"):
+			return ""
+	return "no <name>.json beside <name>.bin in the zip"
+
+
+static func _skipped_in_zip(name: String) -> bool:
+	return name.begins_with("__MACOSX/") or name.get_file().begins_with("._")
+
+
+## The first 16 hex of the zip's md5, remembered per path until its size or time changes; empty when it cannot be read.
+static func _zip_hash(zip_path: String) -> String:
+	var f := FileAccess.open(zip_path, FileAccess.READ)
+	if f == null:
+		return ""
+	var size := f.get_length()
+	f.close()
+	var mtime := FileAccess.get_modified_time(zip_path)
+	var known: Array = _zip_hashes.get(zip_path, [])
+	if known.size() == 3 and int(known[0]) == size and int(known[1]) == mtime:
+		return str(known[2])
+	var md5 := FileAccess.get_md5(zip_path)
+	if md5.is_empty():
+		return ""
+	_zip_hashes[zip_path] = [size, mtime, md5.substr(0, 16)]
+	return md5.substr(0, 16)
+
+
+static func _copy_tree(from_dir: String, to_dir: String) -> int:
+	if DirAccess.make_dir_recursive_absolute(to_dir) != OK:
+		return 0
+	var count := 0
+	for n in DirAccess.get_files_at(from_dir):
+		if DirAccess.copy_absolute(from_dir.path_join(n), to_dir.path_join(n)) == OK:
+			count += 1
+	for d in DirAccess.get_directories_at(from_dir):
+		count += _copy_tree(from_dir.path_join(d), to_dir.path_join(d))
+	return count
+
+
+## Removes [param dir] with everything in it, hidden names included (the [code].unpacked[/code] marker).
+static func _wipe(dir: String) -> void:
+	var d := DirAccess.open(dir)
+	if d == null:
+		return
+	d.include_hidden = true
+	for sub in d.get_directories():
+		_wipe(dir.path_join(sub))
+	for n in d.get_files():
+		DirAccess.remove_absolute(dir.path_join(n))
+	DirAccess.remove_absolute(dir)
 
 
 static func _title(folder: String, dir: String, name: String) -> String:

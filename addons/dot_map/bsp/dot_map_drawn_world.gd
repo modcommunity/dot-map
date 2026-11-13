@@ -30,7 +30,8 @@ static func read(prefix: String, cloud: Object = null) -> DotResult:
 	return DotResult.success(world)
 
 
-## Draws [param world] under [param parent].
+## Draws [param world] under [param parent]. [code]options.original_textures[/code] (default false) draws the map's own
+## textures ([member DotMapSurfaces.use_original_textures]); pass [method DotMapLocalMaps.is_original] of a local entry, never true for a published map.
 static func attach(parent: Node3D, world: DotMapBspMesh, options: Dictionary = {}) -> DotMapDrawnWorld:
 	var surfaces := _surfaces_for(world, options)
 	var node := world.build_node(surfaces.world_material_for(world, world.source_path.get_base_dir()))
@@ -81,6 +82,7 @@ static func _tell(mark: Callable, label: String) -> void:
 static func _surfaces_for(world: DotMapBspMesh, options: Dictionary) -> DotMapSurfaces:
 	var surfaces := DotMapSurfaces.new(str(options.get("surfaces_root", DotMapSurfaces.DEFAULT_ROOT)))
 	surfaces.use_lightmap = bool(options.get("lightmap", true))
+	surfaces.use_original_textures = bool(options.get("original_textures", false))
 	DotMapStore.apply(world.licence(), options.get("cloud"), surfaces, world)
 	if bool(options.get("one_way_glass", true)) and not world.glass_material_for.is_valid():
 		var cell := DotMapOneWayGlass.cell_of(world.manifest)

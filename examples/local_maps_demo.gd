@@ -1,13 +1,16 @@
 extends "suite_base.gd"
 
-## DotMapLocalMaps: raw convert folders copied under a root are found, named "(local)", loaded and given start points.
-## Headless. The fixture section copies examples/bsp_mesh/fixture; `-- --source=<a map's convert folder>` adds a real
+## DotMapLocalMaps: raw convert folders copied under a root are found, named "(local)", loaded and given start points;
+## zips of them are unpacked once into a cache, and dropped folders and zips are copied in while junk is refused. Headless. The fixture section copies examples/bsp_mesh/fixture; `-- --source=<a map's convert folder>` adds a real
 ## map copied the way a person would, built into a DotMapWorld.
 
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const ROOT_A := "user://local_maps_demo/a"
 const ROOT_B := "user://local_maps_demo/b"
 const ROOT_REAL := "user://local_maps_demo/real"
+const ROOT_ZIP := "user://local_maps_demo/zips"
+const DROP := "user://local_maps_demo/dropped"
+const OUTSIDE := "user://local_maps_demo/outside"
 
 var _source := ""
 
@@ -23,9 +26,13 @@ func _ready() -> void:
 func _run() -> void:
 	print("dot-map local maps")
 	_wipe("user://local_maps_demo")
+	var cache_was := DotMapLocalMaps.zip_cache
+	DotMapLocalMaps.zip_cache = "user://local_maps_demo/.zip_cache"
 	_test_fixture()
-	var sections := 1
-	var checks := 24
+	_test_zip_and_drop()
+	DotMapLocalMaps.zip_cache = cache_was
+	var sections := 2
+	var checks := 24 + 16
 	if _source != "":
 		sections += 1
 		checks += 11
@@ -95,6 +102,96 @@ func _test_fixture() -> void:
 	_check(DotMapLocalMaps.is_original(orig_entry) and DotMapLocalMaps.surfaces_for(orig_entry).use_original_textures, "an _orig pack draws its own textures")
 	_check(DotMapLocalMaps.describe_lines(found).size() == 2, "a summary line per map")
 	_done()
+
+
+func _test_zip_and_drop() -> void:
+	_section("zip and drop: zips unpacked once by hash, dropped folders and zips copied in, junk refused")
+	var src := FIXTURE.get_base_dir()
+	var fixture := {"fixture.json": FileAccess.get_file_as_bytes(src.path_join("fixture.json")),
+			"fixture.bin": FileAccess.get_file_as_bytes(src.path_join("fixture.bin"))}
+	# A zip of a whole map folder (one folder down, convert/ inside), and one of the convert folder's files at its top.
+	_zip(ROOT_ZIP.path_join("fixture_map.zip"), {"fixture_map/convert/fixture.json": fixture["fixture.json"],
+			"fixture_map/convert/fixture.bin": fixture["fixture.bin"], "fixture_map/addon.json": JSON.stringify({"title": "Zipped"}).to_utf8_buffer(),
+			"__MACOSX/fixture_map/._fixture.bin": PackedByteArray([0])})
+	_zip(ROOT_ZIP.path_join("bare.zip"), {"surf_bare.json": _renamed_manifest("surf_bare"), "surf_bare.bin": fixture["fixture.bin"]})
+	_write(ROOT_ZIP.path_join("broken.zip"), "not a zip")
+	_zip(ROOT_ZIP.path_join("climb.zip"), {"../evil.json": fixture["fixture.json"], "../evil.bin": fixture["fixture.bin"]})
+
+	var found := DotMapLocalMaps.scan(PackedStringArray([ROOT_ZIP]))
+	var ids := found.map(func(e: Dictionary) -> String: return str(e["id"]))
+	_check(ids == ["fixture_local", "surf_bare_local"], "two zips are maps, the broken and climbing ones are not: %s" % str(ids))
+	var zipped: Dictionary = found[0] if found.size() > 0 else {}
+	_check(str(zipped.get("zip", "")) == ROOT_ZIP.path_join("fixture_map.zip") and str(zipped.get("root", "")) == ROOT_ZIP, "the entry names its zip and root")
+	_check(str(zipped.get("dir", "")).begins_with(DotMapLocalMaps.zip_cache), "unpacked under the cache: %s" % str(zipped.get("dir", "")))
+	_check(str(zipped.get("title", "")) == "Zipped (local)", "the title from the zipped addon.json")
+	_check(not FileAccess.file_exists("user://local_maps_demo/evil.json"), "a climbing name is never written outside the cache")
+	_check(not _has_file(DotMapLocalMaps.zip_cache, "._fixture.bin"), "__MACOSX litter is not unpacked")
+	_check(DotMapLocalMaps.open(zipped).ok, "the zipped map loads")
+	var cached := DirAccess.get_directories_at(DotMapLocalMaps.zip_cache).size()
+	var stamp := FileAccess.get_modified_time(str(zipped.get("prefix", "")) + ".bin")
+	DotMapLocalMaps.scan(PackedStringArray([ROOT_ZIP]))
+	_check(DirAccess.get_directories_at(DotMapLocalMaps.zip_cache).size() == cached and cached == 2
+			and FileAccess.get_modified_time(str(zipped.get("prefix", "")) + ".bin") == stamp, "a second scan unpacks nothing again (%d cached)" % cached)
+
+	# Dropped: a map folder, a zip, a lone .json (its folder is taken), and junk that must not crash or be copied.
+	_copy_files(src, OUTSIDE.path_join("dropme/convert"), ["fixture.json", "fixture.bin"])
+	_copy_files(src, OUTSIDE.path_join("loose"), ["fixture.json", "fixture.bin"])
+	_rename_pair(OUTSIDE.path_join("loose"), "fixture", "bhop_loose")
+	_write(OUTSIDE.path_join("notes.txt"), "hello")
+	_write(OUTSIDE.path_join("fake.zip"), "PK not really")
+	DirAccess.make_dir_recursive_absolute(OUTSIDE.path_join("emptydir"))
+	var abs_out := ProjectSettings.globalize_path(OUTSIDE)
+	var result := DotMapLocalMaps.accept_dropped(PackedStringArray([abs_out.path_join("dropme"),
+			ProjectSettings.globalize_path(ROOT_ZIP.path_join("bare.zip")), abs_out.path_join("loose/bhop_loose.json"),
+			abs_out.path_join("notes.txt"), abs_out.path_join("fake.zip"), abs_out.path_join("emptydir"),
+			abs_out.path_join("missing"), "", ProjectSettings.globalize_path("user://")]), DROP)
+	var added: Array = result.get("added", [])
+	var errors: PackedStringArray = result.get("errors", PackedStringArray())
+	var added_ids := added.map(func(e: Dictionary) -> String: return str(e["id"]))
+	added_ids.sort()
+	_check(added_ids == ["bhop_loose_local", "fixture_local", "surf_bare_local"], "a folder, a zip and a lone .json's folder are added: %s" % str(added_ids))
+	_check(errors.size() == 6, "six junk drops refused with a reason each: %s" % " | ".join(errors))
+	_check(errors.size() > 0 and errors[0].begins_with("notes.txt: "), "the reason names the dropped file")
+	_check(DirAccess.dir_exists_absolute(DROP.path_join("dropme/convert")) and FileAccess.file_exists(DROP.path_join("bare.zip")),
+			"the folder and zip are copied in")
+	_check(not FileAccess.file_exists(DROP.path_join("fake.zip")) and not DirAccess.dir_exists_absolute(DROP.path_join("emptydir")),
+			"nothing is copied for junk")
+	var rescanned := DotMapLocalMaps.scan(PackedStringArray([DROP]))
+	_check(rescanned.size() == 3, "a rescan of the drop root lists the three: %s" % "; ".join(DotMapLocalMaps.describe_lines(rescanned)))
+	var again := DotMapLocalMaps.accept_dropped(PackedStringArray([abs_out.path_join("dropme")]), DROP)
+	_check((again["added"] as Array).size() == 1 and (again["errors"] as PackedStringArray).is_empty(), "dropping the same folder again replaces the copy")
+	var self_drop := DotMapLocalMaps.accept_dropped(PackedStringArray([ProjectSettings.globalize_path(DROP.path_join("dropme"))]), DROP)
+	_check((self_drop["added"] as Array).size() == 1 and DotMapLocalMaps.open(self_drop["added"][0]).ok, "a folder already in the drop root is kept, not wiped")
+	_done()
+
+
+func _zip(path: String, files: Dictionary) -> void:
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	var zip := ZIPPacker.new()
+	if zip.open(path) != OK:
+		print("    cannot write %s" % path)
+		return
+	for name: String in files:
+		zip.start_file(name)
+		zip.write_file(files[name])
+		zip.close_file()
+	zip.close()
+
+
+func _renamed_manifest(new_name: String) -> PackedByteArray:
+	var parsed: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(FIXTURE.get_base_dir().path_join("fixture.json")))
+	parsed["bin"]["file"] = new_name + ".bin"
+	parsed["name"] = new_name
+	return JSON.stringify(parsed).to_utf8_buffer()
+
+
+func _has_file(dir: String, file: String) -> bool:
+	if FileAccess.file_exists(dir.path_join(file)):
+		return true
+	for d in DirAccess.get_directories_at(dir):
+		if _has_file(dir.path_join(d), file):
+			return true
+	return false
 
 
 func _test_real() -> void:
@@ -184,10 +281,12 @@ func _write(path: String, text: String) -> void:
 
 
 func _wipe(dir: String) -> void:
-	if not DirAccess.dir_exists_absolute(dir):
+	var d := DirAccess.open(dir)
+	if d == null:
 		return
-	for d in DirAccess.get_directories_at(dir):
-		_wipe(dir.path_join(d))
-	for n in DirAccess.get_files_at(dir):
+	d.include_hidden = true
+	for sub in d.get_directories():
+		_wipe(dir.path_join(sub))
+	for n in d.get_files():
 		DirAccess.remove_absolute(dir.path_join(n))
 	DirAccess.remove_absolute(dir)
