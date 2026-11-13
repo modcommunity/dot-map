@@ -44,6 +44,8 @@ func build_breakables(root: Node3D, collision_layer: int = 1, authoritative: boo
 const DEFAULT_SOUND_DIRS: PackedStringArray = [
 	"res://addons/dot_map/sounds", "res://addons/dot_audio/stock/ambience"]
 const DEFAULT_PROP_DIRS: PackedStringArray = ["res://addons/dot_map/props"]
+## What a prop's model is found as in [constant DEFAULT_PROP_DIRS].
+const PROP_EXTS: PackedStringArray = [".glb", ".tscn"]
 
 ## The stand-in models face +Z; a Source model faces +X at yaw 0.
 const PROP_FACING_DEGREES := 90.0
@@ -202,14 +204,20 @@ func build_environment(max_probes: int = 8, sun_shadows: bool = true) -> Node3D:
 
 ## The first resource named [param id] with one of [param exts] in [param dirs], or null.
 static func find_resource(id: String, dirs: PackedStringArray, exts: PackedStringArray) -> Resource:
+	var path := find_resource_path(id, dirs, exts)
+	return null if path.is_empty() else load(path)
+
+
+## Where [method find_resource] loads [param id] from, or "".
+static func find_resource_path(id: String, dirs: PackedStringArray, exts: PackedStringArray) -> String:
 	if id.is_empty():
-		return null
+		return ""
 	for d in dirs:
 		for x in exts:
 			var path := d.path_join(id + x)
 			if ResourceLoader.exists(path):
-				return load(path)
-	return null
+				return path
+	return ""
 
 
 ## The map's ambient sounds as nodes under [code]Sounds[/code]: each [code]ambient_generic[/code] with a free
@@ -293,11 +301,47 @@ func build_props(scene_for: Callable = Callable(), collide_fn: Callable = Callab
 ## [method build_props] that awaits [method DotFrameSlice.pause] between props, so a cover keeps drawing.
 func build_props_async(slice: DotFrameSlice, scene_for: Callable = Callable(), collide_fn: Callable = Callable()) -> Node3D:
 	var build := _props_begin(scene_for, collide_fn)
+	await _read_models_async(build, slice)
 	for rec: Dictionary in manifest.get("props", []):
 		if slice.due():
 			await slice.pause()
 		_prop_one(build, rec)
 	return _props_end(build)
+
+
+## The imported models the props will place, read on loader threads while frames go on and put where [method _place_prop] looks
+## first. Read in the props loop, a model's first load() and its textures' upload were one frame (98 ms and +38 MB of textures
+## for cp-orange-x3's four models on staging02). Without [param build]'s scene_for only: a caller's own lookup is its own.
+func _read_models_async(build: Dictionary, slice: DotFrameSlice) -> void:
+	if (build["scene_for"] as Callable).is_valid():
+		return
+	var cache: Dictionary = build["cache"]
+	var reading := {}  # path -> the stand-in id it is the model of, or "" for a library scene
+	for rec: Dictionary in manifest.get("props", []):
+		var id := str(rec.get("stand_in", ""))
+		if rec.has("box") or id.is_empty() or cache.has(id) or reading.values().has(id):
+			continue
+		var path := find_resource_path(id, DEFAULT_PROP_DIRS, PROP_EXTS)
+		var lib := ""
+		if path.is_empty() and id.begins_with("lib/"):
+			lib = _library_path(id)
+			if lib.begins_with("res://") and ResourceLoader.exists(lib) and not _imported_scenes.has(lib):
+				path = lib
+		if not path.is_empty() and not reading.has(path):
+			reading[path] = "" if path == lib else id
+	# One at a time: a read's textures reach the GPU on the frame it finishes, and the four read together were +39 MB in
+	# one 136 ms frame.
+	for path: String in reading:
+		if ResourceLoader.load_threaded_request(path) != OK:
+			continue
+		while ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			await slice.pause()
+		var res := ResourceLoader.load_threaded_get(path)
+		if str(reading[path]).is_empty():
+			_imported_scenes[path] = res
+		elif res != null:
+			cache[reading[path]] = res
+		await slice.pause()
 
 
 func _props_begin(scene_for: Callable, collide_fn: Callable) -> Dictionary:
@@ -465,7 +509,7 @@ func _place_prop(rec: Dictionary, scene_for: Callable, cache: Dictionary, longes
 	var id := str(rec.get("stand_in", ""))
 	if not cache.has(id):
 		cache[id] = scene_for.call(id) if scene_for.is_valid() \
-				else find_resource(id, DEFAULT_PROP_DIRS, PackedStringArray([".glb", ".tscn"]))
+				else find_resource(id, DEFAULT_PROP_DIRS, PROP_EXTS)
 	if cache[id] == null and id.begins_with("lib/"):
 		var started := Time.get_ticks_msec()
 		cache[id] = _library_model(id)
@@ -659,7 +703,7 @@ func _preload_library_models(ids: Array, scene_for: Callable, cache: Dictionary)
 		if cache.has(id):
 			continue
 		cache[id] = scene_for.call(id) if scene_for.is_valid() \
-				else find_resource(id, DEFAULT_PROP_DIRS, PackedStringArray([".glb", ".tscn"]))
+				else find_resource(id, DEFAULT_PROP_DIRS, PROP_EXTS)
 		if cache[id] == null and id.begins_with("lib/"):
 			var path := _library_path(id)
 			if path.begins_with("res://") and ResourceLoader.exists(path) and not imported.has(path):
