@@ -46,6 +46,9 @@ const DEFAULT_SOUND_DIRS: PackedStringArray = [
 const DEFAULT_PROP_DIRS: PackedStringArray = ["res://addons/dot_map/props"]
 ## What a prop's model is found as in [constant DEFAULT_PROP_DIRS].
 const PROP_EXTS: PackedStringArray = [".glb", ".tscn"]
+## One model of each material kind the models in [constant DEFAULT_PROP_DIRS] use (plain, textured two-sided, blended),
+## read by [method warm_prop_shaders_async].
+const WARM_PROP_MODELS: PackedStringArray = ["sofa", "signpost", "stove"]
 
 ## The stand-in models face +Z; a Source model faces +X at yaw 0.
 const PROP_FACING_DEGREES := 90.0
@@ -342,6 +345,30 @@ func _read_models_async(build: Dictionary, slice: DotFrameSlice) -> void:
 		elif res != null:
 			cache[reading[path]] = res
 		await slice.pause()
+
+
+## Reads [constant WARM_PROP_MODELS] on loader threads, one per frame of [param tree], and keeps them, so the prop materials'
+## shaders compile now and not on the frame a map's props are read (89 ms for cp-orange-x3's signpost on staging02). Call
+## once at a quiet moment, e.g. under a boot cover; a second call returns at once.
+static func warm_prop_shaders_async(tree: SceneTree) -> void:
+	if _props_warming:
+		return
+	_props_warming = true
+	for id: String in WARM_PROP_MODELS:
+		var path := find_resource_path(id, DEFAULT_PROP_DIRS, PROP_EXTS)
+		if path.is_empty() or ResourceLoader.load_threaded_request(path) != OK:
+			continue
+		while ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			await tree.process_frame
+		var res := ResourceLoader.load_threaded_get(path)
+		if res != null:
+			_warm_props.append(res)
+		await tree.process_frame
+
+
+static var _props_warming := false
+## The [constant WARM_PROP_MODELS] read, kept so their compiled shaders stay.
+static var _warm_props: Array[Resource] = []
 
 
 func _props_begin(scene_for: Callable, collide_fn: Callable) -> Dictionary:

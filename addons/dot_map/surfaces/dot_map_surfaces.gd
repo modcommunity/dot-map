@@ -86,6 +86,8 @@ var path_fn: Callable = Callable()
 ## Folders (each laid out like [member root]) a texture under [member root] or [constant DEFAULT_ROOT] is looked for in when this build does not carry it.
 ## The client shell leaves the textures out of its pck and a host adds the mounted surfaces pack's folder here.
 static var fallback_roots: PackedStringArray = PackedStringArray()
+## One material per world shader, kept so [method warm_shaders_async] compiles each only once.
+static var _warm_materials: Array[ShaderMaterial] = []
 
 ## Scales every kind's metallic value. A game that lays baked light over its map sets this to 0
 ## on the instance it bakes with: a lightmap holds diffuse light only, and a metallic surface has
@@ -105,6 +107,9 @@ var water_material: Material = null
 ## Draws a map that carries its author's baked lighting with it (the lightmapped shader, unshaded);
 ## off draws every map with [method try_material]'s lit materials.
 var _textures: Dictionary = {}
+## Told [code]func(label: String)[/code] as [method world_material_for_async] passes its steps and of each material dearer than [constant SLOW_MATERIAL_USEC]; a game's frame trace hangs them on its frames. Unset tells no one.
+var on_step: Callable = Callable()
+const SLOW_MATERIAL_USEC := 8000
 ## Workers that decode the world's texture files ahead of the material pass ([code]map_load_threads[/code]): 0 inline, -1 automatic.
 var load_threads: int = DotMapParallelBuild.default_workers
 ## Longest side of a decoded texture file; larger ones are halved until they fit (0 keeps them). Store slices are imported, never touched.
@@ -237,10 +242,17 @@ func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 ## Each surface's material is then made here, a frame yielded before one that might not fit in what is left of [param slice_ms] (the dearest yet is the guess): making one uploads its textures (6-12 ms for a large set), and the mesh build that follows finds them all made.
 func world_material_for_async(world: DotMapBspMesh, dir: String, slice_ms: int = 8) -> Callable:
 	var sets := _note_sets(world, dir)
+	_tell("materials: sets noted")
 	await _prefetch_async(world, sets["generated"], sets["library"], slice_ms)
+	_tell("materials: prefetched")
 	var material_for := _material_callable(world, sets["generated"], sets["library"], sets["stand_in"], dir)
 	await _make_materials_async(world, material_for, slice_ms)
 	return material_for
+
+
+func _tell(label: String) -> void:
+	if on_step.is_valid():
+		on_step.call(label)
 
 
 ## Calls [param material_for] on each surface ahead of the mesh build. One already made is a cache hit: it costs microseconds and never raises the guess.
@@ -260,7 +272,10 @@ func _make_materials_async(world: DotMapBspMesh, material_for: Callable, slice_m
 			since = Time.get_ticks_usec()
 		var t := Time.get_ticks_usec()
 		material_for.call(rec)
-		guess = maxi(guess, Time.get_ticks_usec() - t)
+		var took := Time.get_ticks_usec() - t
+		guess = maxi(guess, took)
+		if took > SLOW_MATERIAL_USEC:
+			_tell("materials: %s took %.1f ms" % [str(rec.get("free", "")), took / 1000.0])
 	await tree.process_frame    # the mesh build that follows starts a frame of its own
 	DotLog.debug(CHANNEL, "world materials made ahead", {"surfaces": world.surfaces.size(), "dearest_ms": guess / 1000.0})
 
@@ -439,6 +454,17 @@ func _prefetch_done(plan: Dictionary, decode_ms: int) -> void:
 
 
 ## The suffix of the pre-baked texture this build loads (`dot-map-convert/tools/bake_textures.gd`), "" when it has no VRAM format to read.
+## Compiles the world shaders (lightmapped, blended, liquid) one per frame of [param tree], so the first converted world drawn later does not stop a frame for the compile (about 85 ms for the lightmapped one on a desktop GPU). Call once at a quiet moment, e.g. under a boot cover; a second call returns at once.
+static func warm_shaders_async(tree: SceneTree) -> void:
+	if not _warm_materials.is_empty():
+		return
+	for shader: Shader in [LIGHTMAPPED, BLENDED, LIQUID]:
+		var m := ShaderMaterial.new()
+		m.shader = shader
+		_warm_materials.append(m)
+		await tree.process_frame
+
+
 static func baked_variant() -> String:
 	return DotMapTextureBake.pick_variant(OS.has_feature, OS.get_environment("NOCOMP") != "")
 
