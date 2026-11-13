@@ -96,6 +96,9 @@ var metallic_scale: float = 1.0
 ## colour; off draws every kind's photo as it is (which read pale beside dark source wood and rock).
 var match_original: bool = true
 
+## Draw a surface with the map's own texture where its record names one (`orig`, written by `dot-map-convert` `regen --orig-textures` into an internal `_orig` pack): the file beside the pack, at the mesh's own UVs (source coordinate over source size, so one repeat is the original's). A surface without one, or whose file is missing, keeps its free replacement. INTERNAL packs only: never published.
+var use_original_textures: bool = false
+
 ## What [method world_material_for] draws water faces with (a game's own water shader); null is [method liquid_material] by the face's name.
 var water_material: Material = null
 
@@ -227,7 +230,7 @@ func material(kind: StringName, tint: Color = Color.WHITE) -> StandardMaterial3D
 func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 	var sets := _note_sets(world, dir)
 	_prefetch(world, sets["generated"], sets["library"])
-	return _material_callable(world, sets["generated"], sets["library"], sets["stand_in"])
+	return _material_callable(world, sets["generated"], sets["library"], sets["stand_in"], dir)
 
 
 ## [method world_material_for] whose texture decode yields a frame whenever [param slice_ms] has passed ([method prefetch]), so the decode never holds one frame.
@@ -235,7 +238,7 @@ func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 func world_material_for_async(world: DotMapBspMesh, dir: String, slice_ms: int = 8) -> Callable:
 	var sets := _note_sets(world, dir)
 	await _prefetch_async(world, sets["generated"], sets["library"], slice_ms)
-	var material_for := _material_callable(world, sets["generated"], sets["library"], sets["stand_in"])
+	var material_for := _material_callable(world, sets["generated"], sets["library"], sets["stand_in"], dir)
 	await _make_materials_async(world, material_for, slice_ms)
 	return material_for
 
@@ -297,12 +300,16 @@ func _resolve_sets(world: DotMapBspMesh, dir: String) -> Dictionary:
 	return {"generated": generated, "library": library, "stand_in": stand_in, "missing": missing}
 
 
-func _material_callable(world: DotMapBspMesh, generated: Dictionary, library: Dictionary, stand_in: Dictionary) -> Callable:
+func _material_callable(world: DotMapBspMesh, generated: Dictionary, library: Dictionary, stand_in: Dictionary, dir: String = "") -> Callable:
 	var cache := {}
 	return func(rec: Dictionary) -> Material:
 		if rec.get("water", false):
 			return water_material if water_material != null else liquid_material(liquid_kind(str(rec.get("material", ""))))
 		var lit := use_lightmap and world.has_lightmap() and rec.has("lightmap_page") and not rec.has("glass")
+		if use_original_textures and not rec.has("glass") and str(rec.get("orig", "")) != "":
+			var own := _original_material(world, rec, dir, lit, cache)
+			if own != null:
+				return own
 		var free := str(rec.get("free", ""))
 		var tint := Color.WHITE
 		# A blend's average is two textures' (grass and rock), never the one drawn: left untinted.
@@ -339,6 +346,30 @@ func _material_callable(world: DotMapBspMesh, generated: Dictionary, library: Di
 			m = material(StringName(free.get_slice(":", 0)), tint)
 		cache[key] = m
 		return m
+
+
+## The material of a surface drawn with the map's own texture at the mesh UVs, or null when the pack has no such file. One per texture and lightmap page.
+func _original_material(world: DotMapBspMesh, rec: Dictionary, dir: String, lit: bool, cache: Dictionary) -> Material:
+	var file := dir.path_join(str(rec["orig"]))
+	var key := "orig|%s|%s|%s" % [file, rec.get("lightmap_page", -1) if lit else -1, rec.get("emissive", false)]
+	if cache.has(key):
+		return cache[key]
+	var tex := _file_texture(file)
+	if tex == null:
+		return null
+	var m: Material
+	if lit:
+		var sm := _lightmapped(world, rec, "orig", Color.WHITE, "", "", tex)
+		if sm is ShaderMaterial:
+			(sm as ShaderMaterial).set_shader_parameter("use_uv", true)
+		m = sm
+	else:
+		var st := StandardMaterial3D.new()
+		st.albedo_texture = tex
+		st.texture_repeat = true
+		m = st
+	cache[key] = m
+	return m
 
 
 ## Splits the files the world's surfaces use into those still to decode from disk and the imported ones (already requested); a pre-baked file is taken here.
