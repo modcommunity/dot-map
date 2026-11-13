@@ -2,7 +2,7 @@ extends "bsp_mesh_parts/tests_image.gd"
 
 ## [DotMapBspMesh]: the converter's fixture read, built, and ray-cast.
 
-const CHECKS := 172
+const CHECKS := 175
 const SECTIONS := 14
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
@@ -662,6 +662,37 @@ func _test_terrain() -> void:
 	var broken: Dictionary = fx["terrain"].duplicate()
 	broken["bytes"] = 1
 	_check(DotMapTerrain.from_dict(broken).code() == DotError.CODE_PARSE, "a wrong size is refused as a parse error")
+	# build_mesh() builds packed arrays directly; it must match the SurfaceTool reference it replaced
+	var tr: DotMapTerrain = DotMapTerrain.from_dict(fx["terrain"]).value
+	var built := tr.build_mesh()
+	var arr_got: Array = built.surface_get_arrays(0)
+	var ref_st := SurfaceTool.new()
+	ref_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var ground := tr.faces()
+	for k in ground.size():
+		ref_st.set_uv(Vector2(ground[k].x, ground[k].z))
+		ref_st.add_vertex(ground[k])
+	var skirt_tris := tr.skirt_faces()
+	for k in range(0, skirt_tris.size(), 3):
+		for side in 2:
+			for v in 3:
+				var q: Vector3 = skirt_tris[k + (v if side == 0 else 2 - v)]
+				ref_st.set_uv(Vector2(q.x + q.z, q.y))
+				ref_st.add_vertex(q)
+	ref_st.generate_normals()
+	var arr_want: Array = ref_st.commit_to_arrays()
+	_check(arr_got[Mesh.ARRAY_VERTEX].size() == arr_want[Mesh.ARRAY_VERTEX].size(), "terrain mesh vertex count matches the SurfaceTool reference: %d vs %d" % [arr_got[Mesh.ARRAY_VERTEX].size(), arr_want[Mesh.ARRAY_VERTEX].size()])
+	var worst := 0.0
+	var ground_n: int = ground.size()
+	for k in mini(arr_got[Mesh.ARRAY_NORMAL].size(), arr_want[Mesh.ARRAY_NORMAL].size()):
+		if k < ground_n:
+			worst = maxf(worst, (arr_got[Mesh.ARRAY_NORMAL][k] - arr_want[Mesh.ARRAY_NORMAL][k]).length())
+	_check(worst < 0.001, "ground normals match the SurfaceTool reference (worst %f)" % worst)
+	var uv_ok := true
+	for k in mini(arr_got[Mesh.ARRAY_TEX_UV].size(), arr_want[Mesh.ARRAY_TEX_UV].size()):
+		if not arr_got[Mesh.ARRAY_TEX_UV][k].is_equal_approx(arr_want[Mesh.ARRAY_TEX_UV][k]):
+			uv_ok = false
+	_check(uv_ok, "terrain uvs match the reference")
 	_done()
 
 

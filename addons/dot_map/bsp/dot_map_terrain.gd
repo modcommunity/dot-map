@@ -230,23 +230,63 @@ func build_shape(with_skirt: bool = false) -> ConcavePolygonShape3D:
 	return shape
 
 
-## A drawable mesh of [method faces] with normals and UVs in metres (x, z), then the skirt
-## (both sides, UVs along the edge and down).
+## A drawable mesh of [method faces] with smooth normals and UVs in metres (x, z), then the skirt
+## (both sides, UVs along the edge and down). Built from packed arrays straight into
+## [method ArrayMesh.add_surface_from_arrays], with no [SurfaceTool]: that holds about a hundred
+## bytes per vertex and its smoothing tables on top, which a five-million-vertex island (the web
+## build's 2 GB wasm heap) cannot afford. The normals are the ones [method SurfaceTool.generate_normals]
+## gave (a vertex shared by triangles takes their sum; the skirt's two sides cancel, so its lower
+## edge has none and its upper edge takes the ground's), summed per grid sample rather than hashed.
 func build_mesh() -> ArrayMesh:
-	var tool := SurfaceTool.new()
-	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for p in faces():
-		tool.set_uv(Vector2(p.x, p.z))
-		tool.add_vertex(p)
+	var ground := faces()
 	var wall := skirt_faces()
+	var count := ground.size() + wall.size() * 2
+	var mesh := ArrayMesh.new()
+	if count == 0:
+		return mesh
+	var verts := PackedVector3Array()
+	verts.resize(count)
+	var uvs := PackedVector2Array()
+	uvs.resize(count)
+	var normals := PackedVector3Array()
+	normals.resize(count)
+	# The sum of the face normals at each grid sample.
+	var sums := PackedVector3Array()
+	sums.resize(nx * nz)
+	var inv := 1.0 / cell
+	for k in range(0, ground.size(), 3):
+		var a := ground[k]
+		var b := ground[k + 1]
+		var c := ground[k + 2]
+		var n := (a - c).cross(a - b).normalized()
+		sums[roundi((a.z - origin_z) * inv) * nx + roundi((a.x - origin_x) * inv)] += n
+		sums[roundi((b.z - origin_z) * inv) * nx + roundi((b.x - origin_x) * inv)] += n
+		sums[roundi((c.z - origin_z) * inv) * nx + roundi((c.x - origin_x) * inv)] += n
+	for k in ground.size():
+		var p := ground[k]
+		verts[k] = p
+		uvs[k] = Vector2(p.x, p.z)
+		normals[k] = sums[roundi((p.z - origin_z) * inv) * nx + roundi((p.x - origin_x) * inv)].normalized()
+	var at := ground.size()
 	for k in range(0, wall.size(), 3):
 		for side in 2:
 			for v in 3:
 				var p := wall[k + (v if side == 0 else 2 - v)]
-				tool.set_uv(Vector2(p.x + p.z, p.y))
-				tool.add_vertex(p)
-	tool.generate_normals()
-	return tool.commit()
+				verts[at] = p
+				uvs[at] = Vector2(p.x + p.z, p.y)
+				# The two sides cancel, so only a vertex on the ground's own sample has a normal.
+				var i := roundi((p.x - origin_x) * inv)
+				var j := roundi((p.z - origin_z) * inv)
+				if is_equal_approx(p.y, sample(i, j)):
+					normals[at] = sums[j * nx + i].normalized()
+				at += 1
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
 
 
 ## Points every [param spacing] metres whose nearest sample a walker reached, on the surface;
