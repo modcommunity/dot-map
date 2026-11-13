@@ -9,5 +9,6 @@ extends RefCounted
 # DotMapSurfaces, the surface-kind material library (and its textures in surfaces/).
 # 22: DotMapDef.profile, DotMapRotationFile.profile_changed, DotMapConfig.apply_values (per-map mode/cfg profiles).
 # 23: DotMapLocalMaps (raw convert folders under res://addons/maps and user://maps, offered as "(local)").
-const LEVEL := 23
+# 24: DotMapLocalMaps zips (entry_in_zip, zip_cache) and drag-and-drop (accept_dropped, watch_drops, DROP_ROOT); DotMapDrawnWorld option original_textures.
+const LEVEL := 24
 const OLDEST := 1
