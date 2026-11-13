@@ -8,5 +8,6 @@ extends RefCounted
 # DotMapCatalogue.add_delivered. 3: a relative scene given to either is resolved onto the pack's mount. 4:
 # DotMapSurfaces, the surface-kind material library (and its textures in surfaces/).
 # 22: DotMapDef.profile, DotMapRotationFile.profile_changed, DotMapConfig.apply_values (per-map mode/cfg profiles).
-const LEVEL := 22
+# 23: DotMapLocalMaps (raw convert folders under res://addons/maps and user://maps, offered as "(local)").
+const LEVEL := 23
 const OLDEST := 1

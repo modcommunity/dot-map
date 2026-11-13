@@ -20,7 +20,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 
 | Path | What |
 | --- | --- |
-| `addons/dot_map/core/` | `DotMapDef` (id, version, scene, pack, tier, player range), `DotMapCatalogue` (the JSON an operator edits) |
+| `addons/dot_map/core/` | `DotMapDef` (id, version, scene, pack, tier, player range), `DotMapCatalogue` (the JSON an operator edits), `DotMapLocalMaps` (raw convert folders under `res://addons/maps` and `user://maps`, listed as "(local)", `examples/local_maps_demo.tscn`) [local maps](docs/content.md#local-maps-a-convert-folder-copied-in-by-hand) |
 | `addons/dot_map/runtime/` | `DotMapLoader` (def to `PackedScene`, fetching first), `DotMapRotation`, `DotMapRotationFile` (`cfg/addons/dot_map/maps.yml`, the game and operator tiers, `merge: true`, `exempt:` (alias `remove:`), per-map `mode:`/`cfg:` profiles on `DotMapDef.profile`, legacy `cfg/maps.yml` via `DotCfgLegacy`), `DotMapSession` (the node a game adds) |
 | `addons/dot_map/net/` | `DotMapMessage` (the five messages), `DotMapSyncHost` (announce, wait, swap; read its class doc), `DotMapSyncClient` (fetch, ready, load; owns the trust rules) |
 | `addons/dot_map/surfaces/` | `DotMapSurfaces`: a surface kind (`&"brick"`) to a world-space triplanar material; 28 CC0 photo kinds (four carpets, snow, rock, sand, cut stone, clay roof, ceiling tile, worn plaster and two wallpapers among them), credits beside them. [surfaces](docs/surfaces.md) |
