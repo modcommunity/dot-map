@@ -25,7 +25,7 @@ func _run() -> void:
 	_wipe("user://local_maps_demo")
 	_test_fixture()
 	var sections := 1
-	var checks := 22
+	var checks := 24
 	if _source != "":
 		sections += 1
 		checks += 11
@@ -90,6 +90,9 @@ func _test_fixture() -> void:
 
 	_write(ROOT_B.path_join("convert/surf_fixture.bin"), "not a mesh")
 	_check(not DotMapLocalMaps.open(surf).ok, "a damaged copy fails to load, it does not crash")
+	_check(not DotMapLocalMaps.is_original(fx) and not DotMapLocalMaps.surfaces_for(fx).use_original_textures, "a plain local map keeps the free textures")
+	var orig_entry := {"name": "bhop_amor_orig"}
+	_check(DotMapLocalMaps.is_original(orig_entry) and DotMapLocalMaps.surfaces_for(orig_entry).use_original_textures, "an _orig pack draws its own textures")
 	_check(DotMapLocalMaps.describe_lines(found).size() == 2, "a summary line per map")
 	_done()
 
