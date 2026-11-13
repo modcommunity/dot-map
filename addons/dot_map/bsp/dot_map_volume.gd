@@ -31,9 +31,17 @@ const COLUMN_SLACK := 0.03
 ## than a sheet's width between two ticks cannot step over it. Hurt, water and ladder are never grown:
 ## a kill sheet under a floor would reach a body standing on it.
 static var min_thickness: float = 0.25
+## Metres the volume's box is grown by before a column is culled against it: far more than the plane test's 0.0001 slack.
+const COLUMN_CULL_PAD := 0.01
 const THICKEN_KINDS := ["multiple", "once", "teleport", "push", "gravity"]
 
 var _brushes: Array = []
+var _bounds_cache := AABB()
+var _bounds_cached := false
+var _boxes_cache: Array[AABB] = []
+var _boxes_cached := false
+var _column_box := AABB()
+var _column_box_cached := false
 
 
 ## Builds from a record of the manifest's [code]volumes[/code].
@@ -69,6 +77,9 @@ static func from_record(rec: Dictionary) -> DotMapVolume:
 ## so an angled sheet is thickened too, and nothing grows along the sheet's edges): the two planes facing
 ## opposite ways on that normal move out by half the shortfall each.
 func _thicken(thickness: float) -> void:
+	_bounds_cached = false
+	_boxes_cached = false
+	_column_box_cached = false
 	for planes: Array in _brushes:
 		var verts: Array[Vector3] = []
 		for i in planes.size():
@@ -113,6 +124,20 @@ func contains(point: Vector3) -> bool:
 	return false
 
 
+## Whether [method column_box] is usable: every brush has corners to box.
+func culls_columns() -> bool:
+	return brush_boxes().size() == _brushes.size() and not _brushes.is_empty()
+
+
+## Every brush's box, grown by what [method touches_column] allows a column below its feet and beyond a plane: a column
+## whose feet and head lie outside it touches no brush of the volume.
+func column_box() -> AABB:
+	if not _column_box_cached:
+		_column_box = bounds().grow(COLUMN_SLACK + COLUMN_CULL_PAD)
+		_column_box_cached = true
+	return _column_box
+
+
 ## Whether the vertical column from [param feet] up [param height] metres touches the volume: the exact
 ## test of a segment against each convex brush, so a slab thinner than the points [method contains]
 ## samples (a belt laid flat on a floor) still catches a body standing on it.
@@ -143,8 +168,11 @@ func push_velocity() -> Vector3:
 	return direction * speed if kind == "push" else Vector3.ZERO
 
 
-## The box around every brush (corners found from plane triples).
+## The box around every brush (corners found from plane triples). Found once: the brushes do not move after load, and a
+## map's logic asks per body per tick.
 func bounds() -> AABB:
+	if _bounds_cached:
+		return _bounds_cache
 	var box := AABB()
 	var first := true
 	for planes: Array in _brushes:
@@ -156,11 +184,15 @@ func bounds() -> AABB:
 						continue
 					box = AABB(hit, Vector3.ZERO) if first else box.expand(hit)
 					first = false
+	_bounds_cache = box
+	_bounds_cached = true
 	return box
 
 
 ## One box per brush (a ladder or a water brush is one convex box; a union would span the gaps).
 func brush_boxes() -> Array[AABB]:
+	if _boxes_cached:
+		return _boxes_cache
 	var out: Array[AABB] = []
 	for planes: Array in _brushes:
 		var box := AABB()
@@ -175,6 +207,8 @@ func brush_boxes() -> Array[AABB]:
 					first = false
 		if not first:
 			out.append(box)
+	_boxes_cache = out
+	_boxes_cached = true
 	return out
 
 
