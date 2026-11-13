@@ -7,6 +7,8 @@ const SUN_CHECKS := 3
 const LIGHT_CHECKS := 5
 const OFF_TREE_CHECKS := 4
 const MAP_CHECKS := 4
+const TRI_CHECKS := 3
+const VisStats := preload("res://examples/vis_stats.gd")
 const ErrorCatcher := preload("res://examples/error_catcher.gd")
 
 var _passed := 0
@@ -14,8 +16,8 @@ var _failed := 0
 var _failures := PackedStringArray()
 var _entered := 0
 var _completed := 0
-var _expected_sections := 4
-var _expected_checks := SYNTH_CHECKS + SUN_CHECKS + LIGHT_CHECKS + OFF_TREE_CHECKS
+var _expected_sections := 5
+var _expected_checks := SYNTH_CHECKS + SUN_CHECKS + LIGHT_CHECKS + OFF_TREE_CHECKS + TRI_CHECKS
 
 
 func _ready() -> void:
@@ -36,6 +38,7 @@ func _run() -> void:
 	_test_sun_reach()
 	_test_light_cache()
 	_test_off_tree()
+	_test_tri_count()
 	var maps := _arg("maps", "")
 	for prefix in (maps.split(",", false) if not maps.is_empty() else PackedStringArray()):
 		_expected_sections += 1
@@ -229,6 +232,28 @@ func _test_synthetic() -> void:
 	vis.queue_free()
 	drawn.queue_free()
 	_completed += 1
+
+
+## vis_stats counts triangles per chunk; a primitive mesh (BoxMesh) has no surface arrays and must count 0, not crash.
+func _test_tri_count() -> void:
+	_entered += 1
+	var verts := PackedVector3Array([Vector3(0, 0, 0), Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(1, 1, 0), Vector3(0, 0, 1), Vector3(1, 0, 1)])
+	var one := ArrayMesh.new()
+	one.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _surface_arrays(verts))
+	var two := ArrayMesh.new()
+	two.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _surface_arrays(verts))
+	two.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _surface_arrays(verts.slice(0, 3)))
+	_check(VisStats.tri_count(BoxMesh.new()) == 0, "a BoxMesh counts 0 triangles and does not error")
+	_check(VisStats.tri_count(one) == 2, "an ArrayMesh of 6 vertices is 2 triangles (%d)" % VisStats.tri_count(one))
+	_check(VisStats.tri_count(two) == 3, "two surfaces add up: 2 + 1 triangles (%d)" % VisStats.tri_count(two))
+	_completed += 1
+
+
+func _surface_arrays(verts: PackedVector3Array) -> Array:
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	return arrays
 
 
 func _test_map(prefix: String, points: int, rays: int) -> void:

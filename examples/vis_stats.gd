@@ -16,6 +16,16 @@ func _arg(key: String, fallback: String) -> String:
 	return fallback
 
 
+## Triangles in a mesh's surfaces. Only an ArrayMesh has surface arrays: a primitive (BoxMesh, ...) counts as 0.
+static func tri_count(mesh: Mesh) -> int:
+	if not mesh is ArrayMesh:
+		return 0
+	var t := 0
+	for s in mesh.get_surface_count():
+		t += (mesh as ArrayMesh).surface_get_array_len(s) / 3
+	return t
+
+
 func _run() -> void:
 	var points := int(_arg("points", "60"))
 	for prefix in _arg("maps", "").split(",", false):
@@ -42,8 +52,7 @@ func _run() -> void:
 			var t := 0
 			if n is MeshInstance3D and (n as MeshInstance3D).mesh != null:
 				chunk_n += 1
-				for s in (n as MeshInstance3D).mesh.get_surface_count():
-					t += (n as MeshInstance3D).mesh.surface_get_array_len(s) / 3
+				t = tri_count((n as MeshInstance3D).mesh)
 			tris.append(t)
 			tris_all += t
 			if cl.has(-1):
