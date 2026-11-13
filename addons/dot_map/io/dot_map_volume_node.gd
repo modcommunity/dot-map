@@ -33,7 +33,18 @@ func active() -> bool:
 func step(io: DotMapIO, bodies: Array) -> void:
 	var now_in := {}
 	if active():
+		# A body whose column lies outside the volume's box touches none of it: most volumes of a map are far from most
+		# bodies, and the exact test below costs a call per brush plane.
+		var culls := volume.culls_columns()
+		var box := volume.column_box()
+		var lo := box.position
+		var hi := box.end
 		for info: Dictionary in bodies:
+			if culls:
+				var at: Vector3 = info["position"]
+				if at.x < lo.x or at.x > hi.x or at.z < lo.z or at.z > hi.z or at.y > hi.y \
+						or at.y + float(info.get("height", 1.8)) < lo.y:
+					continue
 			if _admits(io, info) and _touches(info):
 				now_in[info["id"]] = info
 	else:
