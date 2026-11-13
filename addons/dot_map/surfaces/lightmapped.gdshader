@@ -8,6 +8,7 @@ uniform sampler2D albedo_tex : source_color, filter_linear_mipmap_anisotropic, r
 uniform sampler2D lightmap : filter_linear, repeat_disable;
 uniform vec3 tint : source_color = vec3(1.0);
 uniform float metres = 2.0;
+uniform bool use_uv = false;    // the author's own texture: sampled at the mesh UV (source coordinate over source size), not triplanar
 uniform float sharpness = 4.0;
 uniform float exposure = 1.0;
 uniform float emissive = 0.0;
@@ -68,6 +69,9 @@ void fragment() {
 	vec3 s = (texture(albedo_tex, wpos.zy / metres).rgb * w.x
 			+ texture(albedo_tex, wpos.xz / metres).rgb * w.y
 			+ texture(albedo_tex, wpos.xy / metres).rgb * w.z) * tint;
+	if (use_uv) {
+		s = texture(albedo_tex, UV).rgb * tint;
+	}
 	if (has_blend) {
 		vec3 s2 = (texture(albedo2_tex, wpos.zy / metres).rgb * w.x
 				+ texture(albedo2_tex, wpos.xz / metres).rgb * w.y
