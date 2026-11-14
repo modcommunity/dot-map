@@ -234,7 +234,7 @@ func material(kind: StringName, tint: Color = Color.WHITE) -> StandardMaterial3D
 ## beside [param dir] (the pack's directory).
 func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 	var sets := _note_sets(world, dir)
-	_prefetch(world, sets["generated"], sets["library"])
+	_prefetch(world, sets["generated"], sets["library"], sets["stand_in"])
 	return _material_callable(world, sets["generated"], sets["library"], sets["stand_in"], dir)
 
 
@@ -243,7 +243,7 @@ func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 func world_material_for_async(world: DotMapBspMesh, dir: String, slice_ms: int = 8) -> Callable:
 	var sets := _note_sets(world, dir)
 	_tell("materials: sets noted")
-	await _prefetch_async(world, sets["generated"], sets["library"], slice_ms)
+	await _prefetch_async(world, sets["generated"], sets["library"], slice_ms, sets["stand_in"])
 	_tell("materials: prefetched")
 	await _warm_textures_async(world, sets, dir, slice_ms)
 	var material_for := _material_callable(world, sets["generated"], sets["library"], sets["stand_in"], dir)
@@ -375,7 +375,7 @@ func _note_sets(world: DotMapBspMesh, dir: String) -> Dictionary:
 ## Reads the map's textures ahead of [method world_material_for] without holding the main thread: decoded in batches on workers, a frame yielded whenever [param slice_ms] has passed, so dot-cloud's fetch callbacks and the loading cover keep running. The later [method world_material_for] finds them cached. Inline (no yield) when there are no workers.
 func prefetch(world: DotMapBspMesh, dir: String, slice_ms: int = 8) -> void:
 	var sets := _resolve_sets(world, dir)
-	await _prefetch_async(world, sets["generated"], sets["library"], slice_ms)
+	await _prefetch_async(world, sets["generated"], sets["library"], slice_ms, sets["stand_in"])
 
 
 func _resolve_sets(world: DotMapBspMesh, dir: String) -> Dictionary:
@@ -470,7 +470,7 @@ func _original_material(world: DotMapBspMesh, rec: Dictionary, dir: String, lit:
 
 
 ## Splits the files the world's surfaces use into those still to decode from disk and the imported ones (already requested); a pre-baked file is taken here.
-func _prefetch_plan(world: DotMapBspMesh, generated: Dictionary, library: Dictionary) -> Dictionary:
+func _prefetch_plan(world: DotMapBspMesh, generated: Dictionary, library: Dictionary, stand_in: Dictionary = {}) -> Dictionary:
 	var used := {}
 	for rec: Dictionary in world.surfaces:
 		used[str(rec.get("free", ""))] = true
@@ -485,6 +485,9 @@ func _prefetch_plan(world: DotMapBspMesh, generated: Dictionary, library: Dictio
 				var found := _set_file(library[key], part)
 				if not found.is_empty():
 					files.append(found)
+	for key: String in stand_in:    # a stand-in's webp decodes 5-15 ms: on a worker, not in the material
+		if used.has(key) and (stand_in[key] as Dictionary).has("file"):
+			files.append(str(stand_in[key]["file"]))
 	var disk := PackedStringArray()
 	var imported := PackedStringArray()
 	var baked := 0
@@ -504,19 +507,19 @@ func _prefetch_plan(world: DotMapBspMesh, generated: Dictionary, library: Dictio
 	return {"disk": disk, "imported": imported, "baked": baked}
 
 
-func _prefetch(world: DotMapBspMesh, generated: Dictionary, library: Dictionary) -> void:
+func _prefetch(world: DotMapBspMesh, generated: Dictionary, library: Dictionary, stand_in: Dictionary = {}) -> void:
 	if DotParallel.resolve_workers(load_threads) == 0:
 		return
-	var plan := _prefetch_plan(world, generated, library)
+	var plan := _prefetch_plan(world, generated, library, stand_in)
 	var started := Time.get_ticks_msec()
 	_textures.merge(DotMapParallelBuild.textures(plan["disk"], load_threads, max_texture_size, half_res_masks, half_res_normals))
 	_prefetch_done(plan, Time.get_ticks_msec() - started)
 
 
-func _prefetch_async(world: DotMapBspMesh, generated: Dictionary, library: Dictionary, slice_ms: int) -> void:
+func _prefetch_async(world: DotMapBspMesh, generated: Dictionary, library: Dictionary, slice_ms: int, stand_in: Dictionary = {}) -> void:
 	if DotParallel.resolve_workers(load_threads) == 0:
 		return
-	var plan := _prefetch_plan(world, generated, library)
+	var plan := _prefetch_plan(world, generated, library, stand_in)
 	var started := Time.get_ticks_msec()
 	_textures.merge(await DotMapParallelBuild.textures_async(plan["disk"], load_threads, max_texture_size, half_res_masks, slice_ms, half_res_normals))
 	# load_threaded_get blocks until its load is done: wait for the imported ones a frame at a time instead.
