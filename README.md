@@ -1,5 +1,3 @@
-# dot-map
-
 Maps as content, not as builds. One Godot game can carry a hundred maps and switch between them under live players. dot-map gives you a map catalogue, a rotation with a cooldown, a time limit with rock-the-vote, nominations and voting, a loader that turns a map into a scene, and tools for drawing converted BSP maps. Part of TMC's open source **Dot** collection (MIT licence).
 
 > Built with Claude Code. Every addon has a headless test suite and the suites pass, but little of this has met real players yet. Please report rough edges.
