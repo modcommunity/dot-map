@@ -245,9 +245,91 @@ func world_material_for_async(world: DotMapBspMesh, dir: String, slice_ms: int =
 	_tell("materials: sets noted")
 	await _prefetch_async(world, sets["generated"], sets["library"], slice_ms)
 	_tell("materials: prefetched")
+	await _warm_textures_async(world, sets, dir, slice_ms)
 	var material_for := _material_callable(world, sets["generated"], sets["library"], sets["stand_in"], dir)
 	await _make_materials_async(world, material_for, slice_ms)
 	return material_for
+
+
+## Reads each texture file the surfaces use that the prefetch left (no loader threads, or one it could not take), one file per step, a frame yielded before one that might not fit in what is left of [param slice_ms]. A set's albedo, normal, roughness and AO decode (and mip and compress) 4-18 ms together: made inside one material they held one frame. [method _file_texture] caches by path, so the material built later finds each and looks the same.
+func _warm_textures_async(world: DotMapBspMesh, sets: Dictionary, dir: String, slice_ms: int) -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	var files := PackedStringArray()
+	var used := {}
+	for rec: Dictionary in world.surfaces:
+		if rec.has("glass") or rec.get("water", false):
+			continue
+		used[str(rec.get("free", ""))] = true
+		used[str(rec.get("free2", ""))] = true
+		if use_original_textures and str(rec.get("orig", "")) != "":
+			files.append(dir.path_join(str(rec["orig"])))
+	var lit := use_lightmap and world.has_lightmap()
+	var library: Dictionary = sets["library"]
+	var generated: Dictionary = sets["generated"]
+	var stand_in: Dictionary = sets["stand_in"]
+	for key: String in used:
+		if library.has(key):
+			for part in ["albedo", "normal", "roughness", "ao"]:
+				var found := _set_file(library[key], part)
+				if not found.is_empty():
+					files.append(found)
+		elif lit and generated.has(key):
+			files.append(generated[key])
+		elif stand_in.has(key) and (stand_in[key] as Dictionary).has("file"):
+			files.append(str(stand_in[key]["file"]))
+	var pace := {"since": Time.get_ticks_usec() - slice_ms * 1000, "guess": 0}
+	if lit:    # the first lit material builds the baked light's atlas pages: one per step here, and the floor light's scan
+		var pages: Array = (world.manifest.get("lightmap", {}) as Dictionary).get("pages", [])
+		for i in pages.size():
+			await _pace(pace, slice_ms, tree)
+			var t := Time.get_ticks_usec()
+			world.lightmap_page(i)
+			pace["guess"] = maxi(pace["guess"], Time.get_ticks_usec() - t)
+		await _pace(pace, slice_ms, tree)
+		world.light_floor()
+	var seen := {}
+	for p in files:
+		if seen.has(p) or _textures.has(p):
+			continue
+		seen[p] = true
+		await _warm_file_async(p, pace, slice_ms, tree)
+
+
+## [method _file_texture] for a file only a raw decode can give, in its three steps (decode, mip, compress) each its own piece of the budget; the same calls in the same order, so the texture is the same. An imported or pre-baked file is one cheap load: left to [method _file_texture].
+func _warm_file_async(path: String, pace: Dictionary, slice_ms: int, tree: SceneTree) -> void:
+	if (path.begins_with("res://") and ResourceLoader.exists(path)) or _baked_texture(path) != null:
+		await _pace(pace, slice_ms, tree)
+		var t := Time.get_ticks_usec()
+		_file_texture(path)
+		pace["guess"] = maxi(pace["guess"], Time.get_ticks_usec() - t)
+		return
+	await _pace(pace, slice_ms, tree)
+	var t0 := Time.get_ticks_usec()
+	var img := Image.load_from_file(path)
+	pace["guess"] = maxi(pace["guess"], Time.get_ticks_usec() - t0)
+	if img == null:
+		return
+	await _pace(pace, slice_ms, tree)
+	t0 = Time.get_ticks_usec()
+	var shrunk := DotMapImagePrep.shrink_image(img, path, max_texture_size, half_res_masks, half_res_normals)
+	pace["guess"] = maxi(pace["guess"], Time.get_ticks_usec() - t0)
+	if shrunk:
+		await _pace(pace, slice_ms, tree)
+		t0 = Time.get_ticks_usec()
+		DotMapImagePrep.compress_image(img, -1)
+		pace["guess"] = maxi(pace["guess"], Time.get_ticks_usec() - t0)
+	await _pace(pace, slice_ms, tree)
+	_textures[path] = ImageTexture.create_from_image(img)
+
+
+## Yields a frame when what [param pace] says was spent this frame plus its dearest step yet would pass [param slice_ms].
+func _pace(pace: Dictionary, slice_ms: int, tree: SceneTree) -> void:
+	var spent := Time.get_ticks_usec() - int(pace["since"])
+	if spent > 1000 and spent + int(pace["guess"]) >= slice_ms * 1000:
+		await tree.process_frame
+		pace["since"] = Time.get_ticks_usec()
 
 
 func _tell(label: String) -> void:
