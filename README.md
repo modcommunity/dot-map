@@ -26,7 +26,7 @@ A map here is an id, a version, a scene path and optionally a content pack. The 
 
 `DotMapSurfaces` gives a map generator a photo material per surface kind (`&"brick"`, `&"asphalt"`, `&"tile_dark"`...), mapped in world space so code-built boxes need no UVs, and drawn the same in Forward+ and the browser's Compatibility renderer. Details in [docs/surfaces.md](docs/surfaces.md).
 
-Textures: fifteen photographic PBR materials from [ambientCG](https://ambientcg.com) (Lennart Demes and contributors), **CC0 1.0**, one asset per kind; asset ids, pages and licence in [addons/dot_map/surfaces/CREDITS.md](addons/dot_map/surfaces/CREDITS.md).
+Textures are third-party and CC0 (see [Credits](#credits)).
 
 ## Installing
 
@@ -211,6 +211,12 @@ A level you built by hand gets the same from `DotOccluderBaker` (large walls and
 godot --headless --path . --import
 godot --headless --path . res://examples/map_selftest.tscn
 ```
+
+## Credits
+
+| Asset | Author / source | Licence |
+| --- | --- | --- |
+| Fifteen photographic PBR surface materials, one per surface kind | Lennart Demes and contributors, [ambientCG](https://ambientcg.com) (asset ids and pages in [CREDITS.md](addons/dot_map/surfaces/CREDITS.md)) | CC0 1.0 |
 
 ## Licence
 
