@@ -1,40 +1,20 @@
-This is the **map** asset for TMC's **Dot** collection. It exists so one game can carry a hundred maps, because a project per map falls apart somewhere around map forty.
+# dot-map
 
-This collection of assets provides modular building blocks for creating games and applications within the TMC ecosystem, ensuring consistency and interoperability across all `dot-*` assets. This includes core functionality, networking, authentication, cloud integration, and more.
+Maps as content, not as builds. One Godot game can carry a hundred maps and switch between them under live players. dot-map gives you a map catalogue, a rotation with a cooldown, a time limit with rock-the-vote, nominations and voting, a loader that turns a map into a scene, and tools for drawing converted BSP maps. Part of TMC's open source **Dot** collection (MIT licence).
 
-**These assets are COMPLETELY OPEN SOURCE**. You are free to use, modify, and distribute them under the terms of the MIT license. The only thing not open source is the back-end web infrastructure. So if you opt into using your own authentication backend instead of integrating with TMC, you will need to build and integrate your own back-end infrastructure.
-
-## From Maintainer & WARNING
-This asset, along with all the others, was built initially with **Claude Code** and will continue to be maintained and extended using it. This is because I (`gamemann`) cannot build the entire TMC platform alone (I wish I could lol).
-
-**Please treat this as partially tested.** Every asset has its own headless test suite and those suites pass, but very little of this has been in front of real players yet. Expect rough edges, and please report anything you run into.
-
-I intend on reviewing code, testing, and editing documentation regularly. If you're interested in helping out, please let me know!
-
-## Maps as Content, Not as Builds
-**Maps as content, not as builds.** One Godot game, a hundred maps, switched under live players.
-
-A catalogue, a rotation with a cooldown, a map time limit with rock-the-vote and extending, nominations and voting, and a loader that resolves a map to a scene, fetching its content through [dot-cloud](https://github.com/modcommunity/dot-cloud) when the map is delivered and reading the disk when it ships in the build.
+> Built with Claude Code. Every addon has a headless test suite and the suites pass, but little of this has met real players yet. Please report rough edges.
 
 ## Why
 
-The obvious way to ship a hundred surf maps is a hundred Godot projects. At map forty that is a hundred export pipelines, a hundred copies of every addon, a player who downloads a whole game to try one map, and records that cannot be compared because each project has its own.
+The obvious way to ship a hundred maps is a hundred Godot projects: a hundred export pipelines, a hundred copies of every addon, and a player who downloads a whole game to try one map. Here a map is an id, a version, a scene path and optionally a content pack. The server switches between them, the client fetches the one it needs, and a leaderboard can span all of them.
 
-A map here is an id, a version, a scene path and optionally a content pack. The server switches between them; the client fetches the one it needs; the leaderboard spans all of them.
+## Install
 
-## Surface materials
+Copy `addons/dot_map/` and [dot-core](https://github.com/modcommunity/dot-core)'s `addons/dot_core/` into your project and enable dot-map under **Project > Project Settings > Plugins**.
 
-`DotMapSurfaces` gives a map generator a photo material per surface kind (`&"brick"`, `&"asphalt"`, `&"tile_dark"`...), mapped in world space so code-built boxes need no UVs, and drawn the same in Forward+ and the browser's Compatibility renderer. Details in [docs/surfaces.md](docs/surfaces.md).
+[dot-cloud](https://github.com/modcommunity/dot-cloud) (to fetch delivered maps) and [dot-timer](https://github.com/modcommunity/dot-timer) (zones) are optional and found at run time.
 
-Textures are third-party and CC0 (see [Credits](#credits)).
-
-## Installing
-
-Copy `addons/dot_map/` and [`dot-core`](https://github.com/modcommunity/dot-core)'s `addons/dot_core/` into your project and enable dot-map in *Project → Project Settings → Plugins*.
-
-dot-cloud and [dot-timer](https://github.com/modcommunity/dot-timer) are optional and are not named anywhere in the source.
-
-## Five minutes
+## Quick start
 
 ```gdscript
 var session := DotMapSession.new()
@@ -81,18 +61,33 @@ await session.change_to(&"surf_beginner")
 }
 ```
 
-The second map is delivered: its scene lives inside a dot-cloud pack that is fetched and mounted before the scene is loaded.
+The second map is delivered: its scene lives in a dot-cloud pack that is fetched and mounted before the scene loads.
 
-A game whose maps are published one pack per map (dot-ci's `release-maps.yml`) lists them in its descriptor's `maps:` as pinned `<owner>/<map id>@<version>` keys, and dot-server hands them back as `DotGameManager.current_maps()`. `DotMapCatalogue.add_delivered(key, scene)` turns each into a delivered map, with the last segment of the content id as the id a player types:
+A game whose maps are published one pack per map lists them in its descriptor's `maps:` as pinned `<owner>/<map id>@<version>` keys, and dot-server returns them as `DotGameManager.current_maps()`. `DotMapCatalogue.add_delivered(key, scene)` turns each into a delivered map, using the last part of the content id as the id a player types:
 
 ```gdscript
 for key in server.games.current_maps():
     catalogue.add_delivered(key, "map.tscn")
 ```
 
+## Parts
+
+| Piece | What it does | More |
+| --- | --- | --- |
+| `DotMapSession`, catalogue | Loads the catalogue and changes the map in one process. | [docs/content.md](docs/content.md) |
+| `DotMapSyncHost`, `DotMapSyncClient` | Change the map for every connected peer. | [docs/changing.md](docs/changing.md) |
+| `DotMapRotation`, `DotMapVote`, `DotMapTimeLimit` | Next-map choice, voting, time limit and rock-the-vote. | [docs/rotation.md](docs/rotation.md) |
+| `DotMapSurfaces` | A photo material per surface kind, mapped in world space so code-built boxes need no UVs. | [docs/surfaces.md](docs/surfaces.md) |
+| `DotMapBrush` | Map-building solids as data. | [docs/brushes.md](docs/brushes.md) |
+| `DotMapBspMesh`, `DotMapWorld` | Read a converted map and build the playable world. | below |
+| `DotMapIO`, entities | Doors, buttons, lifts, triggers and their output links. | [docs/io.md](docs/io.md), [docs/brush-entities.md](docs/brush-entities.md) |
+| `DotMapNavLinks` | Closed doors and teleports as data for a navigation bake or an AI. | [docs/nav-links.md](docs/nav-links.md) |
+| `DotMapVisibility`, `DotOccluderBaker`, `DotAreaPortal` | Draw only what can be seen. | [docs/visibility.md](docs/visibility.md), [docs/culling.md](docs/culling.md) |
+| `DotMapConfig` | Per-map settings files. | [docs/map-config.md](docs/map-config.md) |
+
 ## A converted map, from files to a drawn world
 
-A converted map is a prefix: `<prefix>.json` (the manifest), `<prefix>.bin` (geometry, lightmaps, visibility), usually `<prefix>.doc.json` (the source document, which gives entities and links) and `<prefix>.coverage.json`. `examples/bsp_mesh/fixture.json` and `fixture.bin` are a tiny one to start from, and the converter's `bsp.py regen` writes the real ones (below).
+A converted map is a prefix: `<prefix>.json` (the manifest), `<prefix>.bin` (geometry, lightmaps, visibility), usually `<prefix>.doc.json` (entities and links) and `<prefix>.coverage.json`. `examples/bsp_mesh/fixture.json` and `fixture.bin` are a tiny one to start from. The converter, [dot-map-convert](https://github.com/modcommunity/dot-map-convert), writes real ones.
 
 ```gdscript
 # `world` is a DotMapBspMesh, read from the prefix (the path without ".json").
@@ -102,54 +97,47 @@ if not loaded.ok:
     return
 var world: DotMapBspMesh = loaded.value
 
-# 1. The whole playable world (geometry, props, doors, triggers, collision, the map's own environment).
+# 1. The playable world: geometry, props, doors, triggers, collision and the map's environment.
 var surfaces := DotMapSurfaces.new()
-var material_for := surfaces.world_material_for(world, "res://examples/bsp_mesh")   # the folder the textures sit in
+var material_for := surfaces.world_material_for(world, "res://examples/bsp_mesh")   # folder the textures sit in
 var built := DotMapWorld.build(world, {"material_for": material_for})
 if not built.ok:
     return
 var dw: DotMapWorld = built.value
 add_child(dw)
 
-# 2. Draw only what the camera can see. Fails quietly (the map is drawn whole) when the map has no visibility data.
+# 2. Draw only what the camera can see. If the map has no visibility data it is drawn whole.
 var vis := DotMapVisibility.new()
 add_child(vis)
 vis.setup(world, dw.visual)
 
-# 3. Lightmapped maps only: let the baked light drive the sky and ambient, and free the bake's own lamps. Returns null for a map without a lightmap.
+# 3. Lightmapped maps only: baked light drives the sky and ambient. Returns null otherwise.
 DotMapLitWorld.attach(dw, world, environment, lamps)
 ```
 
-`examples/bsp_world_shot.gd` is this flow in about eighty lines with a camera (`tools/screenshot.sh dot-map out.png --scene res://examples/bsp_world_shot.tscn`, with `--world=<prefix>`), and `world.build_node()` alone gives just the mesh tree when you want to place everything yourself. `world` in the snippets above is that `DotMapBspMesh`, never a node.
+`examples/bsp_world_shot.gd` is this flow with a camera: `tools/screenshot.sh dot-map out.png --scene res://examples/bsp_world_shot.tscn`, with `--world=<prefix>`. `world.build_node()` alone gives just the mesh tree if you want to place everything yourself.
 
-`tools/prop_audit.gd` is the check that no converted world has a library prop that failed to load or would be invisible but solid: `godot --headless --path . -s res://tools/prop_audit.gd -- <worlds dir>...` (exit 1 on any; `--allow-proxied` tolerates maps drawn with box proxies). Run it on the path a game reaches the worlds by (its `worlds` link), because the store is found beside the manifest.
+`tools/prop_audit.gd` checks that no converted world has a library prop that failed to load or would be invisible but solid. Run it on the path a game reaches the worlds by: `godot --headless --path . -s res://tools/prop_audit.gd -- <worlds dir>...`. It exits 1 on a problem; `--allow-proxied` accepts maps drawn with box proxies.
 
-To make a converted map from an original, with the author's file in the converter's store (`bsp.py store`), from `dot-map-convert`:
+When a converted map is wrong, fix the converter or its rule tables and regenerate. Do not patch the output ([docs/converter-v2.md](docs/converter-v2.md)).
 
-```bash
-python3 bsp.py regen --out ../maps/my_map/my_map <game>/<map>      # writes my_map.json, .bin, .coverage.json, .doc.json
-python3 bsp.py regen --ratchet --out ../maps/my_map/my_map <game>/<map>   # fails when more is unmapped than the committed coverage says
-```
+### Maps that share art
 
-A converted map that names a shared art slice (`licence.store_pack`, its own slice plus the shared slices it names; see [docs/content.md](docs/content.md#shared-stores-as-dot-cloud-slices)) needs two lines in the game's loader, between reading the world and building it, plus the credit line for a scoreboard or map screen (CC-BY asks for it):
+A converted map that names a shared art slice (`licence.store_pack`, see [docs/content.md](docs/content.md#shared-stores-as-dot-cloud-slices)) needs two lines in the game's loader between reading the world and building it. A scoreboard or map screen should show the credit line (CC-BY asks for it):
 
 ```gdscript
 var cloud: Object = DotRegistry.get_service(&"dot_cloud_client")
 var licence: Dictionary = world.manifest.get("licence", {})
-await DotMapStore.ensure(licence, cloud)                 # download and mount the slice once; a pack acquired with --depends has it
-DotMapStore.apply(licence, cloud, surfaces, world)       # point DotMapSurfaces and DotMapBspMesh at it, before world_material_for / build_node
+await DotMapStore.ensure(licence, cloud)                 # download and mount the slice once
+DotMapStore.apply(licence, cloud, surfaces, world)       # before world_material_for / build_node
 var credits := DotMapCredits.line(world.manifest)        # "Map by X | Art: A, B"; DotMapCredits.works(manifest) is the full list
 ```
-
-Zombie Zone does exactly this in `ZzMap.load_world` / `attach_world` and shows the line on its Tab board.
-
-When a converted map is wrong, fix the converter or its rule tables and regenerate; do not patch the output ([docs/converter-v2.md](docs/converter-v2.md)).
 
 ## Rotation and voting
 
 ```gdscript
 session.rotation.mode = DotMapRotation.Mode.RANDOM
-session.rotation.cooldown = 5          # maps recently played that are off the menu
+session.rotation.cooldown = 5          # recently played maps kept off the menu (default 5)
 
 var vote := DotMapVote.new()
 vote.nominate(&"surf_tidewater")
@@ -164,24 +152,21 @@ if winner != null:
 ## Ending a map
 
 ```gdscript
-session.map_seconds = 1800.0          # half an hour
-session.time_limit.rtv_fraction = 0.6 # 60% of players to end it early
+session.map_seconds = 1800.0          # default: half an hour
+session.time_limit.rtv_fraction = 0.6 # default: 60% of players end it early
 
 session.map_over.connect(func(map, reason):
     # The session says the map is over. What happens next is yours.
     await session.change_to(session.rotation.choose(player_count).id)
 )
 
-# once per simulated tick
-session.advance(delta)
-
-# when somebody types !rtv
-session.rock_the_vote(player_id, player_count)
+session.advance(delta)                       # once per simulated tick
+session.rock_the_vote(player_id, player_count)   # when somebody types !rtv
 ```
 
 ## Changing the map for everybody
 
-`DotMapSession` changes the map in one process. `DotMapSyncHost` and `DotMapSyncClient` change it for every connected peer: announce, fetch, ready, then load, over whatever transport you hand them a `send_fn` for.
+`DotMapSession` changes the map in one process. `DotMapSyncHost` and `DotMapSyncClient` change it for every connected peer: announce, fetch, ready, then load, over any transport you give a `send_fn`.
 
 ```gdscript
 var host := DotMapSyncHost.new()
@@ -189,23 +174,23 @@ host.session = session
 host.send_fn = func(peer: int, payload: Dictionary) -> void: link.send_to(peer, payload)
 add_child(host)
 
-host.admit_peer(peer_id)                 # as each client joins; it is told the current map
+host.admit_peer(peer_id)                   # as each client joins; it is told the current map
 await host.change_to(&"surf_tidewater")    # announce, wait for peers, swap, tell them to load
 ```
 
-On the client, `DotMapSyncClient.handle(payload)` takes whatever arrives. A host may say which map, never what the map is: a map the client does not have must be delivered content. A game whose maps are data read by one scene in its own build lists that scene in `trusted_template_scenes`, and the delivered requirement then applies to the data instead — see [`docs/changing.md`](docs/changing.md#template-scenes) for exactly what that does and does not let a host do.
+On the client, pass whatever arrives to `DotMapSyncClient.handle(payload)`. A host may say which map, never what the map is: a map the client does not have must be delivered content. A game whose maps are data read by one scene in its own build lists that scene in `trusted_template_scenes`. See [docs/changing.md](docs/changing.md#template-scenes) for what that allows.
 
 ## Drawing only what can be seen
 
-A converted map keeps its precomputed visibility data (clusters, the potentially visible set, area portals) and gets occluders from its large solid brushes. `DotMapVisibility` shows only the chunks and props the camera's cluster can see, re-deciding only when the camera changes cluster, and closes area portals when their doors shut. `vis_mode` is off, pvs, occluders or both; a map without the data draws everything. Details and measurements in [docs/visibility.md](docs/visibility.md).
+A converted map keeps its precomputed visibility data (clusters, the potentially visible set, area portals) and gets occluders from its large solid brushes. `DotMapVisibility` shows only the chunks and props the camera's cluster can see, and closes area portals when their doors shut. `mode` is `OFF`, `PVS`, `OCCLUDERS` or `BOTH` (default). A map without the data is drawn whole. Details and measurements are in [docs/visibility.md](docs/visibility.md).
 
-A level you built by hand gets the same from `DotOccluderBaker` (large walls and floors become occluder quads, headless or from the editor's Tools menu) and `DotAreaPortal` (a doorway that hides the room behind it while the door is shut): [add culling in 5 minutes](docs/culling.md). Both are opt-in.
+A hand-built level gets the same from `DotOccluderBaker` (large walls and floors become occluder quads) and `DotAreaPortal` (a doorway that hides the room behind it while the door is shut). See [docs/culling.md](docs/culling.md). Both are opt-in.
 
 ## Documentation
 
-[`docs/`](docs/README.md) has the design reasoning: why the catalogue is not the rotation, the order a map change has to happen in and what breaks when it does not, and why the loader reaches dot-cloud through the registry rather than by name.
+[docs/README.md](docs/README.md) indexes the design notes: why the catalogue is not the rotation, the order a map change must happen in, and why the loader reaches dot-cloud through the registry.
 
-## Validating
+## Testing
 
 ```bash
 godot --headless --path . --import
@@ -216,7 +201,7 @@ godot --headless --path . res://examples/map_selftest.tscn
 
 | Asset | Author / source | Licence |
 | --- | --- | --- |
-| Fifteen photographic PBR surface materials, one per surface kind | Lennart Demes and contributors, [ambientCG](https://ambientcg.com) (asset ids and pages in [CREDITS.md](addons/dot_map/surfaces/CREDITS.md)) | CC0 1.0 |
+| 28 photographic PBR surface materials, one per surface kind | Lennart Demes and contributors, [ambientCG](https://ambientcg.com) (asset ids and pages in [CREDITS.md](addons/dot_map/surfaces/CREDITS.md)) | CC0 1.0 |
 
 ## Licence
 
