@@ -406,7 +406,12 @@ func build_meshes_async(model: int, material_for: Callable, slice: DotFrameSlice
 	for from in range(0, planned["plan"].size(), step):
 		if slice.due():
 			await slice.pause()
-		_mesh_batch(planned, from, step, out, state)
+		var merged := _mesh_merge(planned, from, step)
+		var chunk: Array = merged["chunk"]
+		for i in chunk.size():
+			if i > 0 and slice.due():    # each surface add is a main-thread upload: a batch of them must not hold one frame
+				await slice.pause()
+			_mesh_add(planned, chunk[i], merged["arrays"][i], out, state)
 	return out
 
 
@@ -468,26 +473,35 @@ func _plan_rec(by_material: Dictionary, rec: Dictionary, material_for: Callable)
 
 ## Builds plan entries [param from] to [param from] + [param step] into [param out]; [param state] carries the open mesh between batches.
 func _mesh_batch(planned: Dictionary, from: int, step: int, out: Array[Dictionary], state: Dictionary) -> void:
-	var plan: Array = planned["plan"]
+	var merged := _mesh_merge(planned, from, step)
+	for i in merged["chunk"].size():
+		_mesh_add(planned, merged["chunk"][i], merged["arrays"][i], out, state)
+
+
+## The surface arrays of plan entries [param from] to [param from] + [param step], merged on the workers: {chunk, arrays}.
+func _mesh_merge(planned: Dictionary, from: int, step: int) -> Dictionary:
+	var chunk := (planned["plan"] as Array).slice(from, from + step)
+	return {"chunk": chunk, "arrays": DotMapParallelBuild.merged(self, chunk.map(func(p: Array) -> Array: return p[1]["recs"]), load_threads)}
+
+
+## Adds one plan entry [param item] ([group key, entry]) with its merged [param arrays] to the open mesh in [param state].
+func _mesh_add(planned: Dictionary, item: Array, arrays: Array, out: Array[Dictionary], state: Dictionary) -> void:
 	var groups: Dictionary = planned["groups"]
-	var chunk := plan.slice(from, from + step)
-	var arrays := DotMapParallelBuild.merged(self, chunk.map(func(p: Array) -> Array: return p[1]["recs"]), load_threads)
-	for i in chunk.size():
-		var key: String = chunk[i][0]
-		var entry: Dictionary = chunk[i][1]
-		var first: Dictionary = entry["recs"][0]
-		var mesh: ArrayMesh = state["mesh"]
-		if key != state["key"] or mesh.get_surface_count() >= MAX_SURFACES:
-			state["key"] = key
-			mesh = ArrayMesh.new()
-			state["mesh"] = mesh
-			out.append({"mesh": mesh, "chunk": first.get("chunk", []), "sky3d": bool(first.get("sky3d", false)),
-					"glass": first.has("glass"), "clusters": _clusters_of(groups[key])})
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays[i])
-		var s := mesh.get_surface_count() - 1
-		mesh.surface_set_name(s, str(first.get("material", "")))
-		if entry["material"] != null:
-			mesh.surface_set_material(s, entry["material"])
+	var key: String = item[0]
+	var entry: Dictionary = item[1]
+	var first: Dictionary = entry["recs"][0]
+	var mesh: ArrayMesh = state["mesh"]
+	if key != state["key"] or mesh.get_surface_count() >= MAX_SURFACES:
+		state["key"] = key
+		mesh = ArrayMesh.new()
+		state["mesh"] = mesh
+		out.append({"mesh": mesh, "chunk": first.get("chunk", []), "sky3d": bool(first.get("sky3d", false)),
+				"glass": first.has("glass"), "clusters": _clusters_of(groups[key])})
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var s := mesh.get_surface_count() - 1
+	mesh.surface_set_name(s, str(first.get("material", "")))
+	if entry["material"] != null:
+		mesh.surface_set_material(s, entry["material"])
 
 
 ## The union of the records' clusters, or null when any record has none (drawn from everywhere).
