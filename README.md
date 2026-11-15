@@ -8,9 +8,9 @@ The obvious way to ship a hundred maps is a hundred Godot projects: a hundred ex
 
 ## Install
 
-Copy `addons/dot_map/` and [dot-core](https://github.com/modcommunity/dot-core)'s `addons/dot_core/` into your project and enable dot-map under **Project > Project Settings > Plugins**.
+Copy `addons/dot_map/` and [dot-core](https://github.com/gamespice-platform/core)'s `addons/dot_core/` into your project and enable dot-map under **Project > Project Settings > Plugins**.
 
-[dot-cloud](https://github.com/modcommunity/dot-cloud) (to fetch delivered maps) and [dot-timer](https://github.com/modcommunity/dot-timer) (zones) are optional and found at run time.
+[dot-cloud](https://github.com/gamespice-platform/cloud) (to fetch delivered maps) and [dot-timer](https://github.com/gamespice-platform/timer) (zones) are optional and found at run time.
 
 ## Quick start
 
