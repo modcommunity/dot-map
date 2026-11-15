@@ -3,8 +3,8 @@ extends Node3D
 ## Every surface kind of [DotMapSurfaces] on code-built boxes, and the suite that proves the library hands
 ## back what a map generator expects.
 
-const CHECKS := 137
-const SECTIONS := 8
+const CHECKS := 140
+const SECTIONS := 9
 
 const COLUMNS := 5
 const CUBE := 3.0
@@ -26,6 +26,7 @@ func _ready() -> void:
 func _run() -> void:
 	print("dot-map surfaces")
 	_test_kinds()
+	_test_headless_shrink()
 	_test_material_flags()
 	_test_aliases_and_fallback()
 	_test_paths()
@@ -80,6 +81,8 @@ func _test_kinds() -> void:
 	_section("every kind loads")
 	var kinds := _surfaces.kinds()
 	_check(kinds.size() == 28, "twenty-eight kinds")
+	var shrink := DotMapSurfaces.shrink_textures_headless
+	DotMapSurfaces.shrink_textures_headless = false
 	for k in kinds:
 		var res := _surfaces.try_material(StringName(k))
 		_check(res.ok, "%s loads" % k)
@@ -91,6 +94,24 @@ func _test_kinds() -> void:
 			"%s has albedo, normal and roughness" % k
 		)
 		_check(m.albedo_texture.get_width() == 1024, "%s is 1K" % k)
+	DotMapSurfaces.shrink_textures_headless = shrink
+	_done()
+
+
+func _test_headless_shrink() -> void:
+	_section("headless, a kind's textures load as 4x4 downsamples")
+	var lib := DotMapSurfaces.new()
+	var a := lib.material(&"brick")
+	var b := lib.material(&"brick", Color(0.5, 0.6, 0.7))
+	if DotPlatform.is_headless():
+		_check(a.albedo_texture.get_width() == 4 and a.normal_texture.get_width() == 4 and a.roughness_texture.get_width() == 4, "brick's maps are 4x4 (%d)" % a.albedo_texture.get_width())
+	else:
+		_check(a.albedo_texture.get_width() == 1024, "a windowed build keeps the full textures")
+	_check(a.albedo_texture == b.albedo_texture, "two tints of a kind share one texture")
+	DotMapSurfaces.shrink_textures_headless = false
+	var full := DotMapSurfaces.new().material(&"brick")
+	DotMapSurfaces.shrink_textures_headless = true
+	_check(full.albedo_texture.get_width() == 1024, "shrink_textures_headless false keeps 1K (%d)" % full.albedo_texture.get_width())
 	_done()
 
 

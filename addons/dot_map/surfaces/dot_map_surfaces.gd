@@ -89,6 +89,13 @@ static var fallback_roots: PackedStringArray = PackedStringArray()
 ## One material per world shader, kept so [method warm_shaders_async] compiles each only once.
 static var _warm_materials: Array[ShaderMaterial] = []
 
+## Whether a headless build swaps each kind texture for a 4x4 bilinear downsample as it loads. The dummy
+## renderer keeps a decoded copy of every texture it never draws: 55 MB for FC's six built-in kinds.
+## Collision and navigation read only geometry. False keeps the full textures.
+static var shrink_textures_headless := true
+## Resolved path -> the 4x4 texture headless hands out, so every material of a kind shares one.
+static var _small: Dictionary = {}
+
 ## Scales every kind's metallic value. A game that lays baked light over its map sets this to 0
 ## on the instance it bakes with: a lightmap holds diffuse light only, and a metallic surface has
 ## almost no diffuse, so a baked corrugated roof drew nearly black.
@@ -780,7 +787,26 @@ func _load(path: String) -> Texture2D:
 		path = _from_fallback(path)
 		if path.is_empty():
 			return null
-	return load(path) as Texture2D
+	if not (shrink_textures_headless and DotPlatform.is_headless()):
+		return load(path) as Texture2D
+	if _small.has(path):
+		return _small[path] as Texture2D
+	var tex := load(path) as Texture2D
+	if tex == null:
+		return null
+	_small[path] = _shrunk(tex)
+	return _small[path] as Texture2D
+
+
+## [param tex] as a 4x4 bilinear downsample, or itself when it is that small already or its image cannot be read.
+static func _shrunk(tex: Texture2D) -> Texture2D:
+	if tex.get_width() <= 4 and tex.get_height() <= 4:
+		return tex
+	var img := tex.get_image()
+	if img == null or img.is_empty() or (img.is_compressed() and img.decompress() != OK):
+		return tex
+	img.resize(4, 4, Image.INTERPOLATE_BILINEAR)
+	return ImageTexture.create_from_image(img)
 
 
 func _from_fallback(path: String) -> String:
