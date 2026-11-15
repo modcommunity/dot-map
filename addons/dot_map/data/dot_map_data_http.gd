@@ -1,11 +1,9 @@
 class_name DotMapDataHttp
 extends DotMapDataStore
 
-## Map data on the backbone: `GET <prefix>/<game>/<map>` lists versions, `GET|PUT|DELETE <prefix>/<game>/<map>/<version>`
-## carry one bundle as JSON text. [member client] is duck-typed (dot-core's DotHttp, or a fake): it needs
-## `request(method, path, body: PackedByteArray, headers) -> DotResult` whose value has `status` and `body_text`.
-## The reply is untrusted: it is size-capped, validated by [method DotMapDataBundle.from_json] and must be
-## the map that was asked for.
+## Map data on the backbone: `GET <prefix>/<game>/<map>` lists versions, `GET|PUT|DELETE <prefix>/<game>/<map>/<version>` carry one bundle as JSON text.
+## [member client] is duck-typed (dot-core's DotHttp, or a fake): it needs `request(method, path, body: PackedByteArray, headers) -> DotResult` whose value has `status` and `body_text`.
+## The reply is untrusted: it is size-capped, validated by [method DotMapDataBundle.from_json] and must be the map that was asked for.
 
 const CHANNEL := "map_data"
 const MAX_VERSIONS := 1000

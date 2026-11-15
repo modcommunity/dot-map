@@ -4,11 +4,8 @@ extends RefCounted
 ## could call that did not exist before. OLDEST is raised to LEVEL when something a game could have called is
 ## removed or changes meaning, because every pack built before that no longer compiles against this addon.
 
-# 1: everything before this file existed (absent means 1). 2: DotMapDef.from_content_key and
-# DotMapCatalogue.add_delivered. 3: a relative scene given to either is resolved onto the pack's mount. 4:
-# DotMapSurfaces, the surface-kind material library (and its textures in surfaces/).
-# 22: DotMapDef.profile, DotMapRotationFile.profile_changed, DotMapConfig.apply_values (per-map mode/cfg profiles).
-# 23: DotMapLocalMaps (raw convert folders under res://addons/maps and user://maps, offered as "(local)").
+# 1: everything before this file existed (absent means 1). 2: DotMapDef.from_content_key and DotMapCatalogue.add_delivered. 3: a relative scene given to either is resolved onto the pack's mount. 4: DotMapSurfaces, the surface-kind material library (and its textures in surfaces/).
+# 22: DotMapDef.profile, DotMapRotationFile.profile_changed, DotMapConfig.apply_values (per-map mode/cfg profiles). 23: DotMapLocalMaps (raw convert folders under res://addons/maps and user://maps, offered as "(local)").
 # 24: DotMapLocalMaps zips (entry_in_zip, zip_cache) and drag-and-drop (accept_dropped, watch_drops, DROP_ROOT); DotMapDrawnWorld option original_textures.
 const LEVEL := 24
 const OLDEST := 1

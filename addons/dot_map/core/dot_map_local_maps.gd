@@ -1,9 +1,7 @@
 class_name DotMapLocalMaps
 extends RefCounted
 
-## Converted maps dropped into a game by hand: a raw [code]dot-bsp-mesh[/code] folder ([code]<name>.json[/code], [code]<name>.bin[/code], [code]textures/[/code]) copied under a root, offered as "(local)" with no pack or manifest written.
-## A [code].zip[/code] of such a folder under a root is unpacked once into [member zip_cache] (keyed by its hash) and offered the same way;
-## [method accept_dropped] copies a folder or zip dragged onto the window into [constant DROP_ROOT] ([method watch_drops] wires it).
+## Converted maps dropped into a game by hand: a raw [code]dot-bsp-mesh[/code] folder ([code]<name>.json[/code], [code]<name>.bin[/code], [code]textures/[/code]) copied under a root, offered as "(local)" with no pack or manifest written. A [code].zip[/code] of such a folder under a root is unpacked once into [member zip_cache] (keyed by its hash) and offered the same way; [method accept_dropped] copies a folder or zip dragged onto the window into [constant DROP_ROOT] ([method watch_drops] wires it).
 ## Every entry is a plain dictionary ([method scan]); [method to_def] makes the catalogue row and [method spawns] the start points, generated from the hulls when the map names none.
 ## Internal only: a local map is never in a pack, so a server never names it and a client never fetches it.
 
@@ -118,10 +116,9 @@ static func entry_in_zip(zip_path: String) -> Dictionary:
 	return entry
 
 
-## Copies each dropped path into [param into]: a map folder, a convert folder, a [code].zip[/code] of either, or a
-## [code].json[/code]/[code].bin[/code] (its folder is taken). A copy replaces an earlier one of the same name.
-## Returns [code]{added: Array[Dictionary], errors: PackedStringArray}[/code]: the new entries, and one line per path that is
-## not a map (nothing is copied for those). The game rescans its catalogue after.
+## Copies each dropped path into [param into]: a map folder, a convert folder, a [code].zip[/code] of either, or a [code].json[/code]/[code].bin[/code] (its folder is taken). A copy replaces an earlier one of the same name.
+## Returns [code]{added: Array[Dictionary], errors: PackedStringArray}[/code]: the new entries, and one line per path that is not a map (nothing is copied for those).
+## The game rescans its catalogue after.
 static func accept_dropped(paths: PackedStringArray, into: String = DROP_ROOT) -> Dictionary:
 	var added: Array[Dictionary] = []
 	var errors := PackedStringArray()

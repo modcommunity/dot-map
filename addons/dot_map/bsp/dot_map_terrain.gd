@@ -230,13 +230,9 @@ func build_shape(with_skirt: bool = false) -> ConcavePolygonShape3D:
 	return shape
 
 
-## A drawable mesh of [method faces] with smooth normals and UVs in metres (x, z), then the skirt
-## (both sides, UVs along the edge and down). Built from packed arrays straight into
-## [method ArrayMesh.add_surface_from_arrays], with no [SurfaceTool]: that holds about a hundred
-## bytes per vertex and its smoothing tables on top, which a five-million-vertex island (the web
-## build's 2 GB wasm heap) cannot afford. The normals are the ones [method SurfaceTool.generate_normals]
-## gave (a vertex shared by triangles takes their sum; the skirt's two sides cancel, so its lower
-## edge has none and its upper edge takes the ground's), summed per grid sample rather than hashed.
+## A drawable mesh of [method faces] with smooth normals and UVs in metres (x, z), then the skirt (both sides, UVs along the edge and down).
+## Built from packed arrays straight into [method ArrayMesh.add_surface_from_arrays], with no [SurfaceTool]: that holds about a hundred bytes per vertex and its smoothing tables on top, which a five-million-vertex island (the web build's 2 GB wasm heap) cannot afford.
+## The normals are the ones [method SurfaceTool.generate_normals] gave (a vertex shared by triangles takes their sum; the skirt's two sides cancel, so its lower edge has none and its upper edge takes the ground's), summed per grid sample rather than hashed.
 func build_mesh() -> ArrayMesh:
 	var ground := faces()
 	var wall := skirt_faces()

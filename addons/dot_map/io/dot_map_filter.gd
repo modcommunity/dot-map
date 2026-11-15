@@ -2,10 +2,8 @@ class_name DotMapFilter
 extends DotMapEntity
 
 ## filter_activator_name, filter_activator_class, filter_activator_team, filter_damage_type and filter_multi.
-## [method passes] answers for one body or hit described by an info dictionary ([code]name[/code], [code]class[/code],
-## [code]team[/code], [code]damage_type[/code]); [code]TestActivator[/code] asks the same of an input's activator and
-## fires [code]OnPass[/code] or [code]OnFail[/code]. A key the host's info does not carry admits everyone and is counted
-## in [member DotMapIO.unhandled] as [code]filter|<class>[/code], so a missing answer is visible, never a silent block.
+## [method passes] answers for one body or hit described by an info dictionary ([code]name[/code], [code]class[/code], [code]team[/code], [code]damage_type[/code]); [code]TestActivator[/code] asks the same of an input's activator and fires [code]OnPass[/code] or [code]OnFail[/code].
+## A key the host's info does not carry admits everyone and is counted in [member DotMapIO.unhandled] as [code]filter|<class>[/code], so a missing answer is visible, never a silent block.
 
 const MAX_DEPTH := 4
 

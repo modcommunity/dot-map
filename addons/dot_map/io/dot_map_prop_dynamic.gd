@@ -1,9 +1,8 @@
 class_name DotMapPropDynamic
 extends DotMapEntity
 
-## prop_dynamic and prop_dynamic_override: the shared inputs (Enable, Disable, Kill, Color, SetParent) plus
-## SetAnimation and SetDefaultAnimation, which only send a [code]prop_animation[/code] event: the stand-in models have no
-## animations, so the view does not change unless the game answers the event. Skin sends a [code]prop_skin[/code] event
+## prop_dynamic and prop_dynamic_override: the shared inputs (Enable, Disable, Kill, Color, SetParent) plus SetAnimation and SetDefaultAnimation, which only send a [code]prop_animation[/code] event:
+## the stand-in models have no animations, so the view does not change unless the game answers the event. Skin sends a [code]prop_skin[/code] event
 ## (the stand-in has one material, so the same holds). No per-frame cost.
 
 

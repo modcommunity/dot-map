@@ -44,7 +44,7 @@ func _bake_occluders() -> void:
 	var baker := DotOccluderBaker.new()
 	var res := baker.bake(root)
 	if res.ok:
-		print("dot-map: %d occluder quads from %d meshes; save the scene" % [baker.stats["quads"], baker.stats["meshes"]])
+		print("dot-map: %d occluder quads from %d meshes; save the scene" % [baker.stats["quads"], baker.stats["meshes"]])  # check-logging: allow print
 	else:
 		push_error("dot-map: " + res.error.message)
 
