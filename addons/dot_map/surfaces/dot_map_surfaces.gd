@@ -1,5 +1,5 @@
 class_name DotMapSurfaces
-extends RefCounted
+extends "dot_map_surfaces_files.gd"
 
 ## A surface kind ([code]&"brick"[/code]) to a world-space triplanar [StandardMaterial3D]: a code-built box has no UVs, and this keeps texel density equal on every wall.
 ## Textures load by path under [member root] (or [member path_fn]), never referenced by a scene, so a delivered pack that mounts elsewhere still finds them.
@@ -104,26 +104,14 @@ var use_original_textures: bool = false
 ## What [method world_material_for] draws water faces with (a game's own water shader); null is [method liquid_material] by the face's name.
 var water_material: Material = null
 
-## Draws a map that carries its author's baked lighting with it (the lightmapped shader, unshaded);
-## off draws every map with [method try_material]'s lit materials.
-var _textures: Dictionary = {}
 ## Told [code]func(label: String)[/code] as [method world_material_for_async] passes its steps and of each material dearer than [constant SLOW_MATERIAL_USEC]; a game's frame trace hangs them on its frames. Unset tells no one.
 var on_step: Callable = Callable()
 const SLOW_MATERIAL_USEC := 8000
 ## Workers that decode the world's texture files ahead of the material pass ([code]map_load_threads[/code]): 0 inline, -1 automatic.
 var load_threads: int = DotMapParallelBuild.default_workers
-## Longest side of a decoded texture file; larger ones are halved until they fit (0 keeps them). Store slices are imported, never touched.
-var max_texture_size: int = 2048
-## Roughness and AO maps keep half their size (a quarter of the memory) when true, decoded, imported or baked alike (the top mip is sliced off, nothing re-encoded). On by default: a frame diff on a manor map is at most 5 of 255.
-var half_res_masks: bool = true
-## Normal maps keep half their size too (same top-mip slice). On by default: a daylight frame at ground level differs by 0.19 of 255 on average, and it takes 258 MB off the manor.
-var half_res_normals: bool = true
+## Draws a map that carries its author's baked lighting with it (the lightmapped shader, unshaded);
+## off draws every map with [method try_material]'s lit materials.
 var use_lightmap: bool = true
-## Folder of the shared PBR sets (`<id>/<tier>/*.webp`) when the game delivers them apart from the pack; empty reads the folder the manifest names, beside the pack.
-var pbr_library: String = ""
-## Folders searched for a set before [member pbr_library], in order: a map's own slice and the shared slices it depends on.
-var pbr_libraries: PackedStringArray = PackedStringArray()
-var _set_roots: Dictionary = {}
 
 ## Brightness of a light-emitting surface (SURF_LIGHT) in the lightmapped path.
 var emissive_energy: float = 1.5
@@ -538,7 +526,6 @@ func _prefetch_done(plan: Dictionary, decode_ms: int) -> void:
 	DotLog.info(CHANNEL, "texture prefetch", {"disk": plan["disk"].size(), "baked": plan["baked"], "decode_ms": decode_ms, "imported": plan["imported"].size(), "formats": texture_report(_textures), "static_mb": OS.get_static_memory_usage() / 1048576})
 
 
-## The suffix of the pre-baked texture this build loads (`dot-map-convert/tools/bake_textures.gd`), "" when it has no VRAM format to read.
 ## Compiles the world shaders (lightmapped, blended, liquid) one per frame of [param tree], so the first converted world drawn later does not stop a frame for the compile (about 85 ms for the lightmapped one on a desktop GPU). Call once at a quiet moment, e.g. under a boot cover; a second call returns at once.
 static func warm_shaders_async(tree: SceneTree) -> void:
 	if not _warm_materials.is_empty():
@@ -548,24 +535,6 @@ static func warm_shaders_async(tree: SceneTree) -> void:
 		m.shader = shader
 		_warm_materials.append(m)
 		await tree.process_frame
-
-
-static func baked_variant() -> String:
-	return DotMapTextureBake.pick_variant(OS.has_feature, OS.get_environment("NOCOMP") != "")
-
-
-## The pre-baked `<name>.<variant>.res` beside [param path] (already capped, mip-mapped and compressed, so no decode), or null when there is none, it is unreadable, predates the bake metadata, was baked from another file, or is not the size [member max_texture_size] and [member half_res_masks] want.
-func _baked_texture(path: String) -> Texture2D:
-	var variant := baked_variant()
-	if variant.is_empty():
-		return null
-	var baked := "%s.%s.res" % [path.get_basename(), variant]
-	if not FileAccess.file_exists(baked):
-		return null
-	var tex := ResourceLoader.load(baked, "ImageTexture") as Texture2D
-	if tex == null or not DotMapTextureBake.fits(tex, path, max_texture_size, variant):
-		return null
-	return tex
 
 
 ## Texture count and megabytes per image format, for the memory log.
@@ -581,15 +550,6 @@ static func texture_report(textures: Dictionary) -> Dictionary:
 				e[1] += img.get_data().size() / 1048576.0
 				out[key] = e
 	return out
-
-
-## The first existing file of the set's [param part] (webp, then jpg), or "".
-func _set_file(dir: String, part: String) -> String:
-	for ext in ["webp", "jpg"]:
-		var p := dir.path_join("%s.%s" % [part, ext])
-		if FileAccess.file_exists(p) or ResourceLoader.exists(p):
-			return p
-	return ""
 
 
 ## The kind that stands in for a texture named [param name] (a PBR set id or a source path) when its files are missing; &"" when no word fits.
@@ -667,38 +627,6 @@ func _stand_in_material(world: DotMapBspMesh, rec: Dictionary, fb: Dictionary, c
 	return m
 
 
-func _white() -> Texture2D:
-	if not _textures.has("white"):
-		var img := Image.create(4, 4, false, Image.FORMAT_RGB8)
-		img.fill(Color.WHITE)
-		_textures["white"] = ImageTexture.create_from_image(img)
-	return _textures["white"]
-
-
-## A library set shipped in the pack (`pbr/<id>/`): albedo, normal, roughness and AO, world-triplanar.
-func _pbr_material(dir: String, key: String) -> StandardMaterial3D:
-	var sm := StandardMaterial3D.new()
-	sm.resource_name = key
-	sm.uv1_triplanar = true
-	sm.uv1_world_triplanar = true
-	sm.uv1_scale = Vector3.ONE * 0.5
-	sm.albedo_texture = _set_texture(dir, "albedo")
-	var n := _set_texture(dir, "normal")
-	if n != null:
-		sm.normal_enabled = true
-		sm.normal_texture = n
-	var r := _set_texture(dir, "roughness")
-	if r != null:
-		sm.roughness_texture = r
-		sm.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
-	var ao := _set_texture(dir, "ao")
-	if ao != null:
-		sm.ao_enabled = true
-		sm.ao_texture = ao
-		sm.ao_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
-	return sm
-
-
 ## A two-layer terrain without a bake: both sets' albedo, mixed by the vertex weight (the unlit twin of the lit blend).
 func _blended_material(dir: String, dir2: String, key: String) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
@@ -708,67 +636,6 @@ func _blended_material(dir: String, dir2: String, key: String) -> ShaderMaterial
 	m.set_shader_parameter("albedo2_tex", _set_texture(dir2, "albedo"))
 	m.set_shader_parameter("sharpness", sharpness)
 	return m
-
-
-## The folder of the PBR set [param t] names: `<library>/<id>/<tier>` for a shared store, the pack's own `pbr/<id>` for an older one.
-func _pbr_dir(dir: String, store: String, t: Dictionary) -> String:
-	var id := str(t["file"]).get_file()
-	if store.is_empty() and pbr_library.is_empty() and pbr_libraries.is_empty():
-		return dir.path_join(str(t["file"]))
-	var tier := str(t.get("tier", "1k"))
-	for lib in pbr_libraries:
-		var cand := lib.path_join(id).path_join(tier)
-		if _has_set(cand):
-			return cand
-	var root := pbr_library if not pbr_library.is_empty() else dir.path_join(store).simplify_path()
-	return root.path_join(id).path_join(tier)
-
-
-func _has_set(dir: String) -> bool:
-	if not _set_roots.has(dir):
-		var found := false
-		for ext in ["webp", "jpg"]:
-			var p := dir.path_join("albedo." + ext)
-			found = found or FileAccess.file_exists(p) or ResourceLoader.exists(p)
-		_set_roots[dir] = found
-	return _set_roots[dir]
-
-
-func _set_texture(dir: String, name: String) -> Texture2D:
-	var p := _set_file(dir, name)
-	return _file_texture(p) if not p.is_empty() else null
-
-
-func _file_texture(path: String) -> Texture2D:
-	if _textures.has(path):
-		return _textures[path]
-	# A mounted store slice holds the engine's import (VRAM-compressed, mipmapped), never the source file.
-	if path.begins_with("res://") and ResourceLoader.exists(path):
-		var loaded := load(path) as Texture2D
-		# A pack published with an .import marker but without its .ctex exists and loads as null: the raw file is still there.
-		if loaded != null:
-			var imported := _masked(path, loaded)
-			_textures[path] = imported
-			return imported
-	var baked := _baked_texture(path)
-	if baked != null:
-		baked = _masked(path, baked)
-		_textures[path] = baked
-		return baked
-	var img := Image.load_from_file(path)
-	if img == null:
-		return null
-	DotMapImagePrep.prepare_image(img, path, max_texture_size, half_res_masks, -1, half_res_normals)
-	var tex := ImageTexture.create_from_image(img)
-	_textures[path] = tex
-	return tex
-
-
-## [param tex] of a roughness, AO or normal map without its top mip level when [member half_res_masks] or [member half_res_normals] says so: an imported or baked map is already compressed, so the next level of its own chain is cut out, with no decode or recompress.
-func _masked(path: String, tex: Texture2D) -> Texture2D:
-	if tex == null or not DotMapImagePrep.halves(path.get_file().get_basename(), half_res_masks, half_res_normals):
-		return tex
-	return DotMapImagePrep.without_top_mip(tex)
 
 
 func _lightmapped(world: DotMapBspMesh, rec: Dictionary, free: String, tint: Color, generated_file: String, set_dir: String = "", texture: Texture2D = null) -> Material:

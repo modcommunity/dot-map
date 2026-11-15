@@ -662,8 +662,12 @@ func _test_terrain() -> void:
 	var broken: Dictionary = fx["terrain"].duplicate()
 	broken["bytes"] = 1
 	_check(DotMapTerrain.from_dict(broken).code() == DotError.CODE_PARSE, "a wrong size is refused as a parse error")
-	# build_mesh() builds packed arrays directly; it must match the SurfaceTool reference it replaced
-	var tr: DotMapTerrain = DotMapTerrain.from_dict(fx["terrain"]).value
+	_check_terrain_mesh(DotMapTerrain.from_dict(fx["terrain"]).value)
+	_done()
+
+
+## build_mesh() builds packed arrays directly; it must match the SurfaceTool reference it replaced.
+func _check_terrain_mesh(tr: DotMapTerrain) -> void:
 	var built := tr.build_mesh()
 	var arr_got: Array = built.surface_get_arrays(0)
 	var ref_st := SurfaceTool.new()
@@ -693,7 +697,6 @@ func _test_terrain() -> void:
 		if not arr_got[Mesh.ARRAY_TEX_UV][k].is_equal_approx(arr_want[Mesh.ARRAY_TEX_UV][k]):
 			uv_ok = false
 	_check(uv_ok, "terrain uvs match the reference")
-	_done()
 
 
 func _test_lightmap() -> DotMapBspMesh:
