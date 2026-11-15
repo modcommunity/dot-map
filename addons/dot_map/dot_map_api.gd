@@ -5,6 +5,7 @@ extends RefCounted
 ## removed or changes meaning, because every pack built before that no longer compiles against this addon.
 
 # 1: everything before this file existed (absent means 1). 2: DotMapDef.from_content_key and DotMapCatalogue.add_delivered. 3: a relative scene given to either is resolved onto the pack's mount. 4: DotMapSurfaces, the surface-kind material library (and its textures in surfaces/).
+
 # 22: DotMapDef.profile, DotMapRotationFile.profile_changed, DotMapConfig.apply_values (per-map mode/cfg profiles). 23: DotMapLocalMaps (raw convert folders under res://addons/maps and user://maps, offered as "(local)").
 # 24: DotMapLocalMaps zips (entry_in_zip, zip_cache) and drag-and-drop (accept_dropped, watch_drops, DROP_ROOT); DotMapDrawnWorld option original_textures.
 # 25: DotMapSurfaces.shrink_textures_headless (default on): headless, a kind's textures load as 4x4 downsamples.
