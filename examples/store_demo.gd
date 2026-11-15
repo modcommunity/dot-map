@@ -2,8 +2,8 @@ extends Node
 ## Proves DotMapCredits and DotMapStore on a hand-written manifest and a stand-in cloud client.
 ## godot --headless --path . res://examples/store_demo.tscn
 
-const CHECKS := 60
-const SECTIONS := 7
+const CHECKS := 65
+const SECTIONS := 8
 
 var _passed := 0
 var _failed := 0
@@ -102,6 +102,7 @@ func _run() -> void:
 	await _missing_slices()
 	_stand_ins()
 	_missing_models()
+	_stale_import()
 	print("%d checks, %d failed, %d/%d sections" % [_passed + _failed, _failed, _completed, SECTIONS])
 	var bad := _failed > 0 or _passed + _failed != CHECKS or _completed != SECTIONS or _entered != SECTIONS
 	get_tree().quit(1 if bad else 0)
@@ -346,4 +347,55 @@ func _missing_models() -> void:
 	props.free()
 	DotMapBspMesh._support_material = null
 	DotMapBspMesh._tinted.clear()
+	_completed += 1
+
+
+## A stale .import (exists() true, load() null) must not turn a prop into a box: the source file is read with GLTFDocument.
+func _stale_import() -> void:
+	_entered += 1
+	var dir := "res://examples/_stale_import_tmp"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
+	var scene := Node3D.new()
+	var mi := MeshInstance3D.new()
+	mi.mesh = BoxMesh.new()
+	scene.add_child(mi)
+	mi.owner = scene
+	var doc := GLTFDocument.new()
+	var state := GLTFState.new()
+	_check("the test model is written", doc.append_from_scene(scene, state) == OK and doc.write_to_filesystem(state, dir + "/box.glb") == OK)
+	scene.free()
+	var imp := FileAccess.open(dir + "/box.glb.import", FileAccess.WRITE)
+	imp.store_string("[remap]\n\nimporter=\"scene\"\ntype=\"PackedScene\"\npath=\"res://.godot/imported/box.glb-0000stale.scn\"\n")
+	imp.close()
+	var w := DotMapBspMesh.new()
+	w.source_path = "user://store_demo_stale/m.json"
+	w.model_library = dir
+	w.manifest = {"licence": {"model_stand_ins": [{"stand_in": "lib/box", "store_file": "box.glb"}]}}
+	var stale := ResourceLoader.exists(dir + "/box.glb") and load(dir + "/box.glb") == null
+	_check("the setup is a stale import: exists() true, load() null (else the fallback is not exercised)", stale)
+	var logs: Array[Dictionary] = []
+	var sink := func(rec: Dictionary) -> void:
+		if rec["channel"] == DotMapBspMesh.CHANNEL:
+			logs.append(rec)
+	DotLog.set_level(DotLog.Level.WARN)
+	DotLog.add_sink(sink)
+	var model := w._library_model("lib/box")
+	_check("a stale import is read through GLTFDocument, not drawn as a box", model != null and model.get_child_count() == 1)
+	_check("and says so, as a warning rather than an error", logs.size() == 1 and logs[0]["level"] == DotLog.Level.WARN)
+	if model != null:
+		model.free()
+	# Both routes failing is logged loudly.
+	logs.clear()
+	var bad := FileAccess.open(dir + "/bad.glb", FileAccess.WRITE)
+	bad.store_string("not a glb at all")
+	bad.close()
+	var imp2 := FileAccess.open(dir + "/bad.glb.import", FileAccess.WRITE)
+	imp2.store_string("[remap]\n\nimporter=\"scene\"\ntype=\"PackedScene\"\npath=\"res://.godot/imported/bad.glb-0000stale.scn\"\n")
+	imp2.close()
+	w.manifest = {"licence": {"model_stand_ins": [{"stand_in": "lib/bad", "store_file": "bad.glb"}]}}
+	_check("a model neither route can read is null and logged", w._library_model("lib/bad") == null and logs.size() >= 1)
+	DotLog.remove_sink(sink)
+	for f in DirAccess.get_files_at(dir):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(dir.path_join(f)))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(dir))
 	_completed += 1

@@ -355,23 +355,16 @@ func _library_model(id: String, parsed: GLTFState = null) -> Node3D:
 	if path.begins_with("res://") and ResourceLoader.exists(path):
 		var packed := (_imported_scenes[path] if _imported_scenes.has(path) else load(path)) as PackedScene
 		model = packed.instantiate() as Node3D if packed != null else null
+		if model == null:
+			# A stale .import (a shared store whose imported copy is gone) leaves exists() true and load() null. The
+			# source file is still there, so read it directly rather than drawing a box.
+			model = _read_gltf_file(path, parsed)
+			if model == null:
+				DotLog.error(CHANNEL, "a library model is listed and imported but neither load() nor GLTFDocument can read it; drawn as a box", {"model": path})
+			else:
+				DotLog.warn(CHANNEL, "a library model's import is stale (load() returned null); read from the source file instead", {"model": path})
 	elif FileAccess.file_exists(path):
-		var defect := gltf_defect(path)
-		if defect != "":
-			_note_defect(path, defect)
-			return null
-		var state := parsed
-		var doc := GLTFDocument.new()
-		if state == null:
-			state = GLTFState.new()
-			if doc.append_from_file(path, state) != OK:
-				state = null
-		if state != null:
-			model = doc.generate_scene(state) as Node3D
-			if model != null:
-				add_mesh_lods(model, model_lod_min_tris, model_max_tris)
-				if model_texture_max >= 0:
-					slim_model_textures(model, model_texture_max)
+		model = _read_gltf_file(path, parsed)
 	if model == null:
 		return null
 	var box := _local_aabb(model)
@@ -379,6 +372,29 @@ func _library_model(id: String, parsed: GLTFState = null) -> Node3D:
 	var holder := Node3D.new()
 	holder.add_child(model)
 	return holder
+
+
+## A glTF/glb read straight from the file with [GLTFDocument] (no import), LODs and texture limits applied; null when the file is
+## damaged ([method gltf_defect], noted once) or unreadable. [param parsed] is a state a worker already parsed.
+func _read_gltf_file(path: String, parsed: GLTFState = null) -> Node3D:
+	if not FileAccess.file_exists(path):
+		return null
+	var defect := gltf_defect(path)
+	if defect != "":
+		_note_defect(path, defect)
+		return null
+	var state := parsed
+	var doc := GLTFDocument.new()
+	if state == null:
+		state = GLTFState.new()
+		if doc.append_from_file(path, state) != OK:
+			return null
+	var model := doc.generate_scene(state) as Node3D
+	if model != null:
+		add_mesh_lods(model, model_lod_min_tris, model_max_tris)
+		if model_texture_max >= 0:
+			slim_model_textures(model, model_texture_max)
+	return model
 
 
 ## Where library model [param id] is on disk ("" when the pack does not list it).
