@@ -85,7 +85,7 @@ for key in server.games.current_maps():
 
 ## A converted map, from files to a drawn world
 
-A converted map is a prefix: `<prefix>.json` (the manifest), `<prefix>.bin` (geometry, lightmaps, visibility), usually `<prefix>.doc.json` (entities and links) and `<prefix>.coverage.json`. `examples/bsp_mesh/fixture.json` and `fixture.bin` are a tiny one to start from. The converter, [dot-map-convert](https://github.com/modcommunity/dot-map-convert), writes real ones.
+A converted map is a prefix: `<prefix>.json` (the manifest), `<prefix>.bin` (geometry, lightmaps, visibility), usually `<prefix>.doc.json` (entities and links) and `<prefix>.coverage.json`. `examples/bsp_mesh/fixture.json` and `fixture.bin` are a tiny one to start from. The converter, [dot-map-convert](https://github.com/gamespice-platform/map-convert), writes real ones.
 
 ```gdscript
 # `world` is a DotMapBspMesh, read from the prefix (the path without ".json").
