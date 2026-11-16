@@ -27,4 +27,4 @@ __pycache__/
 /wt-*/
 
 # Local maps copied in by hand (DotMapLocalMaps); never committed.
-/addons/maps/
+addons/maps/
