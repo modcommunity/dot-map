@@ -1,4 +1,4 @@
-extends "mesh_core.gd"
+extends "mesh_nodes.gd"
 
 ## The solid-prop collision half of [DotMapBspMesh]: boxes cut from a stand-in, trunks and support blocks.
 
