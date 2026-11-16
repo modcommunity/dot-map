@@ -75,7 +75,7 @@ code defaults  <  cfg/addons/<addon>  <  cfg/game/<game>  <  cfg/server.yml (gen
 
 - Within a tier the four roots merge weakest first (`res://cfg`, `<exe>/cfg`, `user://cfg`, `--config DIR`), so a game ships its tier in the pack and the operator changes it in `--config DIR` without editing shipped files. Within one root, files merge in name order. Maps merge key by key; lists and scalars replace whole.
 - Tier beats root: the tier order above is absolute, and roots only order files inside one tier. So an operator editing `DIR/addons/dot_map/` would lose to the game's `cfg/game/<game>/` file. **The operator's layer is therefore its own tier, `server`**: `DIR/server/<addon>/*.yml` for settings and `DIR/server/<kind>/<id>.yml` for profiles (the `cfg/server/` tier `DotProfileSet` already has, generalised to settings), and `cfg/server.yml` is the generic file beside it. One word, "server", means the operator's layer everywhere.
-- Env and cli keep their present spelling (`DOT_MAP_ROTATION_MODE`, `--dot-map.rotation.mode=`, `PROFILE_<KIND>_<ID>_<KEY>`, `--sv-*`). Typed, existing keys only. `DotConfig` subclasses keep `env_prefix`/`cli_prefix`.
+- Env and cli keep their present spelling (`GS_MAP_ROTATION_MODE`, `--dot-map.rotation.mode=`, `PROFILE_<KIND>_<ID>_<KEY>`, `--sv-*`). Typed, existing keys only. `DotConfig` subclasses keep `env_prefix`/`cli_prefix`.
 
 ## Migration shim
 

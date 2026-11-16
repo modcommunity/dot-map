@@ -514,7 +514,7 @@ static func set_model_lod(min_tris: int, max_tris: int = 0) -> void:
 	model_max_tris = maxi(max_tris, 0)
 
 
-## Longest side a library model's texture keeps (a glTF read at run time decodes to raw RGBA with mips, 85 MB for a 4k map); 0 keeps the model's own size, and every one is VRAM-compressed either way; below 0 leaves the textures as the glTF made them (the manor's static memory is 1624 MB uncapped, 400 MB at 2048). [method apply_config] layers it: this value, then `model_texture_max` in `cfg/addon/dot_map/*.yml`, then `DOT_MAP_MODEL_TEXTURE_MAX`, then `--dot-map.model_texture_max=`.
+## Longest side a library model's texture keeps (a glTF read at run time decodes to raw RGBA with mips, 85 MB for a 4k map); 0 keeps the model's own size, and every one is VRAM-compressed either way; below 0 leaves the textures as the glTF made them (the manor's static memory is 1624 MB uncapped, 400 MB at 2048). [method apply_config] layers it: this value, then `model_texture_max` in `cfg/addon/dot_map/*.yml`, then `GS_MAP_MODEL_TEXTURE_MAX`, then `--dot-map.model_texture_max=`.
 static var model_texture_max: int = 2048
 
 
