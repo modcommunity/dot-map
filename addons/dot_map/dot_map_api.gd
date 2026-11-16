@@ -10,5 +10,6 @@ extends RefCounted
 # 24: DotMapLocalMaps zips (entry_in_zip, zip_cache) and drag-and-drop (accept_dropped, watch_drops, DROP_ROOT); DotMapDrawnWorld option original_textures.
 # 25: DotMapSurfaces.shrink_textures_headless (default on): headless, a kind's textures load as 4x4 downsamples.
 # 26: DotMapDropIntake (window, exe and --map-path drops, game acceptors, loud refusal); DotMapLocalMaps.zip_max_files, entry_within, zip_problem.
-const LEVEL := 26
+# 27: decal surface records ("decal": kind) drawn alpha-blended and depth-biased: DotMapBspMesh.DECAL_LOOKS, decal_material, decal_texture, is_decal_material, decal_depth_bias.
+const LEVEL := 27
 const OLDEST := 1

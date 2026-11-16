@@ -157,6 +157,187 @@ static func keep_coverage(img: Image) -> Image:
 	return Image.create_from_data(img.get_width(), img.get_height(), true, img.get_format(), data)
 
 
+## The look of each decal kind (a converter generic id starting [code]decal_[/code]): the pattern
+## [method decal_texture] draws and the colour (with alpha) it is multiplied by. [code]own[/code] takes the
+## colour from the record's average of the original texture instead, its alpha kept.
+const DECAL_LOOKS := {
+	&"decal_lines": {"pattern": &"lines", "colour": Color(0.8, 0.8, 0.78, 0.85)},
+	&"decal_graffiti": {"pattern": &"graffiti", "colour": Color(0.72, 0.18, 0.22, 0.85)},
+	&"decal_sign": {"pattern": &"star", "colour": Color(0.6, 0.1, 0.08, 0.9)},
+	&"decal_fade": {"pattern": &"fade", "colour": Color(0.0, 0.0, 0.0, 1.0)},
+	&"decal_radial": {"pattern": &"radial", "colour": Color(0.5, 0.5, 0.5, 0.8), "own": true},
+	&"decal_patch": {"pattern": &"patch", "colour": Color(1, 1, 1, 0.9), "own": true},
+}
+
+## Metres a decal is drawn toward the camera per metre of distance, over the converter's small lift off its
+## face, so it never fights the face's depth far away. 0 draws it where it lies. Set before the world is built.
+static var decal_depth_bias: float = 0.002
+
+const DECAL_SHADER := """shader_type spatial;
+render_mode blend_mix, depth_draw_never, skip_vertex_transform%s;
+
+// A decal over a face (dot-map DotMapBspMesh.decal_material): a texture's alpha over what is drawn, pulled
+// toward the camera by depth_bias metres per metre so it never fights the face. Lit by the map's bake when
+// it has one (UV2 into the page, as lightmapped.gdshader), else by the scene.
+uniform sampler2D albedo_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform vec4 colour : source_color = vec4(1.0);
+uniform float depth_bias = 0.002;
+uniform bool lit = false;
+uniform sampler2D lightmap : filter_linear, repeat_disable;
+uniform float exposure = 1.0;
+uniform vec3 floor_light : source_color = vec3(0.0);
+uniform float emissive = 0.0;
+
+void vertex() {
+	VERTEX = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	NORMAL = normalize((MODELVIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
+	VERTEX -= normalize(VERTEX) * min(length(VERTEX) * depth_bias, length(VERTEX) * 0.5);
+}
+
+void fragment() {
+	vec4 t = texture(albedo_tex, UV) * colour;
+	ALPHA = t.a;
+	if (lit) {
+		vec3 light = emissive > 0.0 ? vec3(emissive) : max(texture(lightmap, UV2).rgb * exposure, floor_light);
+		ALBEDO = t.rgb * (1.0 - smoothstep(0.15, 0.6, dot(light, vec3(0.3333))));
+		EMISSION = t.rgb * light;
+		SPECULAR = 0.0;
+	} else {
+		ALBEDO = t.rgb;
+	}
+	ROUGHNESS = 1.0;
+}
+"""
+static var _decal_shaders: Dictionary = {}
+static var _decal_cache: Dictionary = {}
+static var _decal_textures: Dictionary = {}
+
+
+## The decal shader; [param baked] leaves out the scene's ambient, which the bake already holds.
+static func decal_shader(baked: bool) -> Shader:
+	if not _decal_shaders.has(baked):
+		var s := Shader.new()
+		s.code = DECAL_SHADER % (", ambient_light_disabled" if baked else "")
+		_decal_shaders[baked] = s
+	return _decal_shaders[baked]
+
+
+## The shared alpha-blended material of a decal [param kind] (an unknown kind is a grey patch). [param texture]
+## replaces the kind's drawn pattern (the map's own texture in an internal pack: drawn white, as authored);
+## [param own_colour] is the record's average of the original, used by kinds that take it; [param light] is
+## the bake: {lightmap: Texture2D, exposure, floor: Color, emissive} (empty: lit by the scene).
+static func decal_material(kind: StringName, own_colour: Array = [], texture: Texture2D = null, light: Dictionary = {}) -> ShaderMaterial:
+	var look: Dictionary = DECAL_LOOKS.get(kind, DECAL_LOOKS[&"decal_patch"])
+	var c: Color = look["colour"]
+	if texture != null:
+		c = Color.WHITE
+	elif look.get("own", false) and own_colour.size() >= 3:
+		c = Color(float(own_colour[0]), float(own_colour[1]), float(own_colour[2]), c.a)
+	var lm: Texture2D = light.get("lightmap")
+	var key := "%s|%s|%d|%d|%s|%s|%s|%s" % [kind, c.to_html(), texture.get_instance_id() if texture != null else 0,
+			lm.get_instance_id() if lm != null else 0, light.get("exposure", 1.0), light.get("floor", Color.BLACK),
+			light.get("emissive", 0.0), decal_depth_bias]
+	if _decal_cache.has(key):
+		return _decal_cache[key]
+	var m := ShaderMaterial.new()
+	m.shader = decal_shader(lm != null)
+	m.resource_name = str(kind)
+	m.set_shader_parameter("albedo_tex", texture if texture != null else decal_texture(StringName(look["pattern"])))
+	m.set_shader_parameter("colour", c)
+	m.set_shader_parameter("depth_bias", decal_depth_bias)
+	if lm != null:
+		var fl: Color = light.get("floor", Color.BLACK)
+		m.set_shader_parameter("lit", true)
+		m.set_shader_parameter("lightmap", lm)
+		m.set_shader_parameter("exposure", float(light.get("exposure", 1.0)))
+		m.set_shader_parameter("floor_light", Vector3(fl.r, fl.g, fl.b))
+		m.set_shader_parameter("emissive", float(light.get("emissive", 0.0)))
+	_decal_cache[key] = m
+	return m
+
+
+## Whether [param mat] is a decal material ([method decal_material] or one a game made on its shader).
+static func is_decal_material(mat: Material) -> bool:
+	return mat is ShaderMaterial and _decal_shaders.values().has((mat as ShaderMaterial).shader)
+
+
+## A 256 px decal image drawn in code (so it has no licence), white with the shape in alpha: two worn
+## parking stripes down the sides, spray strokes, a five-point painted star, a fade from opaque at the top
+## to clear at the bottom, a radial fade, or a ragged feathered patch. Mipmapped.
+static func decal_texture(pattern: StringName) -> ImageTexture:
+	if _decal_textures.has(pattern):
+		return _decal_textures[pattern]
+	var n := 256
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	img.fill(Color(1, 1, 1, 0))
+	var noise := FastNoiseLite.new()
+	noise.seed = 11
+	noise.frequency = 0.035
+	match pattern:
+		&"lines":
+			for y in n:
+				for x in n:
+					var u := float(x) / n
+					if (u > 0.03 and u < 0.09) or (u > 0.91 and u < 0.97):
+						var wear := noise.get_noise_2d(x * 2.0, y * 0.5)
+						img.set_pixel(x, y, Color(1, 1, 1, clampf(0.85 + wear * 0.6, 0.0, 1.0)))
+		&"graffiti":
+			var rng := RandomNumberGenerator.new()
+			rng.seed = 5
+			for _stroke in 9:
+				var p := Vector2(rng.randf_range(0.15, 0.85), rng.randf_range(0.2, 0.8)) * n
+				var dir := Vector2.from_angle(rng.randf() * TAU)
+				var r := rng.randf_range(4.0, 9.0)
+				for _step in 60:
+					dir = dir.rotated(rng.randf_range(-0.35, 0.35))
+					p = (p + dir * 3.0).clamp(Vector2(r + 2, r + 2), Vector2(n - r - 3, n - r - 3))
+					_dab(img, p, r)
+		&"star":
+			var pts := PackedVector2Array()
+			for k in 10:
+				var rad := 0.46 if k % 2 == 0 else 0.19
+				pts.append(Vector2(0.5, 0.5) * n + Vector2.from_angle(-PI / 2 + k * PI / 5) * rad * n)
+			for y in n:
+				for x in n:
+					if Geometry2D.is_point_in_polygon(Vector2(x, y), pts):
+						var worn := noise.get_noise_2d(x * 3.0, y * 3.0)
+						img.set_pixel(x, y, Color(1, 1, 1, clampf(0.95 + worn * 1.2, 0.0, 1.0)))
+		&"fade":
+			for y in n:
+				for x in n:
+					img.set_pixel(x, y, Color(1, 1, 1, 1.0 - float(y) / (n - 1)))
+		&"radial":
+			for y in n:
+				for x in n:
+					var d := Vector2(x + 0.5, y + 0.5).distance_to(Vector2(n, n) * 0.5) / (n * 0.5)
+					img.set_pixel(x, y, Color(1, 1, 1, clampf(1.0 - d, 0.0, 1.0)))
+		_:    # patch
+			for y in n:
+				for x in n:
+					var d := Vector2(x + 0.5, y + 0.5).distance_to(Vector2(n, n) * 0.5) / (n * 0.5)
+					var v := noise.get_noise_2d(x, y)
+					var a := clampf((1.0 - d + v * 0.5) * 2.5, 0.0, 1.0)
+					var shade := 0.8 + v * 0.4
+					img.set_pixel(x, y, Color(shade, shade, shade, a))
+	img.generate_mipmaps()
+	var tex := ImageTexture.create_from_image(img)
+	_decal_textures[pattern] = tex
+	return tex
+
+
+## One round, soft-edged spray dab of radius [param r] at [param p] in [param img].
+static func _dab(img: Image, p: Vector2, r: float) -> void:
+	for dy in range(-int(r) - 1, int(r) + 2):
+		for dx in range(-int(r) - 1, int(r) + 2):
+			var d := Vector2(dx, dy).length() / r
+			if d >= 1.0:
+				continue
+			var x := int(p.x) + dx
+			var y := int(p.y) + dy
+			var a := maxf(img.get_pixel(x, y).a, clampf((1.0 - d) * 3.0, 0.0, 1.0))
+			img.set_pixel(x, y, Color(1, 1, 1, a))
+
+
 ## One shared back-face-visible copy of [param mat] for a surface the source drew from both sides (rope, leaves); a
 ## shader material keeps its own culling, which is a render mode and cannot be switched per instance.
 func _two_sided(mat: Material) -> Material:

@@ -444,12 +444,24 @@ func _mesh_plan_async(model: int, material_for: Callable, slice: DotFrameSlice) 
 	return {"plan": plan, "groups": groups}
 
 
+## A decal surface record's material: [param material_for]'s when it gives a decal material (the game's
+## surfaces lighting it, or an internal pack's own texture), else the built-in [method decal_material].
+func _decal_for(rec: Dictionary, material_for: Callable) -> Material:
+	if material_for.is_valid():
+		var m: Variant = material_for.call(rec)
+		if m is Material and is_decal_material(m):
+			return m
+	return decal_material(StringName(str(rec["decal"])), rec.get("colour", []))
+
+
 func _chunk_groups(model: int) -> Dictionary:
 	var groups := {}
 	for rec: Dictionary in surfaces:
 		if int(rec["model"]) != model:
 			continue
 		var key := "%s|%s|%s" % [str(rec.get("chunk", [])), rec.get("sky3d", false), rec.has("glass")]
+		if rec.has("decal"):
+			key += "|decal"
 		if not groups.has(key):
 			groups[key] = []
 		(groups[key] as Array).append(rec)
@@ -458,7 +470,9 @@ func _chunk_groups(model: int) -> Dictionary:
 
 func _plan_rec(by_material: Dictionary, rec: Dictionary, material_for: Callable) -> void:
 	var mat: Material = null
-	if rec.has("glass"):
+	if rec.has("decal"):
+		mat = _decal_for(rec, material_for)
+	elif rec.has("glass"):
 		mat = _glass_for(rec)
 	elif material_for.is_valid():
 		var m: Variant = material_for.call(rec)
@@ -496,7 +510,7 @@ func _mesh_add(planned: Dictionary, item: Array, arrays: Array, out: Array[Dicti
 		mesh = ArrayMesh.new()
 		state["mesh"] = mesh
 		out.append({"mesh": mesh, "chunk": first.get("chunk", []), "sky3d": bool(first.get("sky3d", false)),
-				"glass": first.has("glass"), "clusters": _clusters_of(groups[key])})
+				"glass": first.has("glass"), "decal": first.has("decal"), "clusters": _clusters_of(groups[key])})
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	var s := mesh.get_surface_count() - 1
 	mesh.surface_set_name(s, str(first.get("material", "")))
@@ -719,11 +733,12 @@ func _add_one_mesh(parent: Node3D, model: int, g: Dictionary) -> void:
 	mi.name = "sky3d" if g["sky3d"] else ("chunk_" + "_".join(PackedStringArray(c.map(str))) if c.size() >= 2 else "mesh")
 	if g["clusters"] != null and model == WORLD:
 		mi.set_meta(&"vis_clusters", g["clusters"])
-	if g["glass"]:
-		mi.name = "glass_" + str(mi.name)
+	var decal: bool = g.get("decal", false)
+	if g["glass"] or decal:
+		mi.name = ("decal_" if decal else "glass_") + str(mi.name)
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(mi)
-	if shadow_proxy and model == WORLD and not g["glass"] and not g["sky3d"]:
+	if shadow_proxy and model == WORLD and not g["glass"] and not decal and not g["sky3d"]:
 		_add_shadow_proxy(parent, mi)
 
 

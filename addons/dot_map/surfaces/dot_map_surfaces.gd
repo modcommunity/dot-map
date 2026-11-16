@@ -179,6 +179,8 @@ func _material_callable(world: DotMapBspMesh, generated: Dictionary, library: Di
 		if rec.get("water", false):
 			return water_material if water_material != null else liquid_material(liquid_kind(str(rec.get("material", ""))))
 		var lit := use_lightmap and world.has_lightmap() and rec.has("lightmap_page") and not rec.has("glass")
+		if rec.has("decal"):
+			return _decal_material(world, rec, dir, lit)
 		if use_original_textures and not rec.has("glass") and str(rec.get("orig", "")) != "":
 			var own := _original_material(world, rec, dir, lit, cache)
 			if own != null:
@@ -243,6 +245,19 @@ func _original_material(world: DotMapBspMesh, rec: Dictionary, dir: String, lit:
 		m = st
 	cache[key] = m
 	return m
+
+
+## A decal surface's alpha-blended material: the map's own texture in an internal pack (use_original_textures),
+## else the kind's drawn pattern; lit by the bake's page when [param lit]. One per kind, texture and page.
+func _decal_material(world: DotMapBspMesh, rec: Dictionary, dir: String, lit: bool) -> Material:
+	var tex: Texture2D = null
+	if use_original_textures and str(rec.get("orig", "")) != "":
+		tex = _file_texture(dir.path_join(str(rec["orig"])))
+	var light := {}
+	if lit:
+		light = {"lightmap": world.lightmap_page(int(rec["lightmap_page"])), "exposure": world.lightmap_scale(),
+				"floor": world.light_floor(), "emissive": emissive_energy if rec.get("emissive", false) else 0.0}
+	return DotMapBspMesh.decal_material(StringName(str(rec["decal"])), rec.get("colour", []), tex, light)
 
 
 ## Splits the files the world's surfaces use into those still to decode from disk and the imported ones (already requested); a pre-baked file is taken here.

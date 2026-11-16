@@ -2,8 +2,8 @@ extends "bsp_mesh_parts/tests_image.gd"
 
 ## [DotMapBspMesh]: the converter's fixture read, built, and ray-cast.
 
-const CHECKS := 175
-const SECTIONS := 14
+const CHECKS := 184
+const SECTIONS := 15
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
 const TERRAIN := "res://examples/bsp_mesh/terrain_fixture.json"
@@ -23,6 +23,7 @@ func _run() -> void:
 		_test_environment(world)
 		await _test_collide(world)
 		await _test_glass()
+		_test_decals()
 		await _test_fence()
 		await _test_legacy_split()
 		await _test_async_build(world)
@@ -481,6 +482,47 @@ func _points_aabb(points: PackedVector3Array) -> AABB:
 	for p in points:
 		box = box.expand(p)
 	return box
+
+
+func _test_decals() -> void:
+	_section("a decal record is drawn alpha-blended in its own shadowless mesh")
+	var res := DotMapBspMesh.load_prefix(GLASS)
+	_check(res.ok, "the glass fixture reads")
+	if not res.ok:
+		_done()
+		return
+	var world: DotMapBspMesh = res.value
+	var floor_rec: Dictionary = world.surfaces.filter(func(r: Dictionary) -> bool: return not r.has("glass") and int(r["model"]) == 0)[0]
+	floor_rec["decal"] = "decal_lines"
+	floor_rec["colour"] = [0.2, 0.4, 0.6]
+	var asked: Array = []
+	var plain := func(rec: Dictionary) -> Material:
+		asked.append(rec.get("decal", ""))
+		return StandardMaterial3D.new()
+	var root := world.build_node(plain)
+	var decals: Array = []
+	for model in root.get_children():
+		for mi: MeshInstance3D in model.get_children():
+			if str(mi.name).begins_with("decal_"):
+				decals.append(mi)
+	_check(decals.size() == 1, "the decal sits in its own mesh instance: %d" % decals.size())
+	_check(asked.has("decal_lines"), "the game's callback is asked first")
+	var di: MeshInstance3D = decals[0] if not decals.is_empty() else null
+	_check(di != null and di.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "a decal casts no shadow")
+	var mat: Material = di.mesh.surface_get_material(0) if di != null else null
+	_check(DotMapBspMesh.is_decal_material(mat) and not DotMapBspMesh.is_decal_material(StandardMaterial3D.new()),
+			"a plain material from the game is replaced by the built-in decal material")
+	_check(mat is ShaderMaterial and is_equal_approx(float((mat as ShaderMaterial).get_shader_parameter("depth_bias")), DotMapBspMesh.decal_depth_bias),
+			"it is pulled toward the camera by decal_depth_bias")
+	_check(DotMapBspMesh.decal_material(&"decal_patch", [0.2, 0.4, 0.6]).get_shader_parameter("colour").is_equal_approx(Color(0.2, 0.4, 0.6, 0.9))
+			and DotMapBspMesh.decal_material(&"decal_lines", [0.2, 0.4, 0.6]) == DotMapBspMesh.decal_material(&"decal_lines"),
+			"a patch takes the record's colour, painted lines keep their own (shared)")
+	var lines := DotMapBspMesh.decal_texture(&"lines").get_image()
+	_check(lines.get_pixel(15, 128).a > 0.3 and lines.get_pixel(128, 128).a == 0.0, "the lines texture is two side stripes over clear")
+	var fade := DotMapBspMesh.decal_texture(&"fade").get_image()
+	_check(fade.get_pixel(5, 0).a > 0.95 and fade.get_pixel(5, 255).a < 0.05, "the fade is opaque at the top and clear at the bottom")
+	root.free()
+	_done()
 
 
 func _test_glass() -> void:
