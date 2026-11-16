@@ -19,8 +19,17 @@ const TAG := " (local)"
 ## The folder the converter writes inside a map's source folder; looked into when a whole map folder was copied.
 const CONVERT_DIR := "convert"
 
-## A zip with more entries than this is refused, not unpacked.
+## The default of [member zip_max_files].
 const ZIP_MAX_FILES := 20000
+
+## A zip with more entries than this is refused, not unpacked; 0 is no limit.
+static var zip_max_files := ZIP_MAX_FILES
+
+## What [method zip_problem] says for a zip that opens but holds no converted map.
+const ZIP_NO_MAP := "no <name>.json beside <name>.bin in the zip"
+
+## What [method zip_problem] says for a file that is not a zip at all.
+const ZIP_UNREADABLE := "not a readable zip"
 
 ## Where a dropped folder or zip is copied.
 const DROP_ROOT := "user://maps"
@@ -277,6 +286,35 @@ static func describe_lines(entries: Array[Dictionary]) -> PackedStringArray:
 	return out
 
 
+## Why a zip would be refused ([constant ZIP_UNREADABLE], [constant ZIP_NO_MAP], too many files, an unsafe name), or empty.
+static func zip_problem(zip_path: String) -> String:
+	return _zip_problem(zip_path)
+
+
+## [method entry_at] for [param dir] or the first folder below it that holds a map, breadth first by name, at most
+## [param depth] folders down (0 is no limit); [code]folder[/code] is the folder to copy (the parent of a found convert/).
+static func entry_within(dir: String, depth: int) -> Dictionary:
+	var level: Array[String] = [dir]
+	var down := 0
+	while not level.is_empty():
+		var next: Array[String] = []
+		for folder in level:
+			var entry := entry_at(folder)
+			if not entry.is_empty():
+				entry["folder"] = folder
+				return entry
+			var subs := DirAccess.get_directories_at(folder)
+			subs.sort()
+			for sub in subs:
+				if not sub.begins_with(".") and sub != "__MACOSX":
+					next.append(folder.path_join(sub))
+		down += 1
+		if depth > 0 and down > depth:
+			break
+		level = next
+	return {}
+
+
 ## [method entry_at] for [param dir], or for the first map folder one level below (a zip of a folder, a dropped parent of one).
 static func _entry_under(dir: String) -> Dictionary:
 	var entry := entry_at(dir)
@@ -343,11 +381,11 @@ static func _unpacked(zip_path: String) -> String:
 static func _zip_problem(zip_path: String) -> String:
 	var zip := ZIPReader.new()
 	if zip.open(zip_path) != OK:
-		return "not a readable zip"
+		return ZIP_UNREADABLE
 	var names := zip.get_files()
 	zip.close()
-	if names.size() > ZIP_MAX_FILES:
-		return "%d files, more than %d" % [names.size(), ZIP_MAX_FILES]
+	if zip_max_files > 0 and names.size() > zip_max_files:
+		return "%d files, more than zip_max_files %d" % [names.size(), zip_max_files]
 	var has := {}
 	for name in names:
 		if name.begins_with("/") or name.contains("\\") or name.contains(":") or name.split("/").has(".."):
@@ -357,7 +395,7 @@ static func _zip_problem(zip_path: String) -> String:
 	for name: String in has:
 		if name.get_extension().to_lower() == "bin" and has.has(name.get_basename() + ".json"):
 			return ""
-	return "no <name>.json beside <name>.bin in the zip"
+	return ZIP_NO_MAP
 
 
 static func _skipped_in_zip(name: String) -> bool:

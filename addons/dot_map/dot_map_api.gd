@@ -9,5 +9,6 @@ extends RefCounted
 # 22: DotMapDef.profile, DotMapRotationFile.profile_changed, DotMapConfig.apply_values (per-map mode/cfg profiles). 23: DotMapLocalMaps (raw convert folders under res://addons/maps and user://maps, offered as "(local)").
 # 24: DotMapLocalMaps zips (entry_in_zip, zip_cache) and drag-and-drop (accept_dropped, watch_drops, DROP_ROOT); DotMapDrawnWorld option original_textures.
 # 25: DotMapSurfaces.shrink_textures_headless (default on): headless, a kind's textures load as 4x4 downsamples.
-const LEVEL := 25
+# 26: DotMapDropIntake (window, exe and --map-path drops, game acceptors, loud refusal); DotMapLocalMaps.zip_max_files, entry_within, zip_problem.
+const LEVEL := 26
 const OLDEST := 1
