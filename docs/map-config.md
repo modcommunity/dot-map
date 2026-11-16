@@ -12,7 +12,7 @@ Strongest first: the command line (`--dot-map.map.<key>=v`) and environment (`DO
 
 ## The whitelist
 
-The game declares what a map may set with `allow(key, {type, min, max})`, the names of cvars it registers; an empty schema allows nothing. A key outside it, a non-scalar, or a value of the wrong type is rejected, logged once as a warning and listed in `rejected` in the result of `resolve()`; it is never applied. A number outside `min`/`max` is clamped.
+The game declares what a map may set with `allow(key, {type, min, max})`, the names of cvars it registers; an empty schema allows nothing. A key outside it, a non-scalar, or a value of the wrong type is rejected, logged once as a warning and listed in `rejected` in the result of `resolve()`; it is never applied. A number outside `min`/`max` is refused the same way (the warning names the key and the value), never clamped; leave `max` out where the game has no real ceiling.
 
 ## Applying and restoring
 

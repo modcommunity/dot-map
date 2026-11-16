@@ -3,7 +3,7 @@ extends "map_selftest_parts/tests_rotation.gd"
 ## Proves the catalogue, the rotation, the vote and the map change do what a server depends on. The most
 ## important test here is [method _test_change_survives_a_failure].
 
-const CHECKS := 494
+const CHECKS := 495
 
 ## Sections entered against sections that ran to their last line, and against this. A runtime error inside a
 ## section aborts that function and nothing says so; a section that bailed out early after a failed guard is
@@ -396,8 +396,13 @@ func _test_map_config() -> void:
 	var plain: Dictionary = cfg.resolve("dm_plain").value
 	_check(plain["settings"].size() == 2 and plain["settings"]["arena_air"] == 10.0 and plain["settings"]["arena_extra"] == 1, "a map no file matches gets the converter default only (%s)" % [plain["settings"]])
 	var bad: Dictionary = cfg.resolve("bad_type").value
-	_check(bad["settings"].get("arena_gravity") == 0.0, "a minimum clamps (%s)" % [bad["settings"]])
-	_check(bad["rejected"].size() == 2 and not bad["settings"].has("arena_air") and not bad["settings"].has("rm"), "a non-number and an unlisted command key are both refused (%s)" % [bad["rejected"]])
+	_check(not bad["settings"].has("arena_gravity"), "a value below the minimum is refused, not clamped (%s)" % [bad["settings"]])
+	var gwhy := ""
+	for r: Dictionary in bad["rejected"]:
+		if r["key"] == "arena_gravity":
+			gwhy = String(r["why"])
+	_check(gwhy.contains("arena_gravity") and gwhy.contains("-5"), "the refusal names the key and the value (%s)" % [gwhy])
+	_check(bad["rejected"].size() == 3 and not bad["settings"].has("arena_air") and not bad["settings"].has("rm"), "a non-number and an unlisted command key are both refused (%s)" % [bad["rejected"]])
 	_check(cfg.resolve("surf_abc").value["sources"]["arena_air"].ends_with("surf_abc.yml"), "each key records its file")
 
 	_test_map_config_restore(cfg)
@@ -450,7 +455,7 @@ func _test_map_config_restore(cfg: DotMapConfig) -> void:
 	_check(not cfg2._check("arena_air", INF).ok and not cfg2._check("arena_air", NAN).ok and not cfg2._check("arena_air", "inf").ok, "inf and nan are refused")
 	_check(cfg2._check("arena_extra", 1.0e30).ok, "a huge value is accepted")
 	cfg2.allow("arena_int", {"type": "int"})
-	_check(cfg2._check("arena_int", 1.0e30).value == 9000000000000000, "an int clamps instead of overflowing")
+	_check(not cfg2._check("arena_int", 1.0e30).ok, "an int too big to hold is refused, not clamped")
 	var bare := DotMapConfig.new()
 	_check(not bare.apply("x").ok, "apply without hooks fails")
 

@@ -137,7 +137,7 @@ func _set_all(map_name: String, settings: Dictionary) -> PackedStringArray:
 		if set_fn.call(key, settings[key]) == false:
 			DotLog.warn(CHANNEL, "the game refused a map setting", {"map": map_name, "key": key})
 			continue
-		# What the cvar holds now is its own coercion of the value (clamped, reformatted); restore compares to that.
+		# What the cvar holds now is its own coercion of the value (reformatted); restore compares to that.
 		_applied[key] = {"before": before, "set": settings[key], "after": get_fn.call(key)}
 		done.append(key)
 	DotLog.info(CHANNEL, "map settings applied", {"map": map_name, "keys": ", ".join(done)})
@@ -208,12 +208,14 @@ func _check(key: String, value: Variant) -> DotResult:
 			out = float(value) if value is float or value is int else text.to_float()
 			if is_inf(float(out)) or is_nan(float(out)):
 				return DotResult.fail(DotError.CODE_INVALID, "expected a finite number")
-			if spec.has("min"):
-				out = maxf(float(out), float(spec["min"]))
-			if spec.has("max"):
-				out = minf(float(out), float(spec["max"]))
+			if spec.has("min") and float(out) < float(spec["min"]):
+				return DotResult.fail(DotError.CODE_INVALID, "%s = %s is below the minimum %s" % [key, str(value), str(spec["min"])])
+			if spec.has("max") and float(out) > float(spec["max"]):
+				return DotResult.fail(DotError.CODE_INVALID, "%s = %s is above the maximum %s" % [key, str(value), str(spec["max"])])
 			if type == "int":
-				out = int(clampf(float(out), -9.0e15, 9.0e15))
+				if absf(float(out)) > 9.0e15:
+					return DotResult.fail(DotError.CODE_INVALID, "%s = %s is beyond the whole numbers a setting can hold (9e15)" % [key, str(value)])
+				out = int(out)
 		"bool":
 			var t := str(value).to_lower()
 			if not ["true", "false", "1", "0"].has(t):
