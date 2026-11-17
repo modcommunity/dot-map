@@ -8,7 +8,7 @@ extends DotMapEntity
 var values: Dictionary = {}
 
 
-func _input(io: DotMapIO, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
 	var setting := ""
 	match name:
 		"setautoexposuremin":

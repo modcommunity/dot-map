@@ -129,7 +129,7 @@ static func _read_prefix(prefix: String, json_path: String, raw: Dictionary) -> 
 		return DotResult.fail(DotError.CODE_IO, "no mesh data", str(raw.get("bin_path", "")))
 	var res := from_data(raw["doc"], raw["stored"], raw)
 	if res.ok:
-		(res.value as DotMapBspMesh).source_path = prefix
+		res.value.source_path = prefix  # a DotMapBspMesh
 	return res if res.ok else res.wrap("loading " + prefix)
 
 
@@ -170,7 +170,8 @@ static func from_data(doc: Dictionary, stored: PackedByteArray, unpacked: Dictio
 	if blob.size() != int(info.get("bytes", blob.size())):
 		return DotResult.fail(DotError.CODE_PARSE, "mesh data is the wrong size",
 				"%d != %s" % [blob.size(), info.get("bytes")])
-	var m := DotMapBspMesh.new()
+	# DotMapBspMesh, loaded: this file is one of its bases, so naming it would keep both parsers alive.
+	var m: RefCounted = (load("uid://bgtb6hc6o6j52") as GDScript).new()
 	m.manifest = doc
 	m.surfaces = doc.get("surfaces", [])
 	m.hulls = doc.get("hulls", [])

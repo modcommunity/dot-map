@@ -15,7 +15,7 @@ func velocity() -> Vector3:
 	return direction * speed
 
 
-func _input(io: DotMapIO, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"setpushspeed":
 			speed = param.to_float() * io.unit_scale

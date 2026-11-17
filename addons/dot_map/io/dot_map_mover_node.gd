@@ -167,7 +167,7 @@ func _seg_heading(i: int, n: int) -> float:
 	return atan2(d.x, d.z) if absf(d.x) + absf(d.z) > 0.0001 else 0.0
 
 
-func on_map_spawn(io: DotMapIO) -> void:
+func on_map_spawn(io: RefCounted) -> void:
 	if mover == null:
 		return
 	if mover.kind == DotMapMover.KIND_PATH and float(mover.record.get("start_speed", 0.0)) > 0.0:
@@ -175,7 +175,7 @@ func on_map_spawn(io: DotMapIO) -> void:
 	_view(io)
 
 
-func _input(io: DotMapIO, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
 	if mover == null:
 		return false
 	match mover.kind:
@@ -230,7 +230,7 @@ func use_state() -> StringName:
 
 
 ## A body used or touched it: a button presses, a door toggles; locked ones fire OnLockedUse.
-func touched(io: DotMapIO, activator: Variant, use: bool) -> bool:
+func touched(io: RefCounted, activator: Variant, use: bool) -> bool:
 	if mover == null or not alive:
 		return false
 	if (use and not mover.use) or (not use and not mover.touch):
@@ -246,7 +246,7 @@ func touched(io: DotMapIO, activator: Variant, use: bool) -> bool:
 
 
 ## A shot at a button or door: fires OnDamaged, and a button flagged "damage activates" (512) is pressed.
-func shot(io: DotMapIO, amount: float, by: Variant) -> bool:
+func shot(io: RefCounted, amount: float, by: Variant) -> bool:
 	if mover == null or not alive or amount <= 0.0:
 		return false
 	fire(io, "OnDamaged", by)
@@ -255,7 +255,7 @@ func shot(io: DotMapIO, amount: float, by: Variant) -> bool:
 	return true
 
 
-func _press(io: DotMapIO, activator: Variant) -> void:
+func _press(io: RefCounted, activator: Variant) -> void:
 	if locked:
 		fire(io, "OnUseLocked", activator)
 		return
@@ -272,7 +272,7 @@ func _press(io: DotMapIO, activator: Variant) -> void:
 	_move_to(io, 1.0)
 
 
-func _open(io: DotMapIO, activator: Variant) -> void:
+func _open(io: RefCounted, activator: Variant) -> void:
 	if locked or _to >= 1.0:
 		return
 	if mover.open_dir == 0 and fraction_at(io.now, io.rate) <= 0.0:
@@ -297,20 +297,20 @@ static func _position_of(activator: Variant) -> Variant:
 	return null
 
 
-func _close(io: DotMapIO, activator: Variant) -> void:
+func _close(io: RefCounted, activator: Variant) -> void:
 	if locked or _to <= 0.0:
 		return
 	fire(io, "OnClose", activator)
 	_move_to(io, 0.0)
 
 
-func _set_locked(io: DotMapIO, on: bool) -> void:
+func _set_locked(io: RefCounted, on: bool) -> void:
 	if locked != on:
 		locked = on
 		io.report_state(self, "locked", on)
 
 
-func _set_speed(io: DotMapIO, units_per_second: float) -> void:
+func _set_speed(io: RefCounted, units_per_second: float) -> void:
 	if units_per_second <= 0.0 or mover == null:
 		return
 	var full := absf(mover.degrees) if mover.kind in [DotMapMover.KIND_HINGE, DotMapMover.KIND_HINGE_BUTTON] else mover.distance
@@ -322,11 +322,11 @@ func _set_speed(io: DotMapIO, units_per_second: float) -> void:
 	_start_move(io, f, _to)
 
 
-func _move_to(io: DotMapIO, target: float) -> void:
+func _move_to(io: RefCounted, target: float) -> void:
 	_start_move(io, fraction_at(io.now, io.rate), target)
 
 
-func _start_move(io: DotMapIO, from: float, target: float) -> void:
+func _start_move(io: RefCounted, from: float, target: float) -> void:
 	_from = from
 	_to = target
 	_t0 = io.now
@@ -338,7 +338,7 @@ func _start_move(io: DotMapIO, from: float, target: float) -> void:
 	io.report_state(self, "motion", [_from, _to, _t0, _tt])
 
 
-func _arrived(io: DotMapIO, activator: Variant) -> void:
+func _arrived(io: RefCounted, activator: Variant) -> void:
 	if _to >= 1.0:
 		fire(io, "OnFullyOpen" if not mover.kind.ends_with("button") else "OnIn", activator)
 		var button := mover.kind.ends_with("button")
@@ -351,7 +351,7 @@ func _arrived(io: DotMapIO, activator: Variant) -> void:
 			io.report_state(self, "in", false)
 
 
-func _spin_input(io: DotMapIO, name: String, param: String) -> bool:
+func _spin_input(io: RefCounted, name: String, param: String) -> bool:
 	var top := mover.spin_rate()
 	match name:
 		"start":
@@ -370,7 +370,7 @@ func _spin_input(io: DotMapIO, name: String, param: String) -> bool:
 	return true
 
 
-func _spin(io: DotMapIO, rate_rad: float) -> void:
+func _spin(io: RefCounted, rate_rad: float) -> void:
 	_a0 = angle_at(io.now, io.rate)
 	_vf = spin_velocity_at(io.now, io.rate)
 	_t0 = io.now
@@ -414,7 +414,7 @@ func _wrap(s: float) -> float:
 	return fposmod(s, _length) if _ring else clampf(s, 0.0, _length)
 
 
-func _path_input(io: DotMapIO, name: String, param: String, activator: Variant) -> bool:
+func _path_input(io: RefCounted, name: String, param: String, activator: Variant) -> bool:
 	var top := _max_speed()
 	match name:
 		"startforward", "resume":
@@ -451,7 +451,7 @@ func _corner_distance(corner_name: String) -> float:
 	return -1.0
 
 
-func _drive(io: DotMapIO, dir: float, speed: float) -> void:
+func _drive(io: RefCounted, dir: float, speed: float) -> void:
 	_a0 = path_at(io.now, io.rate)
 	_t0 = io.now
 	if speed > 0.0:
@@ -462,7 +462,7 @@ func _drive(io: DotMapIO, dir: float, speed: float) -> void:
 	io.report_state(self, "spin", [_a0, _v, _t0, _last_dir])
 
 
-func _schedule_pass(io: DotMapIO) -> void:
+func _schedule_pass(io: RefCounted) -> void:
 	if _v == 0.0 or _corners.size() < 2:
 		return
 	var s := _a0
@@ -481,7 +481,7 @@ func _schedule_pass(io: DotMapIO) -> void:
 	io.schedule_self(self, "__pass", "%d:%d" % [_gen, best], float(maxi(ticks, 1)) / float(io.rate))
 
 
-func _passed(io: DotMapIO, k: int, activator: Variant) -> void:
+func _passed(io: RefCounted, k: int, activator: Variant) -> void:
 	var n := _corners.size()
 	var corner: Dictionary = mover.path()[k % n]
 	_a0 = path_at(io.now, io.rate)
@@ -502,7 +502,7 @@ func _passed(io: DotMapIO, k: int, activator: Variant) -> void:
 	io.report_state(self, "spin", [_a0, _v, _t0, _last_dir])
 
 
-func _apply(_io: DotMapIO, key_: String, value: Variant, _tick: int) -> bool:
+func _apply(_io: RefCounted, key_: String, value: Variant, _tick: int) -> bool:
 	match key_:
 		"motion":
 			var m: Array = value
@@ -570,7 +570,7 @@ static func _about(pivot: Vector3, b: Basis) -> Transform3D:
 
 ## Pushes the bodies in the mover's way and deals with the ones it cannot move. [param bodies]
 ## are [DotMapVolumes] body dictionaries (feet [code]position[/code], [code]height[/code], optional [code]radius[/code]).
-func push_bodies(io: DotMapIO, bodies: Array) -> void:
+func push_bodies(io: RefCounted, bodies: Array) -> void:
 	if mover == null or not alive or not mover.solid or hit_half == Vector3.ZERO:
 		return
 	var now := pose_delta(io.now, io.rate)
@@ -628,7 +628,7 @@ func _on_top(q: Vector3, radius: float, reach: float) -> bool:
 			and q.y > hit_half.y - 0.05 and q.y < hit_half.y + reach
 
 
-func _blocked(io: DotMapIO, info: Dictionary, n: int) -> void:
+func _blocked(io: RefCounted, info: Dictionary, n: int) -> void:
 	var id: Variant = info["id"]
 	var dmg := key_float("dmg")
 	if dmg > 0.0 and io.now - int(_hurt_at.get(id, -1000000)) >= io.ticks_for(BLOCK_DAMAGE_PERIOD):
@@ -643,11 +643,11 @@ func _blocked(io: DotMapIO, info: Dictionary, n: int) -> void:
 		_move_to(io, 0.0 if opening else 1.0)
 
 
-func tick_view(io: DotMapIO) -> void:
+func tick_view(io: RefCounted) -> void:
 	_view(io)
 
 
-func _view(io: DotMapIO) -> void:
+func _view(io: RefCounted) -> void:
 	if node == null or mover == null or not alive:
 		return
 	var f: float

@@ -51,7 +51,7 @@ func set_propdata(data: Dictionary) -> void:
 		material = str(data["material"])
 
 
-func on_map_spawn(io: DotMapIO) -> void:
+func on_map_spawn(io: RefCounted) -> void:
 	if io.propdata_fn.is_valid() and classname.to_lower().begins_with("prop_physics") and not key("model").is_empty():
 		var d: Variant = io.propdata_fn.call(key("model"))
 		if d is Dictionary:
@@ -64,7 +64,7 @@ func is_breakable() -> bool:
 
 
 ## Damage from the game; the authority only. Returns true when it broke.
-func hurt(io: DotMapIO, amount: float, at: Vector3 = Vector3.ZERO, by: Variant = null) -> bool:
+func hurt(io: RefCounted, amount: float, at: Vector3 = Vector3.ZERO, by: Variant = null) -> bool:
 	if not io.authoritative or not is_breakable() or amount <= 0.0 or amount < min_damage:
 		return false
 	health -= amount
@@ -78,7 +78,7 @@ func hurt(io: DotMapIO, amount: float, at: Vector3 = Vector3.ZERO, by: Variant =
 	return false
 
 
-func _input(io: DotMapIO, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
 	# Ignite has no fire model: a documented no-op, answered here (outside the match) so it is not counted as missing at
 	# run time but stays in the converter's inputs_unimplemented list.
 	if name == "ignite" or name == "ignitelifetime" or name == "ignitenumhitpoints":
@@ -114,7 +114,7 @@ func _input(io: DotMapIO, name: String, param: String, activator: Variant, _call
 	return true
 
 
-func _break(io: DotMapIO, by: Variant, at: Vector3) -> void:
+func _break(io: RefCounted, by: Variant, at: Vector3) -> void:
 	if broken:
 		return
 	broken = true
@@ -128,7 +128,7 @@ func _break(io: DotMapIO, by: Variant, at: Vector3) -> void:
 	io.kill(self)
 
 
-func _apply(_io: DotMapIO, key_: String, value: Variant, _tick: int) -> bool:
+func _apply(_io: RefCounted, key_: String, value: Variant, _tick: int) -> bool:
 	match key_:
 		"health":
 			health = float(value)

@@ -6,12 +6,12 @@ extends DotMapEntity
 ## the [code]measure_movement[/code] event whenever the pairing or its enabled state changes.
 
 
-func on_map_spawn(io: DotMapIO) -> void:
+func on_map_spawn(io: RefCounted) -> void:
 	if enabled:
 		_announce(io)
 
 
-func _input(io: DotMapIO, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
 	var slot := ""
 	match name:
 		"setmeasurereference":
@@ -30,7 +30,7 @@ func _input(io: DotMapIO, name: String, param: String, _activator: Variant, _cal
 	return true
 
 
-func _enabled_changed(io: DotMapIO, on: bool) -> void:
+func _enabled_changed(io: RefCounted, on: bool) -> void:
 	io.event("measure_movement", {"entity": index, "on": on, "pairing": pairing()})
 
 
@@ -40,5 +40,5 @@ func pairing() -> Dictionary:
 			"scale": key_float("targetscale", 1.0), "position": flag("shouldoutputposition")}
 
 
-func _announce(io: DotMapIO) -> void:
+func _announce(io: RefCounted) -> void:
 	io.event("measure_movement", {"entity": index, "on": true, "pairing": pairing()})

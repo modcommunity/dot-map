@@ -6,7 +6,7 @@ extends DotMapEntity
 ## (the stand-in has one material, so the same holds). No per-frame cost.
 
 
-func _input(io: DotMapIO, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"setanimation", "setdefaultanimation":
 			io.event("prop_animation", {"entity": index, "name": targetname, "animation": param.strip_edges(),

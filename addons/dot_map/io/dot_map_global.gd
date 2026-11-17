@@ -5,7 +5,7 @@ extends DotMapEntity
 ## entity that names the same globalstate. The map reads it back with the counter outputs.
 
 
-func on_map_spawn(io: DotMapIO) -> void:
+func on_map_spawn(io: RefCounted) -> void:
 	var g := _state(io)
 	if not g.get("init", false):
 		g["init"] = true
@@ -13,14 +13,14 @@ func on_map_spawn(io: DotMapIO) -> void:
 		g["counter"] = int(key_float("counter"))
 
 
-func _state(io: DotMapIO) -> Dictionary:
+func _state(io: RefCounted) -> Dictionary:
 	var name := key("globalstate", targetname)
 	if not io.globals.has(name):
 		io.globals[name] = {"on": false, "counter": 0}
 	return io.globals[name]
 
 
-func _input(io: DotMapIO, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
 	var g := _state(io)
 	match name:
 		"turnon":

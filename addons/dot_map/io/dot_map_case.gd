@@ -7,7 +7,7 @@ extends DotMapEntity
 var _bag: Array = []
 
 
-func _input(io: DotMapIO, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"invalue":
 			var hit := false
@@ -26,7 +26,7 @@ func _input(io: DotMapIO, name: String, param: String, activator: Variant, _call
 		"pickrandomshuffle":
 			if _bag.is_empty():
 				_bag = _filled()
-				var s := io.stream_for(self)
+				var s: DotRandomStream = io.stream_for(self)
 				for i in range(_bag.size() - 1, 0, -1):
 					var j := s.next_range_i(0, i)
 					var t: Variant = _bag[i]
@@ -53,5 +53,5 @@ func _filled() -> Array:
 	return out
 
 
-func _fire_case(io: DotMapIO, n: int, activator: Variant) -> void:
+func _fire_case(io: RefCounted, n: int, activator: Variant) -> void:
 	fire(io, "OnCase%02d" % n, activator, _case(n))

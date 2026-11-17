@@ -6,7 +6,7 @@ extends DotMapEntity
 var out_color := Color.BLACK
 
 
-func _input(io: DotMapIO, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
 	if name != "invalue":
 		return false
 	if not enabled:

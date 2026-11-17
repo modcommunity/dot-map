@@ -1,6 +1,10 @@
 class_name DotMapSurfaces
 extends "dot_map_surfaces_kinds.gd"
 
+# "world" parameters here are DotMapBspMesh, typed RefCounted, and its static helpers are reached through its glass
+# part or the instance: the mesh scripts name this file, so naming the mesh back would keep both parsers alive.
+const _MESH_GLASS := preload("uid://cb3jej8cfm0h0")
+
 ## A surface kind ([code]&"brick"[/code]) to a world-space triplanar [StandardMaterial3D]: a code-built box has no UVs, and this keeps texel density equal on every wall.
 ## Textures load by path under [member root] (or [member path_fn]), never referenced by a scene, so a delivered pack that mounts elsewhere still finds them.
 ## Albedo is untouched ([param tint] multiplies it); normal maps are the OpenGL (Y+) convention. Credits: [code]surfaces/CREDITS.md[/code].
@@ -8,7 +12,7 @@ extends "dot_map_surfaces_kinds.gd"
 ## A `material_for` callable for [method DotMapBspMesh.build_node] that draws a converted map with its free
 ## textures: a surface's `free` key names a surface kind, or a generated flat colour the pack carries as a file
 ## beside [param dir] (the pack's directory).
-func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
+func world_material_for(world: RefCounted, dir: String) -> Callable:
 	var sets := _note_sets(world, dir)
 	_prefetch(world, sets["generated"], sets["library"], sets["stand_in"])
 	return _material_callable(world, sets["generated"], sets["library"], sets["stand_in"], dir)
@@ -16,7 +20,7 @@ func world_material_for(world: DotMapBspMesh, dir: String) -> Callable:
 
 ## [method world_material_for] whose texture decode yields a frame whenever [param slice_ms] has passed ([method prefetch]), so the decode never holds one frame.
 ## Each surface's material is then made here, a frame yielded before one that might not fit in what is left of [param slice_ms] (the dearest yet is the guess): making one uploads its textures (6-12 ms for a large set), and the mesh build that follows finds them all made.
-func world_material_for_async(world: DotMapBspMesh, dir: String, slice_ms: int = 8) -> Callable:
+func world_material_for_async(world: RefCounted, dir: String, slice_ms: int = 8) -> Callable:
 	var sets := _note_sets(world, dir)
 	_tell("materials: sets noted")
 	await _prefetch_async(world, sets["generated"], sets["library"], slice_ms, sets["stand_in"])
@@ -28,7 +32,7 @@ func world_material_for_async(world: DotMapBspMesh, dir: String, slice_ms: int =
 
 
 ## Reads each texture file the surfaces use that the prefetch left (no loader threads, or one it could not take), one file per step, a frame yielded before one that might not fit in what is left of [param slice_ms]. A set's albedo, normal, roughness and AO decode (and mip and compress) 4-18 ms together: made inside one material they held one frame. [method _file_texture] caches by path, so the material built later finds each and looks the same.
-func _warm_textures_async(world: DotMapBspMesh, sets: Dictionary, dir: String, slice_ms: int) -> void:
+func _warm_textures_async(world: RefCounted, sets: Dictionary, dir: String, slice_ms: int) -> void:
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree == null:
 		return
@@ -41,7 +45,7 @@ func _warm_textures_async(world: DotMapBspMesh, sets: Dictionary, dir: String, s
 		used[str(rec.get("free2", ""))] = true
 		if use_original_textures and str(rec.get("orig", "")) != "":
 			files.append(dir.path_join(str(rec["orig"])))
-	var lit := use_lightmap and world.has_lightmap()
+	var lit: bool = use_lightmap and world.has_lightmap()
 	var library: Dictionary = sets["library"]
 	var generated: Dictionary = sets["generated"]
 	var stand_in: Dictionary = sets["stand_in"]
@@ -114,7 +118,7 @@ func _tell(label: String) -> void:
 
 
 ## Calls [param material_for] on each surface ahead of the mesh build. One already made is a cache hit: it costs microseconds and never raises the guess.
-func _make_materials_async(world: DotMapBspMesh, material_for: Callable, slice_ms: int) -> void:
+func _make_materials_async(world: RefCounted, material_for: Callable, slice_ms: int) -> void:
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree == null:
 		return
@@ -138,7 +142,7 @@ func _make_materials_async(world: DotMapBspMesh, material_for: Callable, slice_m
 	DotLog.debug(CHANNEL, "world materials made ahead", {"surfaces": world.surfaces.size(), "dearest_ms": guess / 1000.0})
 
 
-func _note_sets(world: DotMapBspMesh, dir: String) -> Dictionary:
+func _note_sets(world: RefCounted, dir: String) -> Dictionary:
 	var sets := _resolve_sets(world, dir)
 	for key: String in sets["missing"]:
 		if not missing_sets.has(key):
@@ -149,15 +153,15 @@ func _note_sets(world: DotMapBspMesh, dir: String) -> Dictionary:
 
 
 ## Reads the map's textures ahead of [method world_material_for] without holding the main thread: decoded in batches on workers, a frame yielded whenever [param slice_ms] has passed, so dot-cloud's fetch callbacks and the loading cover keep running. The later [method world_material_for] finds them cached. Inline (no yield) when there are no workers.
-func prefetch(world: DotMapBspMesh, dir: String, slice_ms: int = 8) -> void:
+func prefetch(world: RefCounted, dir: String, slice_ms: int = 8) -> void:
 	var sets := _resolve_sets(world, dir)
 	await _prefetch_async(world, sets["generated"], sets["library"], slice_ms, sets["stand_in"])
 
 
-func _resolve_sets(world: DotMapBspMesh, dir: String) -> Dictionary:
+func _resolve_sets(world: RefCounted, dir: String) -> Dictionary:
 	var generated := {}
 	var library := {}
-	var store := str(world.licence().get("pbr_store", ""))
+	var store: String = str(world.licence().get("pbr_store", ""))
 	for t: Dictionary in world.licence().get("textures", []):
 		if str(t["kind"]) == "generated":
 			generated[str(t["key"])] = dir.path_join(str(t["file"]))
@@ -173,12 +177,12 @@ func _resolve_sets(world: DotMapBspMesh, dir: String) -> Dictionary:
 	return {"generated": generated, "library": library, "stand_in": stand_in, "missing": missing}
 
 
-func _material_callable(world: DotMapBspMesh, generated: Dictionary, library: Dictionary, stand_in: Dictionary, dir: String = "") -> Callable:
+func _material_callable(world: RefCounted, generated: Dictionary, library: Dictionary, stand_in: Dictionary, dir: String = "") -> Callable:
 	var cache := {}
 	return func(rec: Dictionary) -> Material:
 		if rec.get("water", false):
 			return water_material if water_material != null else liquid_material(liquid_kind(str(rec.get("material", ""))))
-		var lit := use_lightmap and world.has_lightmap() and rec.has("lightmap_page") and not rec.has("glass")
+		var lit: bool = use_lightmap and world.has_lightmap() and rec.has("lightmap_page") and not rec.has("glass")
 		if rec.has("decal"):
 			return _decal_material(world, rec, dir, lit)
 		if use_original_textures and not rec.has("glass") and str(rec.get("orig", "")) != "":
@@ -224,7 +228,7 @@ func _material_callable(world: DotMapBspMesh, generated: Dictionary, library: Di
 
 
 ## The material of a surface drawn with the map's own texture at the mesh UVs, or null when the pack has no such file. One per texture and lightmap page.
-func _original_material(world: DotMapBspMesh, rec: Dictionary, dir: String, lit: bool, cache: Dictionary) -> Material:
+func _original_material(world: RefCounted, rec: Dictionary, dir: String, lit: bool, cache: Dictionary) -> Material:
 	var file := dir.path_join(str(rec["orig"]))
 	var key := "orig|%s|%s|%s" % [file, rec.get("lightmap_page", -1) if lit else -1, rec.get("emissive", false)]
 	if cache.has(key):
@@ -249,7 +253,7 @@ func _original_material(world: DotMapBspMesh, rec: Dictionary, dir: String, lit:
 
 ## A decal surface's alpha-blended material: the map's own texture in an internal pack (use_original_textures),
 ## else the kind's drawn pattern; lit by the bake's page when [param lit]. One per kind, texture and page.
-func _decal_material(world: DotMapBspMesh, rec: Dictionary, dir: String, lit: bool) -> Material:
+func _decal_material(world: RefCounted, rec: Dictionary, dir: String, lit: bool) -> Material:
 	var tex: Texture2D = null
 	if use_original_textures and str(rec.get("orig", "")) != "":
 		tex = _file_texture(dir.path_join(str(rec["orig"])))
@@ -257,11 +261,11 @@ func _decal_material(world: DotMapBspMesh, rec: Dictionary, dir: String, lit: bo
 	if lit:
 		light = {"lightmap": world.lightmap_page(int(rec["lightmap_page"])), "exposure": world.lightmap_scale(),
 				"floor": world.light_floor(), "emissive": emissive_energy if rec.get("emissive", false) else 0.0}
-	return DotMapBspMesh.decal_material(StringName(str(rec["decal"])), rec.get("colour", []), tex, light)
+	return _MESH_GLASS.decal_material(StringName(str(rec["decal"])), rec.get("colour", []), tex, light)
 
 
 ## Splits the files the world's surfaces use into those still to decode from disk and the imported ones (already requested); a pre-baked file is taken here.
-func _prefetch_plan(world: DotMapBspMesh, generated: Dictionary, library: Dictionary, stand_in: Dictionary = {}) -> Dictionary:
+func _prefetch_plan(world: RefCounted, generated: Dictionary, library: Dictionary, stand_in: Dictionary = {}) -> Dictionary:
 	var used := {}
 	for rec: Dictionary in world.surfaces:
 		used[str(rec.get("free", ""))] = true
@@ -298,7 +302,7 @@ func _prefetch_plan(world: DotMapBspMesh, generated: Dictionary, library: Dictio
 	return {"disk": disk, "imported": imported, "baked": baked}
 
 
-func _prefetch(world: DotMapBspMesh, generated: Dictionary, library: Dictionary, stand_in: Dictionary = {}) -> void:
+func _prefetch(world: RefCounted, generated: Dictionary, library: Dictionary, stand_in: Dictionary = {}) -> void:
 	if DotParallel.resolve_workers(load_threads) == 0:
 		return
 	var plan := _prefetch_plan(world, generated, library, stand_in)
@@ -307,7 +311,7 @@ func _prefetch(world: DotMapBspMesh, generated: Dictionary, library: Dictionary,
 	_prefetch_done(plan, Time.get_ticks_msec() - started)
 
 
-func _prefetch_async(world: DotMapBspMesh, generated: Dictionary, library: Dictionary, slice_ms: int, stand_in: Dictionary = {}) -> void:
+func _prefetch_async(world: RefCounted, generated: Dictionary, library: Dictionary, slice_ms: int, stand_in: Dictionary = {}) -> void:
 	if DotParallel.resolve_workers(load_threads) == 0:
 		return
 	var plan := _prefetch_plan(world, generated, library, stand_in)
@@ -389,7 +393,7 @@ func _pack_fallback(dir: String, key: String, licence: Dictionary) -> Dictionary
 
 
 ## A face whose PBR set is missing: the pack's small albedo, else the stand-in kind tinted to the face's average colour, else that colour flat; lit by the map's lightmap when it has one.
-func _stand_in_material(world: DotMapBspMesh, rec: Dictionary, fb: Dictionary, cache: Dictionary) -> Material:
+func _stand_in_material(world: RefCounted, rec: Dictionary, fb: Dictionary, cache: Dictionary) -> Material:
 	var colour: Variant = rec.get("colour", fb.get("colour", []))
 	if not colour is Array or (colour as Array).size() < 3:
 		colour = [0.5, 0.5, 0.5]
@@ -400,7 +404,7 @@ func _stand_in_material(world: DotMapBspMesh, rec: Dictionary, fb: Dictionary, c
 		if kind == &"":
 			var g := maxf(0.299 * tint.r + 0.587 * tint.g + 0.114 * tint.b, STAND_IN_FLOOR)    # neutral grey: a face's own average hue read as flat blue and teal walls
 			tint = Color(g, g, g)
-	var lit := use_lightmap and world.has_lightmap() and rec.has("lightmap_page") and not rec.has("glass")
+	var lit: bool = use_lightmap and world.has_lightmap() and rec.has("lightmap_page") and not rec.has("glass")
 	var key := "stand_in|%s|%s|%s|%s" % [fb.get("file", kind), tint.to_html(), rec.get("lightmap_page", -1) if lit else -1, rec.get("emissive", false)]
 	if cache.has(key):
 		return cache[key]
@@ -441,7 +445,7 @@ func _blended_material(dir: String, dir2: String, key: String) -> ShaderMaterial
 	return m
 
 
-func _lightmapped(world: DotMapBspMesh, rec: Dictionary, free: String, tint: Color, generated_file: String, set_dir: String = "", texture: Texture2D = null) -> Material:
+func _lightmapped(world: RefCounted, rec: Dictionary, free: String, tint: Color, generated_file: String, set_dir: String = "", texture: Texture2D = null) -> Material:
 	var kind := StringName(free.get_slice(":", 0))
 	var tex: Texture2D = texture
 	var metres := 2.5
@@ -472,9 +476,9 @@ func _lightmapped(world: DotMapBspMesh, rec: Dictionary, free: String, tint: Col
 				m.set_shader_parameter("has_" + pair[0], true)
 	m.set_shader_parameter("sharpness", sharpness)
 	m.set_shader_parameter("exposure", world.lightmap_scale())
-	var fl := world.light_floor()
+	var fl: Color = world.light_floor()
 	m.set_shader_parameter("floor_light", Vector3(fl.r, fl.g, fl.b))
-	m.set_shader_parameter("max_chroma_ratio", DotMapBspMesh.lightmap_max_chroma_ratio)
+	m.set_shader_parameter("max_chroma_ratio", world.lightmap_max_chroma_ratio)
 	if rec.get("emissive", false):
 		m.set_shader_parameter("emissive", emissive_energy)
 	return m

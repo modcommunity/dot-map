@@ -17,7 +17,7 @@ func _configure() -> void:
 	value = key_float("startvalue")
 
 
-func _input(io: DotMapIO, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
 	var v := param.to_float()
 	match name:
 		"add":
@@ -48,7 +48,7 @@ func _bounded() -> bool:
 	return _min != 0.0 or _max != 0.0
 
 
-func _assign(io: DotMapIO, v: float, activator: Variant, fire_outputs: bool) -> void:
+func _assign(io: RefCounted, v: float, activator: Variant, fire_outputs: bool) -> void:
 	if not enabled:
 		return
 	var nv := clampf(v, _min, _max) if _bounded() else v

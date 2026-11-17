@@ -15,16 +15,16 @@ func _configure() -> void:
 		effect_kind = "particles"
 
 
-func on_map_spawn(io: DotMapIO) -> void:
+func on_map_spawn(io: RefCounted) -> void:
 	if not ONE_SHOT.has(classname.to_lower()):
 		io.effect(effect_kind, self, enabled)
 
 
-func _enabled_changed(io: DotMapIO, on: bool) -> void:
+func _enabled_changed(io: RefCounted, on: bool) -> void:
 	io.effect(effect_kind, self, on)
 
 
-func _input(io: DotMapIO, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"showsprite", "start", "startfire", "startspark", "turnon", "enable", "startsteam", "startbeam":
 			if not ONE_SHOT.has(classname.to_lower()):
@@ -51,11 +51,11 @@ func _input(io: DotMapIO, name: String, _param: String, activator: Variant, _cal
 	return false
 
 
-func _data(io: DotMapIO) -> Dictionary:
+func _data(io: RefCounted) -> Dictionary:
 	return {"entity": index, "name": targetname, "origin": origin(io), "keys": keys}
 
 
-func _explode(io: DotMapIO, activator: Variant) -> void:
+func _explode(io: RefCounted, activator: Variant) -> void:
 	var magnitude := key_float("imagnitude", 100.0)
 	var data := _data(io)
 	data["magnitude"] = magnitude

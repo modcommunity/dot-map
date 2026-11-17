@@ -5,7 +5,7 @@ extends DotMapEntity
 ## to a team. The game owns scores, so this only says who gets what through the [code]score[/code] event.
 
 
-func _input(io: DotMapIO, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
 	var team := 0
 	match name:
 		"applyscore":

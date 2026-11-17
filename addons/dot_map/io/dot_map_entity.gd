@@ -1,5 +1,7 @@
 class_name DotMapEntity
 extends RefCounted
+# Map IO runtimes ("io" parameters here and in every entity) are DotMapIO, typed RefCounted so the entity
+# scripts and dot_map_io.gd (which names each of them) do not keep each other's parsers alive.
 
 ## One entity of the map's input/output runtime: a name, its keys, its output links and the inputs
 ## every class has. A class with more behaviour extends this and overrides [method _input].
@@ -67,7 +69,7 @@ func has_spawnflag(bit: int) -> bool:
 
 
 ## Runs one input. Returns false when this class has no such input, so the runtime can count it.
-func accept(io: DotMapIO, input: String, param: String, activator: Variant, caller: Variant) -> bool:
+func accept(io: RefCounted, input: String, param: String, activator: Variant, caller: Variant) -> bool:
 	if not alive:
 		return false
 	var name := input.to_lower()
@@ -103,7 +105,7 @@ func accept(io: DotMapIO, input: String, param: String, activator: Variant, call
 ## [code]SetParent[/code] / [code]ClearParent[/code]: the parent's name is what [code]KillHierarchy[/code] and
 ## [method DotMapIO.kill_hierarchy] follow, and a drawn node moves under the parent's drawn node when both
 ## are bound (a mover then carries it). The attachment point after the name is ignored. No per-frame cost.
-func set_parent(io: DotMapIO, param: String) -> void:
+func set_parent(io: RefCounted, param: String) -> void:
 	var target := param.strip_edges().split(" ", false, 1)[0] if not param.strip_edges().is_empty() else ""
 	if target.begins_with("!"):
 		target = ""
@@ -114,7 +116,7 @@ func set_parent(io: DotMapIO, param: String) -> void:
 	io.report_state(self, "parent", parentname)
 
 
-func _reparent_node(io: DotMapIO) -> void:
+func _reparent_node(io: RefCounted) -> void:
 	if node == null or not node.is_inside_tree() or node is RigidBody3D:
 		return
 	var np: Node = null
@@ -135,11 +137,11 @@ func _reparent_node(io: DotMapIO) -> void:
 
 
 ## Fires an output: queues every link of that name on the runtime.
-func fire(io: DotMapIO, output: String, activator: Variant, param: String = "") -> int:
+func fire(io: RefCounted, output: String, activator: Variant, param: String = "") -> int:
 	return io.fire(self, output, activator, param)
 
 
-func set_enabled(io: DotMapIO, on: bool) -> void:
+func set_enabled(io: RefCounted, on: bool) -> void:
 	if enabled == on:
 		return
 	enabled = on
@@ -148,7 +150,7 @@ func set_enabled(io: DotMapIO, on: bool) -> void:
 
 
 ## [code]AddOutput[/code]: "key value" sets a key, "OnX target:input:param:delay:times" adds a link.
-func add_output(io: DotMapIO, param: String) -> void:
+func add_output(io: RefCounted, param: String) -> void:
 	var text := param.strip_edges()
 	var sp := text.find(" ")
 	if sp < 0:
@@ -177,18 +179,18 @@ func bind_node(n: Node3D) -> void:
 
 
 ## Runs the entity's own on-tick view update (a mover's pose); [param io] says what tick it is.
-func tick_view(_io: DotMapIO) -> void:
+func tick_view(_io: RefCounted) -> void:
 	pass
 
 
 ## A game or client touched/used it: a class that answers returns true. Doors and buttons do.
-func touched(_io: DotMapIO, _activator: Variant, _use: bool) -> bool:
+func touched(_io: RefCounted, _activator: Variant, _use: bool) -> bool:
 	return false
 
 
 ## Takes a state change from the authority ([method state] keys) without running any logic, and
 ## shows it. Returns false for a key this class does not know.
-func apply_state(io: DotMapIO, key: String, value: Variant, tick: int) -> bool:
+func apply_state(io: RefCounted, key: String, value: Variant, tick: int) -> bool:
 	match key:
 		"enabled":
 			enabled = bool(value)
@@ -231,23 +233,23 @@ static func set_solid(n: Node, on: bool) -> void:
 
 ## A body entered this entity's volume ([param info]: id, body, position, kind, name, class).
 ## The default fires [code]OnStartTouch[/code]; a class with a volume of its own overrides it.
-func body_enter(io: DotMapIO, info: Dictionary) -> void:
+func body_enter(io: RefCounted, info: Dictionary) -> void:
 	fire(io, "OnStartTouch", info.get("body"))
 
 
 ## A body left the volume.
-func body_leave(io: DotMapIO, info: Dictionary) -> void:
+func body_leave(io: RefCounted, info: Dictionary) -> void:
 	fire(io, "OnEndTouch", info.get("body"))
 
 
 ## Once a step for each body still inside (after [method body_enter]).
-func body_inside(_io: DotMapIO, _info: Dictionary) -> void:
+func body_inside(_io: RefCounted, _info: Dictionary) -> void:
 	pass
 
 
 ## The entity's [code]origin[/code] key in the game's metres and axes ([member DotMapIO.unit_scale],
 ## [member DotMapIO.world_offset]).
-func origin(io: DotMapIO) -> Vector3:
+func origin(io: RefCounted) -> Vector3:
 	var f := key("origin", "0 0 0").split_floats(" ", false)
 	if f.size() < 3:
 		return io.world_offset
@@ -265,16 +267,16 @@ func _configure() -> void:
 
 
 ## A class's own inputs (lower-cased name); return true when handled.
-func _input(_io: DotMapIO, _name: String, _param: String, _activator: Variant, _caller: Variant) -> bool:
+func _input(_io: RefCounted, _name: String, _param: String, _activator: Variant, _caller: Variant) -> bool:
 	return false
 
 
 ## Called at map start, after every entity is built.
-func on_map_spawn(_io: DotMapIO) -> void:
+func on_map_spawn(_io: RefCounted) -> void:
 	pass
 
 
-func _enabled_changed(_io: DotMapIO, _on: bool) -> void:
+func _enabled_changed(_io: RefCounted, _on: bool) -> void:
 	pass
 
 
@@ -290,11 +292,11 @@ func _view_changed(key: String, value: Variant) -> void:
 
 
 ## A class's own keys from the authority; true when it took the key.
-func _apply(_io: DotMapIO, _key: String, _value: Variant, _tick: int) -> bool:
+func _apply(_io: RefCounted, _key: String, _value: Variant, _tick: int) -> bool:
 	return false
 
 
-func _key_changed(_io: DotMapIO, _name: String, _value: String) -> void:
+func _key_changed(_io: RefCounted, _name: String, _value: String) -> void:
 	pass
 
 

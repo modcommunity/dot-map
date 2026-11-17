@@ -15,19 +15,19 @@ func _configure() -> void:
 
 
 ## A body touched the trigger: OnStartTouch and OnTrigger, then the wait.
-func touch(io: DotMapIO, activator: Variant) -> void:
+func touch(io: RefCounted, activator: Variant) -> void:
 	if not enabled:
 		return
 	fire(io, "OnStartTouch", activator)
 	_activate(io, activator)
 
 
-func end_touch(io: DotMapIO, activator: Variant) -> void:
+func end_touch(io: RefCounted, activator: Variant) -> void:
 	if enabled:
 		fire(io, "OnEndTouch", activator)
 
 
-func body_enter(io: DotMapIO, info: Dictionary) -> void:
+func body_enter(io: RefCounted, info: Dictionary) -> void:
 	if not enabled:
 		return
 	if _touching.is_empty():
@@ -36,7 +36,7 @@ func body_enter(io: DotMapIO, info: Dictionary) -> void:
 	touch(io, info.get("body"))
 
 
-func body_leave(io: DotMapIO, info: Dictionary) -> void:
+func body_leave(io: RefCounted, info: Dictionary) -> void:
 	if not _touching.has(info["id"]):
 		return
 	_touching.erase(info["id"])
@@ -45,17 +45,17 @@ func body_leave(io: DotMapIO, info: Dictionary) -> void:
 		fire(io, "OnEndTouchAll", info.get("body"))
 
 
-func body_inside(io: DotMapIO, info: Dictionary) -> void:
+func body_inside(io: RefCounted, info: Dictionary) -> void:
 	if enabled and alive:
 		_activate(io, info.get("body"))
 
 
-func _enabled_changed(_io: DotMapIO, on: bool) -> void:
+func _enabled_changed(_io: RefCounted, on: bool) -> void:
 	if not on:
 		_touching.clear()
 
 
-func _activate(io: DotMapIO, activator: Variant) -> void:
+func _activate(io: RefCounted, activator: Variant) -> void:
 	if io.now < _blocked_until:
 		return
 	fire(io, "OnTrigger", activator)
@@ -66,7 +66,7 @@ func _activate(io: DotMapIO, activator: Variant) -> void:
 	io.report_state(self, "triggered", io.now)
 
 
-func _input(io: DotMapIO, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
 	if name == "touch":
 		touch(io, activator)
 		return true

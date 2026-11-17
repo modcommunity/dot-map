@@ -5,7 +5,7 @@ extends DotMapEntity
 ## and whether it goes to every player) for the game's HUD; SetText changes the message. Nothing is drawn here.
 
 
-func _input(io: DotMapIO, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"display":
 			io.event("game_text", {"entity": index, "name": targetname, "message": key("message"),

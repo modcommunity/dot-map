@@ -37,7 +37,7 @@ func _apply_motion(authoritative := true) -> void:
 
 ## Authority: reports a moved body's pose (tenth of a second apart, and once more when it stops).
 ## Client: eases the frozen body toward the last pose received.
-func tick_view(io: DotMapIO) -> void:
+func tick_view(io: RefCounted) -> void:
 	if body == null or not alive:
 		return
 	if io.authoritative:
@@ -58,13 +58,13 @@ static func _pose_array(t: Transform3D) -> Array:
 	return [t.origin.x, t.origin.y, t.origin.z, q.x, q.y, q.z, q.w]
 
 
-func hurt(io: DotMapIO, amount: float, at: Vector3 = Vector3.ZERO, by: Variant = null) -> bool:
+func hurt(io: RefCounted, amount: float, at: Vector3 = Vector3.ZERO, by: Variant = null) -> bool:
 	if not motion and _wake_damage > 0.0 and amount >= _wake_damage:
 		_set_motion(io, true, by)
 	return super.hurt(io, amount, at, by)
 
 
-func _set_motion(io: DotMapIO, on: bool, by: Variant) -> void:
+func _set_motion(io: RefCounted, on: bool, by: Variant) -> void:
 	if motion == on:
 		return
 	motion = on
@@ -74,7 +74,7 @@ func _set_motion(io: DotMapIO, on: bool, by: Variant) -> void:
 		fire(io, "OnMotionEnabled", by)
 
 
-func _input(io: DotMapIO, name: String, param: String, activator: Variant, caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, activator: Variant, caller: Variant) -> bool:
 	match name:
 		"enablemotion":
 			_set_motion(io, true, activator)
@@ -94,7 +94,7 @@ func _input(io: DotMapIO, name: String, param: String, activator: Variant, calle
 	return true
 
 
-func _apply(io: DotMapIO, key_: String, value: Variant, tick: int) -> bool:
+func _apply(io: RefCounted, key_: String, value: Variant, tick: int) -> bool:
 	if key_ == "pose":
 		if not value is Array or (value as Array).size() != 7:
 			return false
@@ -112,7 +112,7 @@ func _apply(io: DotMapIO, key_: String, value: Variant, tick: int) -> bool:
 	return super._apply(io, key_, value, tick)
 
 
-func _break(io: DotMapIO, by: Variant, at: Vector3) -> void:
+func _break(io: RefCounted, by: Variant, at: Vector3) -> void:
 	super._break(io, by, at)
 	if body != null:
 		body.freeze = true

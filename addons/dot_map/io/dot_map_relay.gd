@@ -7,7 +7,7 @@ extends DotMapEntity
 var _spent := false
 
 
-func _input(io: DotMapIO, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"trigger":
 			if enabled and not _spent:
@@ -20,7 +20,7 @@ func _input(io: DotMapIO, name: String, _param: String, activator: Variant, _cal
 	return false
 
 
-func on_map_spawn(io: DotMapIO) -> void:
+func on_map_spawn(io: RefCounted) -> void:
 	fire(io, "OnSpawn", null)
 
 

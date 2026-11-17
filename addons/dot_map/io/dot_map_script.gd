@@ -37,7 +37,7 @@ static func valid_op(op: Variant) -> bool:
 	return true
 
 
-func _input(io: DotMapIO, name: String, _param: String, _activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, _param: String, _activator: Variant, _caller: Variant) -> bool:
 	if name != "runcode":
 		return false
 	io.run_script(self)

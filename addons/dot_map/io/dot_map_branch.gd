@@ -10,7 +10,7 @@ func _configure() -> void:
 	value = flag("initialvalue")
 
 
-func _input(io: DotMapIO, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"setvalue":
 			value = param.to_float() != 0.0
@@ -29,7 +29,7 @@ func _input(io: DotMapIO, name: String, param: String, activator: Variant, _call
 	return true
 
 
-func _test(io: DotMapIO, activator: Variant) -> void:
+func _test(io: RefCounted, activator: Variant) -> void:
 	fire(io, "OnTrue" if value else "OnFalse", activator)
 
 

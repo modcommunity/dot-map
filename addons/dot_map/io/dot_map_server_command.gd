@@ -5,7 +5,7 @@ extends DotMapEntity
 ## goes to the game's event callable; a cvar only if allow-listed) and never executed.
 
 
-func _input(io: DotMapIO, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
 	if name != "command":
 		return false
 	io.record_command(self, param)

@@ -39,7 +39,7 @@ func is_solid() -> bool:
 	return enabled and alive
 
 
-func _input(io: DotMapIO, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"alpha":
 			alpha = clampi(int(param.to_float()), 0, 255)
@@ -52,7 +52,7 @@ func _input(io: DotMapIO, name: String, param: String, _activator: Variant, _cal
 	return true
 
 
-func _apply(_io: DotMapIO, key_: String, value: Variant, _tick: int) -> bool:
+func _apply(_io: RefCounted, key_: String, value: Variant, _tick: int) -> bool:
 	match key_:
 		"alpha":
 			alpha = int(value)

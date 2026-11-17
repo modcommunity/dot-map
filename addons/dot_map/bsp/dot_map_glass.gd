@@ -1,6 +1,10 @@
 class_name DotMapGlass
 extends StaticBody3D
 
+# The mesh script chain's glass part, named directly: DotMapBspMesh builds these panes, so naming it here would
+# keep both parsers alive.
+const _MESH_GLASS := preload("uid://cb3jej8cfm0h0")
+
 ## A breakable glass brush entity from a converted map: solid until its health runs out, then gone with a
 ## burst of shards. Built by [method DotMapBspMesh.build_breakables]. Server decides, clients follow.
 
@@ -82,7 +86,7 @@ func _burst(at: Vector3) -> void:
 		var p := CPUParticles3D.new()
 		var quad := QuadMesh.new()
 		quad.size = Vector2(0.07, 0.07)
-		quad.material = shard_material if shard_material != null else DotMapBspMesh.glass_material(kind)
+		quad.material = shard_material if shard_material != null else _MESH_GLASS.glass_material(kind)
 		p.mesh = quad
 		p.amount = shard_count
 		p.one_shot = true

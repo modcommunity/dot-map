@@ -8,7 +8,7 @@ extends DotMapEntity
 const MAX_DEPTH := 4
 
 
-func _input(io: DotMapIO, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
 	if name != "testactivator":
 		return false
 	var info: Dictionary = activator if activator is Dictionary else {"name": str(activator) if activator != null else ""}
@@ -17,7 +17,7 @@ func _input(io: DotMapIO, name: String, _param: String, activator: Variant, _cal
 
 
 ## True when [param info] passes this filter; [code]negated[/code] flips the answer.
-func passes(io: DotMapIO, info: Dictionary, depth: int = 0) -> bool:
+func passes(io: RefCounted, info: Dictionary, depth: int = 0) -> bool:
 	var match_: bool
 	match classname.to_lower():
 		"filter_activator_name":
@@ -40,7 +40,7 @@ func passes(io: DotMapIO, info: Dictionary, depth: int = 0) -> bool:
 					var nm := key("filter%02d" % i)
 					if nm.is_empty():
 						continue
-					var sub := io.find(nm)
+					var sub: Array = io.find(nm)
 					if sub.is_empty():
 						continue
 					var ok := entity_passes(io, sub[0], info, depth + 1)
@@ -55,14 +55,14 @@ func passes(io: DotMapIO, info: Dictionary, depth: int = 0) -> bool:
 	return match_ != flag("negated")
 
 
-func _admit_unknown(io: DotMapIO) -> bool:
+func _admit_unknown(io: RefCounted) -> bool:
 	var k := "filter|" + classname.to_lower()
 	io.unhandled[k] = int(io.unhandled.get(k, 0)) + 1
 	return true
 
 
 ## Any filter entity against [param info]: a [DotMapFilter] answers, another class admits everyone and is counted.
-static func entity_passes(io: DotMapIO, f: DotMapEntity, info: Dictionary, depth: int = 0) -> bool:
+static func entity_passes(io: RefCounted, f: DotMapEntity, info: Dictionary, depth: int = 0) -> bool:
 	if f is DotMapFilter:
 		return (f as DotMapFilter).passes(io, info, depth)
 	var k := "filter|" + f.classname.to_lower()

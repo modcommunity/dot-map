@@ -21,7 +21,7 @@ func _configure() -> void:
 	beats_per_bar = maxi(int(key_float("beatsperbar", float(beats_per_bar))), 1)
 
 
-func on_map_spawn(io: DotMapIO) -> void:
+func on_map_spawn(io: RefCounted) -> void:
 	_arm(io)
 
 
@@ -34,7 +34,7 @@ func interval() -> float:
 	return 60.0 / _bpm if _bpm > 0.0 else 0.0
 
 
-func _input(io: DotMapIO, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"__beat":
 			if enabled and param == str(_gen) and interval() > 0.0:
@@ -58,14 +58,14 @@ func _input(io: DotMapIO, name: String, param: String, activator: Variant, _call
 	return false
 
 
-func _enabled_changed(io: DotMapIO, on: bool) -> void:
+func _enabled_changed(io: RefCounted, on: bool) -> void:
 	if on:
 		_arm(io)
 	else:
 		_gen += 1
 
 
-func _arm(io: DotMapIO) -> void:
+func _arm(io: RefCounted) -> void:
 	_gen += 1
 	_count = 0
 	if enabled and interval() > 0.0:

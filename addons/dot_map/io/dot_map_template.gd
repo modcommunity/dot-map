@@ -8,7 +8,7 @@ extends DotMapEntity
 var _copies := 0
 
 
-func _input(io: DotMapIO, name: String, _param: String, activator: Variant, caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, _param: String, activator: Variant, caller: Variant) -> bool:
 	var maker: int = (caller as DotMapEntity).index if caller is DotMapEntity else -1
 	match name:
 		"forcespawn":
@@ -32,7 +32,7 @@ func _names() -> Array:
 	return out
 
 
-func _spawn(io: DotMapIO, names: Array, activator: Variant, maker: int) -> void:
+func _spawn(io: RefCounted, names: Array, activator: Variant, maker: int) -> void:
 	_copies += 1
 	var keep := has_spawnflag(2)
 	var sources: Array = []
@@ -47,7 +47,7 @@ func _spawn(io: DotMapIO, names: Array, activator: Variant, maker: int) -> void:
 		if renamed.has(src.targetname.to_lower()):
 			rec["targetname"] = renamed[src.targetname.to_lower()]
 		_fix_names(rec, renamed)
-		var e := io.spawn_record(rec)
+		var e: DotMapEntity = io.spawn_record(rec)
 		io.event("template_spawn", {"template": index, "source": src.index, "entity": e.index, "maker": maker})
 	fire(io, "OnEntitySpawned", activator)
 

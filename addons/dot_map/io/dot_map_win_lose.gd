@@ -17,7 +17,7 @@ func _configure() -> void:
 	_seconds = clampf(key_float("slowmoseconds", slowmo_seconds), 0.0, MAX_SECONDS)
 
 
-func _input(io: DotMapIO, name: String, _param: String, _activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, _param: String, _activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"win", "humanswin":
 			io.event("round_decide", {"entity": index, "won": true, "why": "the map ended it"})
@@ -28,7 +28,7 @@ func _input(io: DotMapIO, name: String, _param: String, _activator: Variant, _ca
 	return true
 
 
-func decided(io: DotMapIO, won: bool) -> void:
+func decided(io: RefCounted, won: bool) -> void:
 	fire(io, "OnWin" if won else "OnLose", null)
 	var camera: Variant = null
 	if key("origin") != "":

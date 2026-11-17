@@ -16,7 +16,7 @@ var _held := {}
 var _axes := Vector2.ZERO
 
 
-func _input(io: DotMapIO, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"activate":
 			if enabled and not active:
@@ -34,7 +34,7 @@ func _input(io: DotMapIO, name: String, _param: String, activator: Variant, _cal
 
 
 ## The buttons the holder has down now (names in [constant BUTTONS], plus [code]use[/code] and [code]jump[/code]); call each tick.
-func feed(io: DotMapIO, held: Dictionary) -> void:
+func feed(io: RefCounted, held: Dictionary) -> void:
 	if not active:
 		return
 	if (bool(held.get("use", false)) and has_spawnflag(USE_DEACTIVATES)) or (bool(held.get("jump", false)) and has_spawnflag(JUMP_DEACTIVATES)):
@@ -54,7 +54,7 @@ func feed(io: DotMapIO, held: Dictionary) -> void:
 	_axes = axes
 
 
-func release(io: DotMapIO) -> void:
+func release(io: RefCounted) -> void:
 	if not active:
 		return
 	active = false

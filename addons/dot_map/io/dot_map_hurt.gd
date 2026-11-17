@@ -48,7 +48,7 @@ func _configure() -> void:
 			break
 
 
-func body_enter(io: DotMapIO, info: Dictionary) -> void:
+func body_enter(io: RefCounted, info: Dictionary) -> void:
 	if not enabled:
 		return
 	_touching[info["id"]] = info
@@ -59,21 +59,21 @@ func body_enter(io: DotMapIO, info: Dictionary) -> void:
 		io.schedule_self(self, "__think", str(_gen), 0.0)
 
 
-func body_leave(io: DotMapIO, info: Dictionary) -> void:
+func body_leave(io: RefCounted, info: Dictionary) -> void:
 	_touching.erase(info["id"])
 	_hits.erase(info["id"])
 	if enabled:
 		fire(io, "OnEndTouch", info.get("body"))
 
 
-func _enabled_changed(_io: DotMapIO, _on: bool) -> void:
+func _enabled_changed(_io: RefCounted, _on: bool) -> void:
 	_touching.clear()
 	_hits.clear()
 	_thinking = false
 	_gen += 1
 
 
-func _input(io: DotMapIO, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"__think":
 			if _thinking and param == str(_gen):
@@ -85,7 +85,7 @@ func _input(io: DotMapIO, name: String, param: String, _activator: Variant, _cal
 	return false
 
 
-func _think(io: DotMapIO) -> void:
+func _think(io: RefCounted) -> void:
 	if _touching.is_empty():
 		_thinking = false
 		return

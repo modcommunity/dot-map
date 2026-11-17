@@ -12,11 +12,11 @@ func _configure() -> void:
 	collide = key_float("startdisabled", 1.0) == 0.0
 
 
-func on_map_spawn(io: DotMapIO) -> void:
+func on_map_spawn(io: RefCounted) -> void:
 	_tell(io)
 
 
-func _input(io: DotMapIO, name: String, _param: String, _activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, _param: String, _activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"enablecollisions":
 			collide = true
@@ -28,5 +28,5 @@ func _input(io: DotMapIO, name: String, _param: String, _activator: Variant, _ca
 	return true
 
 
-func _tell(io: DotMapIO) -> void:
+func _tell(io: RefCounted) -> void:
 	io.event("collision_pair", {"entity": index, "a": key("attach1"), "b": key("attach2"), "collide": collide})

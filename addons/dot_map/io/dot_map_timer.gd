@@ -20,12 +20,12 @@ func _configure() -> void:
 	_hi = key_float("upperrandombound")
 
 
-func on_map_spawn(io: DotMapIO) -> void:
+func on_map_spawn(io: RefCounted) -> void:
 	if enabled:
 		_arm(io)
 
 
-func _input(io: DotMapIO, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"__timer":
 			if enabled and _armed and param == str(_gen):
@@ -50,7 +50,7 @@ func _input(io: DotMapIO, name: String, param: String, activator: Variant, _call
 	return false
 
 
-func _enabled_changed(io: DotMapIO, on: bool) -> void:
+func _enabled_changed(io: RefCounted, on: bool) -> void:
 	if on:
 		_arm(io)
 	else:
@@ -58,25 +58,25 @@ func _enabled_changed(io: DotMapIO, on: bool) -> void:
 		_armed = false
 
 
-func _arm(io: DotMapIO) -> void:
+func _arm(io: RefCounted) -> void:
 	_gen += 1
 	_armed = true
 	io.schedule_self(self, "__timer", str(_gen), _interval(io))
 
 
-func _interval(io: DotMapIO) -> float:
+func _interval(io: RefCounted) -> float:
 	if _random:
 		return io.stream_for(self).next_range_f(minf(_lo, _hi), maxf(_lo, _hi))
 	return _refire
 
 
-func _beat(io: DotMapIO, activator: Variant) -> void:
+func _beat(io: RefCounted, activator: Variant) -> void:
 	_beat_once(io, activator)
 	if enabled and _armed:
 		_arm(io)
 
 
-func _beat_once(io: DotMapIO, activator: Variant) -> void:
+func _beat_once(io: RefCounted, activator: Variant) -> void:
 	fire(io, "OnTimer", activator)
 	fire(io, "OnTimerHigh" if _high else "OnTimerLow", activator)
 	_high = not _high

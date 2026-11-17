@@ -8,7 +8,7 @@ extends DotMapEntity
 var health := -1.0
 
 
-func _input(io: DotMapIO, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"sethealth":
 			health = param.to_float()
@@ -19,7 +19,7 @@ func _input(io: DotMapIO, name: String, param: String, _activator: Variant, _cal
 	return true
 
 
-func _apply(_io: DotMapIO, key: String, value: Variant, _tick: int) -> bool:
+func _apply(_io: RefCounted, key: String, value: Variant, _tick: int) -> bool:
 	if key != "health":
 		return false
 	health = float(value)

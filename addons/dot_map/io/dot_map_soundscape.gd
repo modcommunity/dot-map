@@ -21,7 +21,7 @@ func _configure() -> void:
 
 
 ## The soundscape name the game should play: a proxy uses the one it points at.
-func resolved_name(io: DotMapIO) -> String:
+func resolved_name(io: RefCounted) -> String:
 	if classname.to_lower() == "env_soundscape_proxy":
 		for e: DotMapEntity in io.find(key("mainsoundscapename")):
 			if e is DotMapSoundscape:
@@ -30,7 +30,7 @@ func resolved_name(io: DotMapIO) -> String:
 
 
 ## Named positions (metres) the soundscape's sounds are placed at.
-func positions(io: DotMapIO) -> Array[Vector3]:
+func positions(io: RefCounted) -> Array[Vector3]:
 	var out: Array[Vector3] = []
 	var src: DotMapEntity = self
 	if classname.to_lower() == "env_soundscape_proxy":
@@ -48,7 +48,7 @@ func positions(io: DotMapIO) -> Array[Vector3]:
 
 
 ## Whether [param at] (metres) is inside the radius, or body [param id] was put inside by a trigger_soundscape.
-func covers(io: DotMapIO, at: Vector3, id: Variant = null) -> bool:
+func covers(io: RefCounted, at: Vector3, id: Variant = null) -> bool:
 	if triggerable and listeners.has(id):
 		return true
 	if triggerable and not _heard:
@@ -59,7 +59,7 @@ func covers(io: DotMapIO, at: Vector3, id: Variant = null) -> bool:
 
 
 
-func _input(_io: DotMapIO, name: String, _param: String, _activator: Variant, _caller: Variant) -> bool:
+func _input(_io: RefCounted, name: String, _param: String, _activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"startplay", "play":
 			_heard = true

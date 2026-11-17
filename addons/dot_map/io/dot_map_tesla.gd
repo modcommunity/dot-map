@@ -5,7 +5,7 @@ extends DotMapEntity
 ## game to draw; a disabled one does not spark. Nothing is simulated here.
 
 
-func _input(io: DotMapIO, name: String, _param: String, _activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, _param: String, _activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"dospark":
 			if enabled:

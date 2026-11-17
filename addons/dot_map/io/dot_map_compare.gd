@@ -13,7 +13,7 @@ func _configure() -> void:
 	against = key_float("comparevalue")
 
 
-func _input(io: DotMapIO, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"setvalue":
 			value = param.to_float()
@@ -29,7 +29,7 @@ func _input(io: DotMapIO, name: String, param: String, activator: Variant, _call
 	return true
 
 
-func _compare(io: DotMapIO, activator: Variant) -> void:
+func _compare(io: RefCounted, activator: Variant) -> void:
 	if value < against:
 		fire(io, "OnLessThan", activator, str(value))
 	elif value > against:

@@ -7,7 +7,7 @@ extends DotMapEntity
 var broken := false
 
 
-func _input(io: DotMapIO, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"break":
 			if not broken:
@@ -28,7 +28,7 @@ func state() -> Dictionary:
 	return st
 
 
-func _apply(_io: DotMapIO, key: String, value: Variant, _tick: int) -> bool:
+func _apply(_io: RefCounted, key: String, value: Variant, _tick: int) -> bool:
 	if key != "broken":
 		return false
 	broken = bool(value)

@@ -6,22 +6,22 @@ extends DotMapEntity
 ## the change through the usual [code]soundscape[/code] event.
 
 
-func body_enter(io: DotMapIO, info: Dictionary) -> void:
+func body_enter(io: RefCounted, info: Dictionary) -> void:
 	if enabled:
 		_listen(io, info, true)
 
 
-func body_leave(io: DotMapIO, info: Dictionary) -> void:
+func body_leave(io: RefCounted, info: Dictionary) -> void:
 	_listen(io, info, false)
 
 
-func _enabled_changed(_io: DotMapIO, on: bool) -> void:
+func _enabled_changed(_io: RefCounted, on: bool) -> void:
 	if not on:
 		for e: DotMapEntity in _targets(_io):
 			(e as DotMapSoundscape).listeners.clear()
 
 
-func _targets(io: DotMapIO) -> Array:
+func _targets(io: RefCounted) -> Array:
 	var out: Array = []
 	for e: DotMapEntity in io.find(key("soundscape")):
 		if e is DotMapSoundscape:
@@ -29,7 +29,7 @@ func _targets(io: DotMapIO) -> Array:
 	return out
 
 
-func _listen(io: DotMapIO, info: Dictionary, on: bool) -> void:
+func _listen(io: RefCounted, info: Dictionary, on: bool) -> void:
 	for e: DotMapSoundscape in _targets(io):
 		if on:
 			e.listeners[info["id"]] = true

@@ -16,25 +16,28 @@ static func batch_size(workers: int) -> int:
 	return maxi(DotParallel.resolve_workers(workers), 1) * PER_WORKER
 
 
+# "world" below is a DotMapBspMesh, typed RefCounted: the mesh scripts name this file, so naming the mesh back
+# would keep both parsers alive.
+
 ## [method DotMapBspMesh.surface_arrays] merged per list of records in [param lists]; slot i is lists[i]'s.
-static func merged(world: DotMapBspMesh, lists: Array, workers: int) -> Array:
+static func merged(world: RefCounted, lists: Array, workers: int) -> Array:
 	return DotParallel.run(func(i: int) -> Variant: return world._merged_arrays(lists[i]), lists.size(), &"map.mesh", workers)
 
 
 ## Hull points of [param recs] minus [param origin], one [PackedVector3Array] per record.
-static func hull_points(world: DotMapBspMesh, recs: Array, origin: Vector3, workers: int) -> Array:
+static func hull_points(world: RefCounted, recs: Array, origin: Vector3, workers: int) -> Array:
 	return DotParallel.run(func(i: int) -> Variant:
 		var p := int(recs[i]["point_offset"])
-		var pts := world._blob.slice(p, p + 12 * int(recs[i]["point_count"])).to_vector3_array()
+		var pts: PackedVector3Array = world._blob.slice(p, p + 12 * int(recs[i]["point_count"])).to_vector3_array()
 		for k in pts.size():
 			pts[k] -= origin
 		return pts, recs.size(), &"map.hulls", workers)
 
 
 ## Triangle faces (three points per index) of [param recs] minus [param origin], one array per record.
-static func concave_faces(world: DotMapBspMesh, recs: Array, origin: Vector3, workers: int) -> Array:
+static func concave_faces(world: RefCounted, recs: Array, origin: Vector3, workers: int) -> Array:
 	return DotParallel.run(func(i: int) -> Variant:
-		var a := world.surface_arrays(recs[i])
+		var a: Array = world.surface_arrays(recs[i])
 		var verts: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
 		var index: PackedInt32Array = a[Mesh.ARRAY_INDEX]
 		var faces := PackedVector3Array()

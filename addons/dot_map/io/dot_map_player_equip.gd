@@ -9,7 +9,7 @@ const ENGINE_KEYS := ["origin", "angles", "targetname", "spawnflags", "classname
 		"startdisabled", "filtername", "renderfx", "rendercolor", "renderamt", "rendermode", "disableshadows", "disablereceiveshadows"]
 
 
-func _input(io: DotMapIO, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
 	var to := ""
 	match name:
 		"equipactivator":

@@ -39,12 +39,12 @@ func _configure() -> void:
 	spin_down = key_float("spindown")
 
 
-func on_map_spawn(io: DotMapIO) -> void:
+func on_map_spawn(io: RefCounted) -> void:
 	if playing:
 		_play(io, true)
 
 
-func _play(io: DotMapIO, on: bool) -> void:
+func _play(io: RefCounted, on: bool) -> void:
 	playing = on
 	if stand_in.is_empty():
 		io.missing_callables["sound.silent"] = int(io.missing_callables.get("sound.silent", 0)) + 1
@@ -58,7 +58,7 @@ func _play(io: DotMapIO, on: bool) -> void:
 	io.report_state(self, "playing", on)
 
 
-func _input(io: DotMapIO, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
+func _input(io: RefCounted, name: String, param: String, _activator: Variant, _caller: Variant) -> bool:
 	match name:
 		"playsound":
 			_play(io, true)
