@@ -4,11 +4,11 @@ Bugs worth recognising if they come back. The rule each left is in [content.md](
 
 ## What the first transport found
 
-The sync protocol first ran over a real network in game-g2gfast (dot-net, a server and a client), and five things in this addon were wrong. Each is fixed with a check in `map_selftest` that was armed by putting the old line back.
+The sync protocol first ran over a real network in game-airdrift (dot-net, a server and a client), and five things in this addon were wrong. Each is fixed with a check in `map_selftest` that was armed by putting the old line back.
 
 - **A joiner was never told to load.** `join_payload()` is an announce, and `load` was only sent at the end of a change, so a peer that joined between changes fetched the map, said ready, and waited for ever.
 - **A peer admitted mid-change was waited on**, though `add_peer` said it was not: `_wait_for_peers` counted every peer on every poll, so the change was held to its timeout and the joiner reported as a straggler for a map it had never been announced.
-- **The delivered-map rule refused the template shape**, so a game whose maps are data read by one built-in scene could not receive any map. game-g2gfast worked around it by fetching by its own convention before dot-map saw the announce.
+- **The delivered-map rule refused the template shape**, so a game whose maps are data read by one built-in scene could not receive any map. game-airdrift worked around it by fetching by its own convention before dot-map saw the announce.
 - **A refused `load` adopted the map it refused**: `_on_load` set `announced` from the catalogue before checking the version.
 - **Progress was unthrottled**: one message per dot-cloud progress signal, into a server that drops a client's excess without choosing, could cost the `ready` behind it.
 - And, while writing those checks: **a `load` that overtook its own fetch was taken at once**, asking for the same pack twice; it worked only because dot-cloud joins a running request.
