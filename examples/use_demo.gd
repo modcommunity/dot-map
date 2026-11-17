@@ -5,7 +5,7 @@ extends Node
 
 const CHECKS := 19
 const SECTIONS := 4
-const WORLD := "../arena-surf-dm-maps/worlds/surf_forbidden_ways_2nd/surf_forbidden_ways_2nd"
+const WORLD := "../fc-surf-dm-maps/worlds/surf_forbidden_ways_2nd/surf_forbidden_ways_2nd"
 const BUTTON := 39
 
 var _passed := 0

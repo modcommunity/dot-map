@@ -13,7 +13,7 @@ func _init() -> void:
 	var maps := 0
 	var bad := 0
 	for root in roots:
-		# Layouts: <root>/<id>/<id>.json (arena), flat <root>/<id>.json (g2gfast, wipeout), <root>/<dir>/<id>.json (hide-n-seek);
+		# Layouts: <root>/<id>/<id>.json (FC), flat <root>/<id>.json (g2gfast, wipeout), <root>/<dir>/<id>.json (hide-n-seek);
 		# a world is a .json with its .bin beside it.
 		var found: Array[Array] = []
 		for f in DirAccess.get_files_at(root):

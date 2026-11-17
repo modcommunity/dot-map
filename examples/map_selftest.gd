@@ -365,97 +365,97 @@ func _cfg_clear() -> void:
 func _test_map_config() -> void:
 	_section("per-map settings: precedence, whitelist, restore")
 	_cfg_clear()
-	_cfg_file("addons", "surf_*", "arena_air: 100\narena_gravity: 800\n")
-	_cfg_file("addons", "surf_ab*", "arena_air: 120\n")
-	_cfg_file("addons", "surf_abc", "arena_air: 130\nnot_a_cvar: 1\n")
-	_cfg_file("addons", "SURF_?", "arena_gravity: 700\n")
-	_cfg_file("server/addons", "surf_*", "arena_air: 50\n")
-	_cfg_file("server/addons", "surf_exact", "arena_gravity: 400\n")
-	_cfg_file("addons", "bad_type", "arena_air: fast\nrm: \"quit\"\narena_gravity: -5\n")
+	_cfg_file("addons", "surf_*", "fc_air: 100\nfc_gravity: 800\n")
+	_cfg_file("addons", "surf_ab*", "fc_air: 120\n")
+	_cfg_file("addons", "surf_abc", "fc_air: 130\nnot_a_cvar: 1\n")
+	_cfg_file("addons", "SURF_?", "fc_gravity: 700\n")
+	_cfg_file("server/addons", "surf_*", "fc_air: 50\n")
+	_cfg_file("server/addons", "surf_exact", "fc_gravity: 400\n")
+	_cfg_file("addons", "bad_type", "fc_air: fast\nrm: \"quit\"\nfc_gravity: -5\n")
 
 	var cfg := DotMapConfig.new()
 	cfg.config_dir = CFG_ROOT
-	cfg.allow("arena_air", {"type": "float"}).allow("arena_gravity", {"type": "float", "min": 0.0})
-	cfg.defaults = {"arena_air": 10, "arena_extra": 1}
-	cfg.allow("arena_extra")
+	cfg.allow("fc_air", {"type": "float"}).allow("fc_gravity", {"type": "float", "min": 0.0})
+	cfg.defaults = {"fc_air": 10, "fc_extra": 1}
+	cfg.allow("fc_extra")
 	var s: Dictionary = cfg.resolve("surf_zzz").value["settings"]
-	_check(s["arena_air"] == 50.0 and s["arena_gravity"] == 800.0, "a server wildcard beats the shipped one, the rest comes from the shipped wildcard (%s)" % [s])
+	_check(s["fc_air"] == 50.0 and s["fc_gravity"] == 800.0, "a server wildcard beats the shipped one, the rest comes from the shipped wildcard (%s)" % [s])
 	s = cfg.resolve("surf_abc").value["settings"]
-	_check(s["arena_air"] == 50.0, "a server wildcard beats a shipped exact file (%s)" % [s])
-	_check(cfg.resolve("surf_exact").value["settings"]["arena_gravity"] == 400.0, "a server exact file wins")
+	_check(s["fc_air"] == 50.0, "a server wildcard beats a shipped exact file (%s)" % [s])
+	_check(cfg.resolve("surf_exact").value["settings"]["fc_gravity"] == 400.0, "a server exact file wins")
 	DirAccess.remove_absolute(CFG_ROOT.path_join("server/addons/dot_map/map/surf_*.yml"))
 	DirAccess.remove_absolute(CFG_ROOT.path_join("server/addons/dot_map/map/surf_exact.yml"))
 	s = cfg.resolve("surf_zzz").value["settings"]
-	_check(s["arena_air"] == 100.0 and s["arena_gravity"] == 800.0, "the wildcard sets a surf map's keys (%s)" % [s])
-	_check(cfg.resolve("surf_abx").value["settings"]["arena_air"] == 120.0, "the more specific wildcard wins")
+	_check(s["fc_air"] == 100.0 and s["fc_gravity"] == 800.0, "the wildcard sets a surf map's keys (%s)" % [s])
+	_check(cfg.resolve("surf_abx").value["settings"]["fc_air"] == 120.0, "the more specific wildcard wins")
 	var abc: Dictionary = cfg.resolve("surf_abc").value
-	_check(abc["settings"]["arena_air"] == 130.0, "the exact file beats every wildcard")
-	_check(abc["settings"]["arena_gravity"] == 800.0, "a key the exact file lacks falls through to the wildcard")
+	_check(abc["settings"]["fc_air"] == 130.0, "the exact file beats every wildcard")
+	_check(abc["settings"]["fc_gravity"] == 800.0, "a key the exact file lacks falls through to the wildcard")
 	_check(not (abc["settings"] as Dictionary).has("not_a_cvar") and abc["rejected"].size() == 1 and abc["rejected"][0]["key"] == "not_a_cvar", "an unknown key is reported and not applied (%s)" % [abc["rejected"]])
-	_check(cfg.resolve("SURF_1").value["settings"]["arena_gravity"] == 700.0, "`?` matches one character, case does not matter, equal literals break on the longer pattern")
+	_check(cfg.resolve("SURF_1").value["settings"]["fc_gravity"] == 700.0, "`?` matches one character, case does not matter, equal literals break on the longer pattern")
 	var plain: Dictionary = cfg.resolve("dm_plain").value
-	_check(plain["settings"].size() == 2 and plain["settings"]["arena_air"] == 10.0 and plain["settings"]["arena_extra"] == 1, "a map no file matches gets the converter default only (%s)" % [plain["settings"]])
+	_check(plain["settings"].size() == 2 and plain["settings"]["fc_air"] == 10.0 and plain["settings"]["fc_extra"] == 1, "a map no file matches gets the converter default only (%s)" % [plain["settings"]])
 	var bad: Dictionary = cfg.resolve("bad_type").value
-	_check(not bad["settings"].has("arena_gravity"), "a value below the minimum is refused, not clamped (%s)" % [bad["settings"]])
+	_check(not bad["settings"].has("fc_gravity"), "a value below the minimum is refused, not clamped (%s)" % [bad["settings"]])
 	var gwhy := ""
 	for r: Dictionary in bad["rejected"]:
-		if r["key"] == "arena_gravity":
+		if r["key"] == "fc_gravity":
 			gwhy = String(r["why"])
-	_check(gwhy.contains("arena_gravity") and gwhy.contains("-5"), "the refusal names the key and the value (%s)" % [gwhy])
-	_check(bad["rejected"].size() == 3 and not bad["settings"].has("arena_air") and not bad["settings"].has("rm"), "a non-number and an unlisted command key are both refused (%s)" % [bad["rejected"]])
-	_check(cfg.resolve("surf_abc").value["sources"]["arena_air"].ends_with("surf_abc.yml"), "each key records its file")
+	_check(gwhy.contains("fc_gravity") and gwhy.contains("-5"), "the refusal names the key and the value (%s)" % [gwhy])
+	_check(bad["rejected"].size() == 3 and not bad["settings"].has("fc_air") and not bad["settings"].has("rm"), "a non-number and an unlisted command key are both refused (%s)" % [bad["rejected"]])
+	_check(cfg.resolve("surf_abc").value["sources"]["fc_air"].ends_with("surf_abc.yml"), "each key records its file")
 
 	_test_map_config_restore(cfg)
 	_cfg_clear()
-	_cfg_file("addons", "pf_%", "arena_air: 11\narena_gravity: 22\n")
-	_cfg_file("addons", "pf_ab%", "arena_air: 33\n")
-	_cfg_file("addons", "PF_@", "arena_gravity: 44\n")
-	_cfg_file("addons", "pf_abc", "arena_air: 55\n")
-	_cfg_file("server/addons", "pf_%", "arena_air: 66\n")
+	_cfg_file("addons", "pf_%", "fc_air: 11\nfc_gravity: 22\n")
+	_cfg_file("addons", "pf_ab%", "fc_air: 33\n")
+	_cfg_file("addons", "PF_@", "fc_gravity: 44\n")
+	_cfg_file("addons", "pf_abc", "fc_air: 55\n")
+	_cfg_file("server/addons", "pf_%", "fc_air: 66\n")
 	var pc := DotMapConfig.new()
 	pc.config_dir = CFG_ROOT
-	pc.allow("arena_air", {"type": "float"}).allow("arena_gravity", {"type": "float"})
+	pc.allow("fc_air", {"type": "float"}).allow("fc_gravity", {"type": "float"})
 	var ps: Dictionary = pc.resolve("pf_zzz").value["settings"]
-	_check(ps["arena_air"] == 66.0 and ps["arena_gravity"] == 22.0, "`%%` spells `*`: a server pf_%% beats the shipped one (%s)" % [ps])
+	_check(ps["fc_air"] == 66.0 and ps["fc_gravity"] == 22.0, "`%%` spells `*`: a server pf_%% beats the shipped one (%s)" % [ps])
 	DirAccess.remove_absolute(CFG_ROOT.path_join("server/addons/dot_map/map/pf_%.yml"))
-	_check(pc.resolve("pf_zzz").value["settings"]["arena_air"] == 11.0, "the shipped `%` file applies")
-	_check(pc.resolve("pf_abx").value["settings"]["arena_air"] == 33.0, "a longer literal prefix beats a shorter one")
-	_check(pc.resolve("pf_abc").value["settings"]["arena_air"] == 55.0, "an exact file beats a `%` glob")
-	_check(pc.resolve("PF_1").value["settings"]["arena_gravity"] == 44.0, "`@` spells `?`, case does not matter")
-	_check(not pc.resolve("pf_").value["settings"].has("arena_gravity") or pc.resolve("pf_").value["settings"]["arena_gravity"] == 22.0, "`@` needs exactly one character")
+	_check(pc.resolve("pf_zzz").value["settings"]["fc_air"] == 11.0, "the shipped `%` file applies")
+	_check(pc.resolve("pf_abx").value["settings"]["fc_air"] == 33.0, "a longer literal prefix beats a shorter one")
+	_check(pc.resolve("pf_abc").value["settings"]["fc_air"] == 55.0, "an exact file beats a `%` glob")
+	_check(pc.resolve("PF_1").value["settings"]["fc_gravity"] == 44.0, "`@` spells `?`, case does not matter")
+	_check(not pc.resolve("pf_").value["settings"].has("fc_gravity") or pc.resolve("pf_").value["settings"]["fc_gravity"] == 22.0, "`@` needs exactly one character")
 	_cfg_clear()
 	_done()
 
 
 func _test_map_config_restore(cfg: DotMapConfig) -> void:
-	var live := {"arena_air": 150.0, "arena_gravity": 800.0, "arena_extra": 0}
+	var live := {"fc_air": 150.0, "fc_gravity": 800.0, "fc_extra": 0}
 	cfg.defaults = {}
 	cfg.get_fn = func(k: String) -> Variant: return live.get(k)
 	cfg.set_fn = func(k: String, v: Variant) -> bool:
 		live[k] = v
 		return true
-	_check(cfg.apply("surf_zzz").ok and live["arena_air"] == 100.0, "apply sets the surf map's key")
-	_check(cfg.apply("dm_plain").ok and live["arena_air"] == 150.0 and live["arena_gravity"] == 800.0, "the next, non-surf map has the defaults back")
+	_check(cfg.apply("surf_zzz").ok and live["fc_air"] == 100.0, "apply sets the surf map's key")
+	_check(cfg.apply("dm_plain").ok and live["fc_air"] == 150.0 and live["fc_gravity"] == 800.0, "the next, non-surf map has the defaults back")
 	cfg.apply("surf_zzz")
-	live["arena_air"] = 77.0
+	live["fc_air"] = 77.0
 	cfg.apply("dm_plain")
-	_check(live["arena_air"] == 77.0, "a value changed since is not stomped on restore")
-	var clamped := {"arena_air": 150.0, "arena_gravity": 800.0, "arena_extra": 0}
+	_check(live["fc_air"] == 77.0, "a value changed since is not stomped on restore")
+	var clamped := {"fc_air": 150.0, "fc_gravity": 800.0, "fc_extra": 0}
 	var cfg2 := DotMapConfig.new()
 	cfg2.config_dir = CFG_ROOT
-	cfg2.allow("arena_air", {"type": "float"}).allow("arena_gravity", {"type": "float", "min": 0.0}).allow("arena_extra")
+	cfg2.allow("fc_air", {"type": "float"}).allow("fc_gravity", {"type": "float", "min": 0.0}).allow("fc_extra")
 	cfg2.get_fn = func(k: String) -> Variant: return clamped.get(k)
 	cfg2.set_fn = func(k: String, v: Variant) -> bool:
-		clamped[k] = 90.0 if k == "arena_air" and float(v) < 140.0 else v
+		clamped[k] = 90.0 if k == "fc_air" and float(v) < 140.0 else v
 		return true
 	cfg2.apply("surf_zzz")
-	_check(clamped["arena_air"] == 90.0, "the cvar clamped what the map asked for")
+	_check(clamped["fc_air"] == 90.0, "the cvar clamped what the map asked for")
 	cfg2.apply("dm_plain")
-	_check(clamped["arena_air"] == 150.0, "restore still puts back a value the cvar clamped or reformatted")
-	_check(not cfg2._check("arena_air", INF).ok and not cfg2._check("arena_air", NAN).ok and not cfg2._check("arena_air", "inf").ok, "inf and nan are refused")
-	_check(cfg2._check("arena_extra", 1.0e30).ok, "a huge value is accepted")
-	cfg2.allow("arena_int", {"type": "int"})
-	_check(not cfg2._check("arena_int", 1.0e30).ok, "an int too big to hold is refused, not clamped")
+	_check(clamped["fc_air"] == 150.0, "restore still puts back a value the cvar clamped or reformatted")
+	_check(not cfg2._check("fc_air", INF).ok and not cfg2._check("fc_air", NAN).ok and not cfg2._check("fc_air", "inf").ok, "inf and nan are refused")
+	_check(cfg2._check("fc_extra", 1.0e30).ok, "a huge value is accepted")
+	cfg2.allow("fc_int", {"type": "int"})
+	_check(not cfg2._check("fc_int", 1.0e30).ok, "an int too big to hold is refused, not clamped")
 	var bare := DotMapConfig.new()
 	_check(not bare.apply("x").ok, "apply without hooks fails")
 
