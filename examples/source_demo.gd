@@ -25,7 +25,7 @@ func _run() -> void:
 	print("dot-map source (VPK, VTF)")
 	_wipe(ROOT)
 	var sections := 4
-	var checks := 47
+	var checks := 48
 	_test_crc()
 	_test_vpk()
 	_test_vtf()
@@ -51,6 +51,10 @@ func _test_crc() -> void:
 		var gz := data.compress(FileAccess.COMPRESSION_GZIP)
 		ok = ok and DotMapVpk.crc32(data) == gz.decode_u32(gz.size() - 8)
 	_c(ok, "it equals the CRC-32 gzip stores, for 1 to 1000 bytes")
+	var big := PackedByteArray()
+	for i in 5003:
+		big.append((i * 131 + 7) & 0xFF)
+	_c(DotMapVpk.crc32(big) == DotMapVpk.crc32_script(big), "the native one (when dot-sim is loaded) equals the script one")
 	_done()
 
 
