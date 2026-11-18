@@ -27,10 +27,11 @@ func _run() -> void:
 	_test_web_root()
 	_test_window()
 	_test_limits()
+	_test_docs()
 	DotMapLocalMaps.zip_cache = cache_was
 	DotMapLocalMaps.zip_max_files = DotMapLocalMaps.ZIP_MAX_FILES
 	_wipe(BASE)
-	_finish(14 + 4 + 16 + 6, 4)
+	_finish(14 + 4 + 16 + 6 + 14, 5)
 
 
 func _make_fixtures() -> void:
@@ -165,6 +166,63 @@ func _test_limits() -> void:
 	r = intake.handle(PackedStringArray([_abs("plain")]))
 	_check((r["added"] as Array).size() == 1 and DirAccess.dir_exists_absolute(BASE.path_join("elsewhere/plain/convert")), "into is where copies go")
 	_check(intake.describe_lines().size() == 3 and intake.describe_lines()[0].contains("search_depth 0 (no limit)"), "describe_lines: %s" % " / ".join(intake.describe_lines()))
+	intake.free()
+	_done()
+
+
+func _test_docs() -> void:
+	_section("documents: a game's own map JSON taken from a file, a folder or a zip (DotMapDocDrop)")
+	var doc := '{"kind":"demo_map","id":"demo_a","name":"Demo A"}'
+	var other := '{"kind":"demo_map","id":"demo_b","name":"Demo B"}'
+	_write_bytes(OUTSIDE.path_join("docs/a.json"), doc.to_utf8_buffer())
+	_write_bytes(OUTSIDE.path_join("docs/sub/b.json"), other.to_utf8_buffer())
+	_write_bytes(OUTSIDE.path_join("docs/notes.json"), '{"kind":"other"}'.to_utf8_buffer())
+	_zip(OUTSIDE.path_join("docs.zip"), {"pack/a.json": doc.to_utf8_buffer(), "pack/b.json": other.to_utf8_buffer(), "../evil.json": doc.to_utf8_buffer()})
+	_zip(OUTSIDE.path_join("onedoc.zip"), {"x/a.json": doc.to_utf8_buffer(), "readme.txt": "hi".to_utf8_buffer()})
+	_zip(OUTSIDE.path_join("nodoc.zip"), {"x/other.json": '{"kind":"other"}'.to_utf8_buffer()})
+	var into := BASE.path_join("docs_into")
+	var kinds := PackedStringArray(["demo_map"])
+	var taken: Array = []
+	var take := func(d: Dictionary, text: String, name: String, to: String) -> Dictionary:
+		taken.append(name)
+		if str(d.get("id", "")) == "demo_b" and name == "b.json" and taken.size() > 100:
+			return {"error": "unreachable"}
+		var path := DotMapDocDrop.write_doc(to, str(d["id"]), text)
+		return {"added": {"id": d["id"], "title": d["name"], "path": path}} if path != "" else {"error": "cannot write"}
+	var r := DotMapDocDrop.accept(_abs("docs/a.json"), into, kinds, 3, take)
+	_check((r["added"] as Array).size() == 1 and FileAccess.file_exists(into.path_join("demo_a.json")), "one dropped document is stored by id: %s" % str(r))
+	r = DotMapDocDrop.accept(_abs("docs"), into, kinds, 3, take)
+	_check((r["added"] as Array).size() == 2 and (r["errors"] as PackedStringArray).is_empty(), "a folder gives its documents, a deeper one included, the other kind left: %s" % str(r))
+	_write_bytes(OUTSIDE.path_join("docs/sub/deeper/c.json"), '{"kind":"demo_map","id":"demo_c","name":"Demo C"}'.to_utf8_buffer())
+	r = DotMapDocDrop.accept(_abs("docs"), into, kinds, 1, take)
+	_check((r["added"] as Array).size() == 2, "depth 1 reaches sub/ and not deeper/: %s" % str(r["added"]))
+	r = DotMapDocDrop.accept(_abs("onedoc.zip"), into, kinds, 3, take)
+	_check((r["added"] as Array).size() == 1 and (r["errors"] as PackedStringArray).is_empty(), "a zip's documents are read in place: %s" % str(r))
+	_check(not DirAccess.dir_exists_absolute(into.path_join("x")), "nothing is unpacked beside them")
+	r = DotMapDocDrop.accept(_abs("docs.zip"), into, kinds, 3, take)
+	_check((r["added"] as Array).size() == 2 and (r["errors"] as PackedStringArray).size() == 1 and (r["errors"] as PackedStringArray)[0].contains("unsafe path"), "an unsafe name in a zip is refused by name, the rest taken: %s" % str(r))
+	r = DotMapDocDrop.accept(_abs("nodoc.zip"), into, kinds, 3, take)
+	_check((r["added"] as Array).is_empty() and (r["errors"] as PackedStringArray).size() == 1 and (r["errors"] as PackedStringArray)[0] == "nodoc.zip: no map document in the zip", "a zip with no document of the kind says so: %s" % str(r))
+	r = DotMapDocDrop.accept(_abs("notes.txt"), into, kinds, 3, take)
+	_check(r.is_empty(), "a path holding none of the kind is not claimed (the intake refuses it)")
+	r = DotMapDocDrop.accept(_abs("zipped.zip"), into, kinds, 3, take)
+	_check((r["errors"] as PackedStringArray).size() == 1, "a zip of a converted mesh map is refused, not silently dropped")
+	DotMapDocDrop.max_doc_bytes = 10
+	r = DotMapDocDrop.accept(_abs("onedoc.zip"), into, kinds, 3, take)
+	_check((r["added"] as Array).is_empty() and (r["errors"] as PackedStringArray)[0].contains("more than max_doc_bytes 10"), "a document over max_doc_bytes is refused, naming the setting: %s" % str(r))
+	DotMapDocDrop.max_doc_bytes = 0
+	r = DotMapDocDrop.accept(_abs("onedoc.zip"), into, kinds, 3, take)
+	_check((r["added"] as Array).size() == 1, "max_doc_bytes 0 is no limit")
+	DotMapDocDrop.max_doc_bytes = 16 * 1024 * 1024
+	var bad := func(_d: Dictionary, _t: String, _n: String, _to: String) -> Dictionary: return {"error": "no spawns"}
+	r = DotMapDocDrop.accept(_abs("docs/a.json"), into, kinds, 3, bad)
+	_check((r["errors"] as PackedStringArray) == PackedStringArray(["a.json: no spawns"]), "the game's reason is kept with the file name")
+	var lines := DotMapDocDrop.lines({"added": [{"title": "Demo A"}, {"name": "Demo B (local)"}], "errors": PackedStringArray(["x.json: no spawns"])}, "Press M.")
+	_check(lines == PackedStringArray(["Added Demo A (local), Demo B (local). Press M.", "Not a map: x.json: no spawns"]), "lines: %s" % str(lines))
+	var intake := _intake(false)
+	intake.add_acceptor("a demo map .json, folder or zip", func(path: String, to: String) -> Dictionary: return DotMapDocDrop.accept(path, to, kinds, intake.search_depth, take))
+	var h := intake.handle(PackedStringArray([_abs("onedoc.zip"), _abs("notes.txt")]))
+	_check((h["added"] as Array).size() == 1 and (h["errors"] as PackedStringArray).size() == 1, "through the intake, a zip is added and a text file refused: %s" % str(h))
 	intake.free()
 	_done()
 

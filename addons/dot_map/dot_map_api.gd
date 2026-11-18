@@ -12,5 +12,6 @@ extends RefCounted
 # 26: DotMapDropIntake (window, exe and --map-path drops, game acceptors, loud refusal); DotMapLocalMaps.zip_max_files, entry_within, zip_problem.
 # 27: decal surface records ("decal": kind) drawn alpha-blended and depth-biased: DotMapBspMesh.DECAL_LOOKS, decal_material, decal_texture, is_decal_material, decal_depth_bias.
 # 28: DotMapVpk (VPK v1/v2 directory-tree reader, CRC-checked), DotMapVtf (VTF to Image, VMT keys, material names) and DotMapVpkWriter (test fixtures) in source/: a player's own Source install read locally, never shipped.
-const LEVEL := 28
+# 29: DotMapDocDrop (the document-pack drop acceptor for games whose maps are JSON documents: a file, folder or zip; write_doc, lines).
+const LEVEL := 29
 const OLDEST := 1
