@@ -122,20 +122,50 @@ func _stay(io: DotMapIO, info: Dictionary) -> void:
 			io.move_body(info.get("body"), v)
 
 
+## trigger_teleport as the engine runs it: the destination is the entity's live [code]target[/code]
+## (SetRemoteDestination and AddOutput re-aim it), found by name ignoring case. Without a landmark the
+## body lands on the destination facing its yaw (spawnflag 32 keeps the body's own yaw); with a
+## landmark it keeps its offset from the landmark and its own yaw, unless UseLandmarkAngles snaps it
+## to the destination's. Velocity is kept either way. A body reports its own yaw (degrees) as
+## [code]yaw[/code] in [param info]; one that does not gets the destination's.
 func _teleport(io: DotMapIO, info: Dictionary) -> void:
 	var dest_name := volume.target
-	if entity != null and dest_name.is_empty():
-		dest_name = entity.key("target")
-	var dest: Variant = io.destinations.get(dest_name)
-	if not dest is Dictionary:
+	if entity != null:
+		var live := entity.key("target")
+		# A converter retarget (retargeted_from) stands while the key still holds what the author wrote.
+		if not live.is_empty() and live != str(volume.record.get("retargeted_from", "")):
+			dest_name = live
+	var dest := _destination(io, dest_name)
+	if dest.is_empty():
 		io.unresolved["teleport:" + dest_name] = int(io.unresolved.get("teleport:" + dest_name, 0)) + 1
 		return
-	var at: Array = (dest as Dictionary)["at"]
+	var at: Array = dest["at"]
 	var pos := Vector3(at[0], at[1], at[2])
-	var yaw := float((dest as Dictionary).get("yaw", 0.0))
+	var yaw := float(dest.get("yaw", 0.0))
 	var landmark := entity.key("landmark") if entity != null else ""
-	if not landmark.is_empty() and io.destinations.get(landmark) is Dictionary:
-		var lm: Array = (io.destinations[landmark] as Dictionary)["at"]
-		pos += (info["position"] as Vector3) - Vector3(lm[0], lm[1], lm[2])
+	if landmark.is_empty():
+		landmark = str(volume.record.get("landmark", ""))
+	var lm := _destination(io, landmark) if not landmark.is_empty() else {}
+	var own_yaw: Variant = info.get("yaw")
+	if not lm.is_empty():
+		var la: Array = lm["at"]
+		pos += (info["position"] as Vector3) - Vector3(la[0], la[1], la[2])
+		var snap := entity.flag("uselandmarkangles") if entity != null else bool(volume.record.get("landmark_angles", false))
+		if not snap and own_yaw != null:
+			yaw = float(own_yaw)
+	elif (volume.spawnflags & 32) != 0 and own_yaw != null:
+		yaw = float(own_yaw)
 	io.move_body(info.get("body"), Transform3D(Basis(Vector3.UP, deg_to_rad(yaw)), pos))
 	io.event("teleport", {"body": info.get("body"), "to": dest_name, "position": pos})
+
+
+## A destination by name as the engine finds it: exact first, then ignoring case.
+static func _destination(io: DotMapIO, name: String) -> Dictionary:
+	var d: Variant = io.destinations.get(name)
+	if d is Dictionary:
+		return d
+	var lo := name.to_lower()
+	for k: Variant in io.destinations:
+		if str(k).to_lower() == lo and io.destinations[k] is Dictionary:
+			return io.destinations[k]
+	return {}

@@ -4,8 +4,8 @@ extends "volumes_parts/tests_office.gd"
 ## gravity, trigger, ladder and water, the effects and sounds, the command allow-list, and Office's timed
 ## hurt reproduced from its own links.
 
-const CHECKS := 172
-const SECTIONS := 17
+const CHECKS := 180
+const SECTIONS := 18
 
 
 func _ready() -> void:
@@ -19,6 +19,7 @@ func _run() -> void:
 	_test_hurt_model_and_kind()
 	_test_triggers()
 	_test_push_teleport_gravity()
+	_test_teleport_engine()
 	_test_boxes()
 	_test_effects_sounds()
 	_test_commands()
@@ -245,6 +246,54 @@ func _test_push_teleport_gravity() -> void:
 	vols.step([_body(1, Vector3(31, 0, 1))])
 	vols.step([_body(1, Vector3(50, 0, 1))])
 	_check(events.size() == 2 and events[0][1]["scale"] == 0.25 and events[1][1]["scale"] == 1.0, "gravity: the scale on entry and back to 1 on leaving: %s" % [events.size()])
+	_done()
+
+
+func _test_teleport_engine() -> void:
+	_section("teleports as the engine runs them: names ignore case, re-aiming, landmark angles, kept yaw")
+	var w := _world([
+		_rec(0, "trigger_teleport", "tp", [["target", "orange"]]),
+		_rec(1, "logic_relay", "aim", [], [["OnTrigger", "tp", "SetRemoteDestination", "spot2"]]),
+		_rec(2, "trigger_teleport", "lmsnap", [["target", "far"], ["landmark", "LM"], ["UseLandmarkAngles", "1"]]),
+		_rec(3, "trigger_teleport", "lmkeep", [["target", "far"], ["landmark", "lm"]]),
+		_rec(4, "trigger_teleport", "keep", [["target", "far"], ["spawnflags", "33"]]),
+	], [
+		_vol(0, "teleport", "trigger_teleport", Vector3(0, 0, 0), Vector3(2, 2, 2), {"target": "Orange"}),
+		_vol(2, "teleport", "trigger_teleport", Vector3(20, 0, 0), Vector3(22, 2, 2), {"target": "far"}),
+		_vol(3, "teleport", "trigger_teleport", Vector3(30, 0, 0), Vector3(32, 2, 2), {"target": "far"}),
+		_vol(4, "teleport", "trigger_teleport", Vector3(40, 0, 0), Vector3(42, 2, 2), {"target": "far", "spawnflags": 33}),
+	])
+	var io: DotMapIO = w[0]
+	var vols: DotMapVolumes = w[1]
+	io.destinations = {"Orange": {"at": [10.0, 0.0, 0.0], "yaw": 45.0}, "spot2": {"at": [50.0, 0.0, 0.0], "yaw": 180.0},
+			"lm": {"at": [20.0, 0.0, 0.0], "yaw": 0.0}, "far": {"at": [300.0, 0.0, 0.0], "yaw": 30.0}}
+	var moves: Array = []
+	io.move_fn = func(_body: Variant, motion: Variant) -> void: moves.append(motion)
+	var yawed := func(id: int, at: Vector3) -> Dictionary: return _body(id, at).merged({"yaw": 120.0})
+	vols.step([_body(1, Vector3(1, 0, 1))])
+	_check(moves.size() == 1 and (moves[0] as Transform3D).origin == Vector3(10, 0, 0), "a target in another case finds its destination: %s" % [moves])
+	io.send("aim", "Trigger")
+	io.advance(1)
+	_check(io.find("tp")[0].key("target") == "spot2" and io.coverage()["unhandled"].is_empty(), "SetRemoteDestination re-aims the teleport: %s" % [io.coverage()["unhandled"]])
+	moves.clear()
+	vols.step([_body(2, Vector3(1, 0, 1))])
+	_check(moves.size() == 1 and (moves[0] as Transform3D).origin == Vector3(50, 0, 0), "and the next body lands on the new destination: %s" % [moves])
+	moves.clear()
+	vols.step([yawed.call(3, Vector3(21, 0, 1))])
+	var t: Transform3D = moves[0]
+	_check(t.origin == Vector3(301, 0, 1) and is_equal_approx(t.basis.get_euler().y, deg_to_rad(30.0)), "UseLandmarkAngles (landmark named in another case) snaps to the destination's yaw")
+	moves.clear()
+	vols.step([yawed.call(4, Vector3(31, 0, 1))])
+	t = moves[0]
+	_check(is_equal_approx(t.basis.get_euler().y, deg_to_rad(120.0)), "a landmark without it keeps the body's own yaw: %s" % [rad_to_deg(t.basis.get_euler().y)])
+	moves.clear()
+	vols.step([yawed.call(5, Vector3(41, 0, 1))])
+	t = moves[0]
+	_check(t.origin == Vector3(300, 0, 0) and is_equal_approx(t.basis.get_euler().y, deg_to_rad(120.0)), "spawnflag 32 keeps the body's yaw on a plain teleport")
+	moves.clear()
+	vols.step([_body(6, Vector3(41, 0, 1))])
+	_check(is_equal_approx((moves[0] as Transform3D).basis.get_euler().y, deg_to_rad(30.0)), "a body that reports no yaw gets the destination's")
+	io.move_fn = Callable()
 	_done()
 
 

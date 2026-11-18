@@ -99,6 +99,7 @@ func _init() -> void:
 		"logic_relay": DotMapRelay, "logic_timer": DotMapTimer, "math_counter": DotMapCounter,
 		"logic_case": DotMapCase, "logic_compare": DotMapCompare, "logic_branch": DotMapBranch,
 		"logic_auto": DotMapAuto, "trigger_multiple": DotMapTrigger, "trigger_once": DotMapTrigger,
+		"trigger_teleport": DotMapTeleport,
 		"lua_run": DotMapScript, "point_servercommand": DotMapServerCommand, "point_clientcommand": DotMapClientCommand,
 		"func_brush": DotMapToggleBrush, "func_wall_toggle": DotMapToggleBrush, "func_illusionary": DotMapToggleBrush,
 		"func_breakable": DotMapBreakable, "func_breakable_surf": DotMapBreakable,
