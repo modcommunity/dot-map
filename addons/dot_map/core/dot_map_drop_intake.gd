@@ -35,6 +35,14 @@ var value_flags := PackedStringArray(ENGINE_VALUE_FLAGS)
 ## The explicit option: [code]--map-path=<path>[/code] or [code]--map-path <path>[/code], a path that must exist.
 var path_flag := "--map-path"
 
+## The game's own config option prefixes (`--zz-`, say): such an option and its value are never read as a dropped path.
+## `--<addon>.<key> <value>` is always skipped. See [method strip_config_args].
+var config_prefixes := PackedStringArray()
+
+## [code]func(prefix: String, stem: String) -> bool[/code]: whether the config option [code]<prefix><stem>[/code] takes the
+## next argument as its value. Empty: it does when that argument is not an option. [method config_takes_value] answers it from a config.
+var option_takes_value := Callable()
+
 ## The last [method handle] result, and running totals for [method describe_lines].
 var last_result := {}
 var drops := 0
@@ -147,13 +155,51 @@ func take_cmdline(args: PackedStringArray = PackedStringArray(), use_process_arg
 	if use_process_args and args.is_empty():
 		all = OS.get_cmdline_args()
 		all.append_array(OS.get_cmdline_user_args())
-	var found := paths_in_args(all, value_flags, path_flag)
-	var paths: PackedStringArray = found["paths"]
-	var missing: PackedStringArray = found["missing"]
-	if paths.is_empty() and missing.is_empty():
+	var paths := paths_in(all)
+	if paths.is_empty():
 		return {}
-	paths.append_array(missing)
 	return handle(paths, "command line")
+
+
+## The dropped paths in [param args] ([method paths_in_args] after [method strip_config_args] with [member config_prefixes]):
+## every path that exists, every flag value, and every absolute path that does not exist (handled as not found).
+func paths_in(args: PackedStringArray) -> PackedStringArray:
+	var found := paths_in_args(strip_config_args(args, config_prefixes, option_takes_value), value_flags, path_flag)
+	var paths: PackedStringArray = found["paths"]
+	paths.append_array(found["missing"] as PackedStringArray)
+	return paths
+
+
+## [param args] without the game's config options and their values (`<prefix><key> <value>`, and `--<addon>.<key> <value>`): a value
+## that happens to be a folder is not a dropped map. [param takes_value] is [member option_takes_value]; with none, an
+## option without `=` takes the next argument unless that is an option itself.
+static func strip_config_args(args: PackedStringArray, prefixes: PackedStringArray, takes_value: Callable = Callable()) -> PackedStringArray:
+	var out := PackedStringArray()
+	var i := 0
+	while i < args.size():
+		var a := args[i]
+		i += 1
+		var prefix := ""
+		for p in prefixes:
+			if a.begins_with(p):
+				prefix = p
+				break
+		if prefix != "" or (a.begins_with("--") and a.get_slice("=", 0).contains(".")):
+			var value := not a.contains("=") and i < args.size() and not args[i].begins_with("--")
+			if value and prefix != "" and takes_value.is_valid():
+				value = bool(takes_value.call(prefix, a.trim_prefix(prefix)))
+			if value:
+				i += 1
+			continue
+		out.append(a)
+	return out
+
+
+## Whether [param stem] names a non-boolean key of [param config] (a dot-core [code]DotConfig[/code]): a bare boolean option is a
+## switch, so the argument after it is not its value, nor after an unknown key.
+static func config_takes_value(config: Object, stem: String) -> bool:
+	var key := str(config.call(&"_match_key", stem, config.call(&"config_keys")))
+	return key != "" and typeof(config.get(key)) != TYPE_BOOL
 
 
 ## True for a connect address or URL handed to the process (`wss://host:6100/`, `https://...`, `host:6100`): never a dropped

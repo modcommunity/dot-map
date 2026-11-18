@@ -31,7 +31,7 @@ func _run() -> void:
 	DotMapLocalMaps.zip_cache = cache_was
 	DotMapLocalMaps.zip_max_files = DotMapLocalMaps.ZIP_MAX_FILES
 	_wipe(BASE)
-	_finish(14 + 4 + 16 + 6 + 14, 5)
+	_finish(18 + 4 + 16 + 6 + 14, 5)
 
 
 func _make_fixtures() -> void:
@@ -84,7 +84,36 @@ func _test_args() -> void:
 	_check((r["errors"] as PackedStringArray).size() == 1 and (r["errors"] as PackedStringArray)[0] == "map.zip: not found", "a missing one is refused by name: %s" % str(r["errors"]))
 	_check(_results.size() == 1, "handled emitted once")
 	intake.free()
+	_test_config_options(plain)
 	_done()
+
+
+## A fake dot-core config: `--demo-title <value>` takes a value, `--demo-loud` is a bool switch.
+class FakeConfig:
+	var title := ""
+	var loud := false
+
+	func config_keys() -> PackedStringArray:
+		return PackedStringArray(["title", "loud"])
+
+	func _match_key(raw: String, keys: PackedStringArray) -> String:
+		return raw if keys.has(raw) else ""
+
+
+func _test_config_options(plain: String) -> void:
+	var config := FakeConfig.new()
+	var intake := _intake()
+	intake.config_prefixes = PackedStringArray(["--demo-"])
+	intake.option_takes_value = func(_prefix: String, stem: String) -> bool: return DotMapDropIntake.config_takes_value(config, stem)
+	var args := PackedStringArray(["--demo-title", plain, "--demo-loud", plain, "--demo-unknown", plain, "--other.key", plain, "--demo-title=" + plain, "x"])
+	var stripped := DotMapDropIntake.strip_config_args(args, intake.config_prefixes, intake.option_takes_value)
+	_check(stripped == PackedStringArray([plain, plain, "x"]),
+			"a valued option eats its folder, a bool switch and an unknown key do not, `--addon.key v` and `--k=v` go: %s" % str(stripped))
+	_check(intake.paths_in(args) == PackedStringArray([plain, plain]), "paths_in reads what is left that exists")
+	_check(DotMapDropIntake.strip_config_args(args, PackedStringArray(["--demo-"])).size() == 1, "with no takes_value every option without = eats a non-option argument")
+	var r := intake.take_cmdline(PackedStringArray(["--demo-title", plain, "--demo-loud"]))
+	_check(r.is_empty(), "a folder that is a config value is not a drop")
+	intake.free()
 
 
 func _test_web_root() -> void:
