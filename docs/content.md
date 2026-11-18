@@ -57,6 +57,14 @@ On the web, a drop works the same way. The browser copies the dropped files (a f
 
 A local map named `<map>_orig` (what `dot-map-convert` `regen --orig-textures` writes, internal only) is an original pack: `DotMapLocalMaps.is_original(entry)` says so and `surfaces_for(entry)` returns a `DotMapSurfaces` with `use_original_textures` on, so the map is drawn with its own textures at its own UVs; a game drawing through `DotMapDrawnWorld.attach` passes `{"original_textures": DotMapLocalMaps.is_original(entry)}` for the same. Any other local map, and every packed or delivered map, keeps the free textures; original textures are never published.
 
+## Reading a Source install: VPK, VTF, VMT
+
+`DotMapVpk`, `DotMapVtf` and `DotMapVpkWriter` (`addons/dot_map/source/`) read a player's own Source game archives. They are readers only: nothing from an install is stored in a repository or a pack, and callers cache decoded results under `user://`.
+
+- `DotMapVpk.new().open("<game>/tf2_textures_dir.vpk")` parses the v1 or v2 tree (an optional `only_ext` list skips other extensions), `read(path)` returns the preload plus the stored bytes, CRC-checked (`verify_crc := false` to skip). A bad CRC, a missing `_NNN.vpk` part, a truncated file or an unknown version sets `error` and returns empty; nothing is capped.
+- `DotMapVtf.image(bytes, max_side)` picks the largest mip that fits. An unsupported format sets `DotMapVtf.error` and returns null.
+- Measured on a real `tf2_textures_dir.vpk` (CPU, headless): 29,669 entries parse in about 70 ms; CRC-32 costs about 14 ms per MB (slicing-by-8 in GDScript, 1.7x the byte loop); 400 textures (95.5 MB) read and CRC-checked in about 2.0 s, decoded in 0.13 s. CRC dominates, so a native CRC-32 in dot-sim-gdext is the next step (board).
+
 ## Deliberately not here
 
 - **A map downloader UI.** `fetching` says a fetch has started; dot-cloud reports progress; drawing a bar is the game's.

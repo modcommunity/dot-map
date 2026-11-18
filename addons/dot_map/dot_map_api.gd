@@ -11,5 +11,6 @@ extends RefCounted
 # 25: DotMapSurfaces.shrink_textures_headless (default on): headless, a kind's textures load as 4x4 downsamples.
 # 26: DotMapDropIntake (window, exe and --map-path drops, game acceptors, loud refusal); DotMapLocalMaps.zip_max_files, entry_within, zip_problem.
 # 27: decal surface records ("decal": kind) drawn alpha-blended and depth-biased: DotMapBspMesh.DECAL_LOOKS, decal_material, decal_texture, is_decal_material, decal_depth_bias.
-const LEVEL := 27
+# 28: DotMapVpk (VPK v1/v2 directory-tree reader, CRC-checked), DotMapVtf (VTF to Image, VMT keys, material names) and DotMapVpkWriter (test fixtures) in source/: a player's own Source install read locally, never shipped.
+const LEVEL := 28
 const OLDEST := 1
