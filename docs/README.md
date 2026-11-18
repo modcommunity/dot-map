@@ -12,6 +12,7 @@ The reasoning behind maps as content, one subject per file. [CLAUDE.md](../CLAUD
 | [brushes.md](brushes.md) | `DotMapBrush`: map-building solids as data, convex collision, UVs in metres |
 | [brush-entities.md](brush-entities.md) | The converter's doors, buttons, lifts, triggers and output links as manifest data, and `DotMapEntities` reading them |
 | [converter-v2.md](converter-v2.md) | The next converter: a lossless store of each source map, a replacement layer with a coverage report, the entity-class library and the I/O runtime, and the migration plan |
+| [fidelity-audit.md](fidelity-audit.md) | Every source BSP's gameplay fidelity: entity classes implemented / approximated / ignored / unknown, each loss as a finding, per-map numbers, how to regenerate |
 | [map-config.md](map-config.md) | `DotMapConfig`: per-map settings files with wildcards, the whitelist, applying on load and restoring on the next map, and the converter's starter file |
 | [io.md](io.md) | `DotMapIO`: the queue, the tick, delays and fire-once counts, the logic classes, the loop guard, a game's handlers and callables, recorded commands, Office's timed hazard as the test |
 | [nav-links.md](nav-links.md) | `DotMapNavLinks`: closed doors and teleports with their openers, as data for a navigation bake or an AI |
