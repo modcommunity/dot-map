@@ -12,6 +12,14 @@ const KIND_FLAG := {"player": 1, "npc": 2, "pushable": 4, "physics": 8}
 var volume: DotMapVolume
 var entity: DotMapEntity = null
 var inside: Dictionary = {}
+## Parent follow: the movers the volume hangs from (nearest first) for the parent name in [member _parent_of],
+## and their pose when it was attached (identity for the map's own parent, the pose then for a SetParent).
+var _parent_of := "\u0001"
+var _chain: Array[DotMapMoverNode] = []
+var _attach := Transform3D.IDENTITY
+## The parent's motion this step: brush frame to world, and back. Identity when nothing carries the volume.
+var _frame := Transform3D.IDENTITY
+var _inv := Transform3D.IDENTITY
 
 
 func _init(v: DotMapVolume, e: DotMapEntity) -> void:
@@ -33,15 +41,17 @@ func active() -> bool:
 func step(io: DotMapIO, bodies: Array) -> void:
 	var now_in := {}
 	if active():
+		_follow(io)
+		var turned := not _frame.basis.is_equal_approx(Basis.IDENTITY)
 		# A body whose column lies outside the volume's box touches none of it: most volumes of a map are far from most
 		# bodies, and the exact test below costs a call per brush plane.
-		var culls := volume.culls_columns()
+		var culls := volume.culls_columns() and not turned
 		var box := volume.column_box()
 		var lo := box.position
 		var hi := box.end
 		for info: Dictionary in bodies:
 			if culls:
-				var at: Vector3 = info["position"]
+				var at: Vector3 = (info["position"] as Vector3) - _frame.origin
 				if at.x < lo.x or at.x > hi.x or at.z < lo.z or at.z > hi.z or at.y > hi.y \
 						or at.y + float(info.get("height", 1.8)) < lo.y:
 					continue
@@ -67,7 +77,55 @@ func step(io: DotMapIO, bodies: Array) -> void:
 
 
 func _touches(info: Dictionary) -> bool:
-	return volume.touches_column(info["position"], float(info.get("height", 1.8)))
+	if _frame == Transform3D.IDENTITY:
+		return volume.touches_column(info["position"], float(info.get("height", 1.8)))
+	var feet := (info["position"] as Vector3) - Vector3(0.0, DotMapVolume.COLUMN_SLACK, 0.0)
+	var span := Vector3(0.0, float(info.get("height", 1.8)) + DotMapVolume.COLUMN_SLACK, 0.0)
+	return volume.touches_segment(_inv * feet, _inv.basis * span)
+
+
+## A volume parented to a door, lift, train or spinner goes where it goes, as in the engine: the brushes stay in
+## their own frame and each body is looked at from it. The chain is walked through parents that do not move
+## themselves (a func_brush on a train) and composed nearest first. Found again only when the parent name changes.
+func _follow(io: DotMapIO) -> void:
+	var pname := entity.parentname if entity != null else str(volume.record.get("parentname", ""))
+	if pname != _parent_of:
+		_parent_of = pname
+		_chain = _movers_above(io, pname)
+		_attach = Transform3D.IDENTITY
+		var original := str(volume.record.get("parentname", entity.record.get("parentname", "") if entity != null else ""))
+		if pname.to_lower() != original.to_lower():
+			_attach = _pose(io)    # SetParent: the volume keeps where it is now and moves from here
+	if _chain.is_empty():
+		_frame = Transform3D.IDENTITY
+		_inv = _frame
+		return
+	_frame = _pose(io) * _attach.affine_inverse()
+	_inv = _frame.affine_inverse()
+
+
+func _pose(io: DotMapIO) -> Transform3D:
+	var t := Transform3D.IDENTITY
+	for m in _chain:
+		if m.alive:
+			t = m.pose_delta(io.now, io.rate) * t
+	return t
+
+
+static func _movers_above(io: DotMapIO, pname: String) -> Array[DotMapMoverNode]:
+	var out: Array[DotMapMoverNode] = []
+	var seen := {}
+	var name := pname.strip_edges().split(",", false, 1)[0] if not pname.strip_edges().is_empty() else ""
+	while not name.is_empty() and not seen.has(name.to_lower()):
+		seen[name.to_lower()] = true
+		var found := io.find(name)
+		if found.is_empty():
+			break
+		var p: DotMapEntity = found[0]
+		if p is DotMapMoverNode:
+			out.append(p)
+		name = p.parentname.split(",", false, 1)[0] if not p.parentname.is_empty() else ""
+	return out
 
 
 func _admits(io: DotMapIO, info: Dictionary) -> bool:
@@ -118,6 +176,7 @@ func _stay(io: DotMapIO, info: Dictionary) -> void:
 		entity.body_inside(io, info)
 	if volume.kind == "push":
 		var v := volume.push_velocity() if not entity is DotMapPush else (entity as DotMapPush).velocity()
+		v = _frame.basis * v    # a parent that turned the volume turned its push
 		if v != Vector3.ZERO:
 			io.move_body(info.get("body"), v)
 

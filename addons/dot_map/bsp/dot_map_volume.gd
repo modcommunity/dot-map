@@ -142,8 +142,12 @@ func column_box() -> AABB:
 ## test of a segment against each convex brush, so a slab thinner than the points [method contains]
 ## samples (a belt laid flat on a floor) still catches a body standing on it.
 func touches_column(feet: Vector3, height: float) -> bool:
-	var from := feet - Vector3(0.0, COLUMN_SLACK, 0.0)
-	var span := Vector3(0.0, height + COLUMN_SLACK, 0.0)
+	return touches_segment(feet - Vector3(0.0, COLUMN_SLACK, 0.0), Vector3(0.0, height + COLUMN_SLACK, 0.0))
+
+
+## Whether the segment from [param from] along [param span] touches any brush (a column seen from a volume that a
+## parent has turned is no longer vertical in the brushes' own frame).
+func touches_segment(from: Vector3, span: Vector3) -> bool:
 	for planes: Array in _brushes:
 		var t0 := 0.0
 		var t1 := 1.0

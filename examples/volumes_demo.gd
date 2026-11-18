@@ -4,8 +4,8 @@ extends "volumes_parts/tests_office.gd"
 ## gravity, trigger, ladder and water, the effects and sounds, the command allow-list, and Office's timed
 ## hurt reproduced from its own links.
 
-const CHECKS := 180
-const SECTIONS := 18
+const CHECKS := 186
+const SECTIONS := 19
 
 
 func _ready() -> void:
@@ -20,6 +20,7 @@ func _run() -> void:
 	_test_triggers()
 	_test_push_teleport_gravity()
 	_test_teleport_engine()
+	_test_parented_volumes()
 	_test_boxes()
 	_test_effects_sounds()
 	_test_commands()
@@ -248,6 +249,52 @@ func _test_push_teleport_gravity() -> void:
 	_check(events.size() == 2 and events[0][1]["scale"] == 0.25 and events[1][1]["scale"] == 1.0, "gravity: the scale on entry and back to 1 on leaving: %s" % [events.size()])
 	_done()
 
+
+
+func _test_parented_volumes() -> void:
+	_section("a volume parented to a door or spinner goes where its parent goes; SetParent keeps where it is")
+	var door := {"entity": 0, "model": 1, "kind": "slide", "classname": "func_door", "targetname": "slab",
+			"direction": [1, 0, 0], "distance": 10.0, "travel_time": 1.0, "wait": -1.0, "origin": [0, 0, 0]}
+	var lava := _rec(1, "trigger_hurt", "lava", [["damage", "20"]])
+	lava["parentname"] = "slab"
+	var blade := _rec(3, "trigger_hurt", "blade", [["damage", "5"]])
+	blade["parentname"] = "rot"
+	var w := _world([_rec(0, "func_door", "slab"), lava, _rec(2, "func_rotating", "rot"), blade,
+			_rec(4, "trigger_hurt", "late", [["damage", "7"]])], [
+		_vol(1, "hurt", "trigger_hurt", Vector3(0, 0, -1), Vector3(2, 2, 1)),
+		_vol(3, "hurt", "trigger_hurt", Vector3(4, 0, -1), Vector3(6, 2, 1)),
+		_vol(4, "hurt", "trigger_hurt", Vector3(20, 0, -1), Vector3(22, 2, 1)),
+	], 20)
+	var io: DotMapIO = w[0]
+	var vols: DotMapVolumes = w[1]
+	io.bind_movers([DotMapMover.from_record(door), DotMapMover.from_record({"entity": 2, "model": 2, "kind": "spin",
+			"classname": "func_rotating", "axis": [0, 1, 0], "degrees_per_second": 90.0, "origin": [0, 0, 0]})])
+	var hits: Array = []    # a hit is damage x hurtrate (0.5 s): 10, 2.5 and 3.5
+	io.damage_fn = func(_b: Variant, amount: float, _k: String, _a: Variant) -> void: hits.append(amount)
+	io.start()
+	var ids := [100]
+	var probe := func(at: Vector3) -> Array:
+		hits.clear()
+		ids[0] += 1
+		vols.step([_body(ids[0], at)])
+		vols.step([])
+		return hits.duplicate()
+	_check((probe.call(Vector3(1, 0, 0)) as Array).has(10.0), "at rest the parented volume is where the map drew it")
+	io.send("slab", "Open")
+	_run_ticks(io, vols, 25, func(_t: int) -> Array: return [])
+	_check(not (probe.call(Vector3(1, 0, 0)) as Array).has(10.0), "the door slid 10 m: nothing is left where the volume was")
+	_check((probe.call(Vector3(11, 0, 0)) as Array).has(10.0), "and the volume hurts where the door took it")
+	io.send("rot", "Start")
+	_run_ticks(io, vols, 20, func(_t: int) -> Array: return [])
+	var spinner := io.entity_of(2) as DotMapMoverNode
+	var turned := spinner.pose_delta(io.now, io.rate) * Vector3(5, 0, 0)
+	_check(turned.distance_to(Vector3(5, 0, 0)) > 3.0 and (probe.call(turned) as Array).has(2.5)
+			and not (probe.call(Vector3(5, 0, 0)) as Array).has(2.5), "a blade on a spinner turns with it: %s" % [turned])
+	io.send("late", "SetParent", "slab")
+	io.send("slab", "Close")
+	_run_ticks(io, vols, 25, func(_t: int) -> Array: return [])
+	_check((probe.call(Vector3(11, 0, 0)) as Array).has(3.5), "SetParent on an open door: the volume moves back with it as it closes")
+	_check(not (probe.call(Vector3(21, 0, 0)) as Array).has(3.5), "and is no longer where it was drawn")
 
 func _test_teleport_engine() -> void:
 	_section("teleports as the engine runs them: names ignore case, re-aiming, landmark angles, kept yaw")
