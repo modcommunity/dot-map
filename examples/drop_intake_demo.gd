@@ -30,7 +30,7 @@ func _run() -> void:
 	DotMapLocalMaps.zip_cache = cache_was
 	DotMapLocalMaps.zip_max_files = DotMapLocalMaps.ZIP_MAX_FILES
 	_wipe(BASE)
-	_finish(13 + 4 + 16 + 6, 4)
+	_finish(14 + 4 + 16 + 6, 4)
 
 
 func _make_fixtures() -> void:
@@ -63,6 +63,9 @@ func _test_args() -> void:
 	got = DotMapDropIntake.paths_in_args(PackedStringArray(["/no/such/folder", "pg_flatgrass", "res://main.tscn", "user://x", "--solo-map=pg", "--", "++"]))
 	_check((got["paths"] as PackedStringArray).is_empty() and got["missing"] == PackedStringArray(["/no/such/folder"]),
 			"a missing absolute path is reported, a bare word and engine paths are not: %s" % str(got))
+	got = DotMapDropIntake.paths_in_args(PackedStringArray(["wss://tmcdev.net:6100/", "ws://127.0.0.1:6100", "https://x.net/a", "tmcdev.net:6100", plain]))
+	_check(got["paths"] == PackedStringArray([plain]) and (got["missing"] as PackedStringArray).is_empty(),
+			"a connect URL or host:port is not a path, so never 'missing': %s" % str(got))
 	got = DotMapDropIntake.paths_in_args(PackedStringArray(["--config", plain]))
 	_check(got["paths"] == PackedStringArray([plain]), "an option the list does not know is a switch, so its next word is read")
 	got = DotMapDropIntake.paths_in_args(PackedStringArray(["--config", plain]), PackedStringArray(["--config"]))

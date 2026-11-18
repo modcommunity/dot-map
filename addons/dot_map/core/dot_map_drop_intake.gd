@@ -156,6 +156,18 @@ func take_cmdline(args: PackedStringArray = PackedStringArray(), use_process_arg
 	return handle(paths, "command line")
 
 
+## True for a connect address or URL handed to the process (`wss://host:6100/`, `https://...`, `host:6100`): never a dropped
+## path. `file://` is a path and is not one.
+static func is_url_arg(arg: String) -> bool:
+	if arg.contains("://"):
+		return not arg.to_lower().begins_with("file://")
+	var colon := arg.rfind(":")
+	if colon <= 0 or arg.contains("/") or arg.contains("\\"):
+		return false
+	var port := arg.substr(colon + 1)
+	return port.is_valid_int() and not arg.substr(0, colon).contains(":")
+
+
 ## The paths in [param args]: every [param flag] value, and every argument that is not an option, not an option's value
 ## ([param value_flags_in], the engine's when empty), not a [code]res://[/code]/[code]user://[/code] path, and names an existing file or folder.
 ## [code]{paths, missing}[/code]: missing is a flag value or an absolute path that does not exist (an error, not ignored).
@@ -178,7 +190,7 @@ static func paths_in_args(args: PackedStringArray, value_flags_in: PackedStringA
 			if not arg.contains("=") and flags.has(arg):
 				i += 1
 			continue
-		elif arg.begins_with("res://") or arg.begins_with("user://") or arg == "--" or arg == "++":
+		elif arg.begins_with("res://") or arg.begins_with("user://") or arg == "--" or arg == "++" or is_url_arg(arg):
 			continue
 		else:
 			var local := _local_path(arg)
