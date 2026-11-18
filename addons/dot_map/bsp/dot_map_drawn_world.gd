@@ -32,6 +32,7 @@ static func read(prefix: String, cloud: Object = null) -> DotResult:
 
 ## Draws [param world] under [param parent]. [code]options.original_textures[/code] (default false) draws the map's own
 ## textures ([member DotMapSurfaces.use_original_textures]); pass [method DotMapLocalMaps.is_original] of a local entry, never true for a published map.
+## [code]options.props[/code] draws the pack's props; [code]options.batch_props[/code] (default false: no measured gain on Fork yet) draws the static ones in batches ([DotMapPropBatch]: [code]batch_cell[/code], [code]batch_max_tris[/code], [code]instance_cell[/code]).
 static func attach(parent: Node3D, world: DotMapBspMesh, options: Dictionary = {}) -> DotMapDrawnWorld:
 	var surfaces := _surfaces_for(world, options)
 	var node := world.build_node(surfaces.world_material_for(world, world.source_path.get_base_dir()))
@@ -159,10 +160,17 @@ static func _add_props(world: DotMapBspMesh, options: Dictionary, node: Node3D, 
 	if not is_instance_valid(node):
 		props.free()
 		return
-	if props.get_child_count() > 0:
-		node.add_child(props)
-	else:
+	if props.get_child_count() == 0:
 		props.free()
+		return
+	# Static props drawn in batches: small ones baked per cell, copies of larger ones instanced (DotMapPropBatch).
+	if bool(options.get("batch_props", false)):
+		var batcher := DotMapPropBatch.new()
+		batcher.cell = float(options.get("batch_cell", batcher.cell))
+		batcher.max_tris = int(options.get("batch_max_tris", batcher.max_tris))
+		batcher.instance_cell = float(options.get("instance_cell", batcher.instance_cell))
+		batcher.batch(props)
+	node.add_child(props)
 
 
 static func _add_lit(parent: Node3D, world: DotMapBspMesh, options: Dictionary, surfaces: DotMapSurfaces, node: Node3D, drawn: DotMapDrawnWorld) -> void:

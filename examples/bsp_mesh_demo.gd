@@ -1,9 +1,9 @@
-extends "bsp_mesh_parts/tests_terrain.gd"
+extends "bsp_mesh_parts/tests_batch.gd"
 
 ## [DotMapBspMesh]: the converter's fixture read, built, and ray-cast.
 
-const CHECKS := 184
-const SECTIONS := 15
+const CHECKS := 197
+const SECTIONS := 17
 const FIXTURE := "res://examples/bsp_mesh/fixture"
 const GLASS := "res://examples/bsp_mesh/glass"
 const U := 0.01905
@@ -26,8 +26,10 @@ func _run() -> void:
 		await _test_fence()
 		await _test_legacy_split()
 		await _test_async_build(world)
+		_test_chunk_merge(world)
 	_test_terrain()
 	_test_mesh_lods()
+	_test_prop_batch()
 	var lit_world := _test_lightmap()
 	if world != null and lit_world != null:
 		_test_drawn(world, lit_world)

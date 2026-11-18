@@ -26,6 +26,13 @@ var prop_view_per_metre: float = 60.0
 var prop_view_min: float = 30.0
 ## Workers for the pure-CPU build stages ([code]map_load_threads[/code]): 0 inline, -1 automatic, never on the web. The output is identical.
 var load_threads: int = DotMapParallelBuild.default_workers
+## Converter cells (16 m) per drawn chunk along each axis: a chunk costs a draw per material plus a shadow proxy, so merging n x n x n cells draws the same triangles with far fewer draws.
+## 1 keeps the converter's cells; 0 picks the smallest n leaving a model at most [member chunk_target] chunks, so a small map keeps its fine cells (and PVS culling).
+var chunk_merge: int = 0
+## The most drawn chunks per model [code]chunk_merge = 0[/code] aims for; 0 never merges.
+var chunk_target: int = 512
+var _merge_n: int = 1
+var _merge_low: Array = []
 
 var _blob: PackedByteArray = PackedByteArray()
 var _movers: Dictionary = {}
@@ -455,12 +462,68 @@ func _decal_for(rec: Dictionary, material_for: Callable) -> Material:
 	return decal_material(StringName(str(rec["decal"])), rec.get("colour", []))
 
 
+## A converter chunk's coordinates in drawn chunks ([member chunk_merge] cells each way, counted from the model's lowest
+## cell so a map straddling the origin merges like any other); others pass through.
+func merged_chunk(chunk: Variant) -> Variant:
+	return _merged_by(chunk, chunk_merge if chunk_merge > 0 else _merge_n, _merge_low)
+
+
+static func _merged_by(chunk: Variant, n: int, low: Array) -> Variant:
+	if n <= 1 or not chunk is Array:
+		return chunk
+	var out := []
+	for i in (chunk as Array).size():
+		var v: Variant = chunk[i]
+		var lo: int = low[i] if i < low.size() else 0
+		out.append(floori(float(int(v) - lo) / n) if (v is int or v is float) else v)
+	return out
+
+
+## The lowest converter cell of [param model] on each axis.
+func _low_cell(model: int) -> Array:
+	var low := []
+	for rec: Dictionary in surfaces:
+		if int(rec["model"]) != model or not rec.get("chunk") is Array:
+			continue
+		var c: Array = rec["chunk"]
+		for i in c.size():
+			if not (c[i] is int or c[i] is float):
+				continue
+			if i >= low.size():
+				low.resize(i + 1)
+				low[i] = int(c[i])
+			low[i] = mini(low[i] if low[i] != null else int(c[i]), int(c[i]))
+	return low
+
+
+## The merge factor [code]chunk_merge = 0[/code] uses for [param model]: the smallest that leaves at most [member chunk_target] chunks.
+func auto_merge(model: int) -> int:
+	if chunk_target <= 0:
+		return 1
+	var low := _low_cell(model)
+	var cells := {}
+	for rec: Dictionary in surfaces:
+		if int(rec["model"]) == model:
+			cells[str(rec.get("chunk", []))] = rec.get("chunk", [])
+	var n := 1
+	while n < 64:
+		var merged := {}
+		for c: Variant in cells.values():
+			merged[str(_merged_by(c, n, low))] = true
+		if merged.size() <= chunk_target:
+			break
+		n += 1
+	return n
+
+
 func _chunk_groups(model: int) -> Dictionary:
+	_merge_n = auto_merge(model) if chunk_merge <= 0 else chunk_merge
+	_merge_low = _low_cell(model)
 	var groups := {}
 	for rec: Dictionary in surfaces:
 		if int(rec["model"]) != model:
 			continue
-		var key := "%s|%s|%s" % [str(rec.get("chunk", [])), rec.get("sky3d", false), rec.has("glass")]
+		var key := "%s|%s|%s" % [str(merged_chunk(rec.get("chunk", []))), rec.get("sky3d", false), rec.has("glass")]
 		if rec.has("decal"):
 			key += "|decal"
 		if not groups.has(key):
@@ -510,7 +573,7 @@ func _mesh_add(planned: Dictionary, item: Array, arrays: Array, out: Array[Dicti
 		state["key"] = key
 		mesh = ArrayMesh.new()
 		state["mesh"] = mesh
-		out.append({"mesh": mesh, "chunk": first.get("chunk", []), "sky3d": bool(first.get("sky3d", false)),
+		out.append({"mesh": mesh, "chunk": merged_chunk(first.get("chunk", [])), "sky3d": bool(first.get("sky3d", false)),
 				"glass": first.has("glass"), "decal": first.has("decal"), "clusters": _clusters_of(groups[key])})
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	var s := mesh.get_surface_count() - 1
