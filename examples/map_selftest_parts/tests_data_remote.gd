@@ -3,7 +3,7 @@ extends "tests_data.gd"
 ## The sql and http map data stores against fakes: no database and no network are touched.
 
 
-## A dot-sql driver held in memory: understands exactly the statements DotMapDataSqlSchema writes.
+## A GameSpice SQL driver held in memory: understands exactly the statements DotMapDataSqlSchema writes.
 class FakeSql extends RefCounted:
 	var rows: Array = []  # {game, map_id, map_version, section, data, updated_by}
 	var opened := false

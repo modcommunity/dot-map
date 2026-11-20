@@ -13,7 +13,7 @@ The question this addon answers is "how do we ship a hundred surf maps", and the
 | A "server" can only ever run one map | A server runs a rotation |
 | A map fix is a release | A map fix is a version bump on one pack |
 
-So a map is a `DotMapDef`: an id, a version, a scene path, and optionally a dot-cloud content id the scene lives inside. It is how every game in this genre has worked for decades, and it is the shape the rest of the family was built for: dot-cloud namespaces content by `id/version` *because a mounted resource pack can never be unmounted on any platform*, so a new version of a map is a new mount rather than a replacement, and a server can hold both while players finish their runs on the old one.
+So a map is a `DotMapDef`: an id, a version, a scene path, and optionally a GameSpice Cloud content id the scene lives inside. It is how every game in this genre has worked for decades, and it is the shape the rest of the family was built for: GameSpice Cloud namespaces content by `id/version` *because a mounted resource pack can never be unmounted on any platform*, so a new version of a map is a new mount rather than a replacement, and a server can hold both while players finish their runs on the old one.
 
 **A map id is never renamed.** Records name their map by it, so changing one orphans every time ever set on it. `display_name` is the one to change.
 
@@ -27,7 +27,7 @@ A server knows about two hundred maps and rotates through twelve. The other hund
 
 **A version is checked with `.valid`.** `DotSemVer.parse` always returns an object and reports the outcome on `.valid`; a `== null` check passes for every string, and `"banana"` was once a valid map version.
 
-## Reaching dot-cloud without naming it
+## Reaching GameSpice Cloud without naming it
 
 `DotMapLoader` finds the cloud client in `DotRegistry` under `dot_cloud_client` and calls `ensure(content_id, version, groups, manifest_url)` and `is_mounted(content_id, version)` by name. The family rule is reason enough (a script that *mentions* an absent `class_name` fails to parse), but there is a sharper one:
 
@@ -39,11 +39,11 @@ So `DotMapLoader.require_cloud` exists. A deployment that *knows* its maps are d
 
 `DotMapDef.manifest_url` is the escape hatch and is normally empty: a catalogue of two hundred maps should not repeat the same CDN hostname two hundred times, so the cloud client builds the URL from `content_id`, `content_version` and its own `manifest_url_template`.
 
-**Zones come back from `load_zones` as text**, not as a parsed `DotTimerZoneSet`. dot-timer is optional; naming the class here would make every map load in a game without a timer fail to parse. The host, which has dot-timer, calls `DotTimerZoneSet.from_json`.
+**Zones come back from `load_zones` as text**, not as a parsed `DotTimerZoneSet`. GameSpice Timer is optional; naming the class here would make every map load in a game without a timer fail to parse. The host, which has GameSpice Timer, calls `DotTimerZoneSet.from_json`.
 
 ## Workshop maps: following the content index
 
-`DotMapCatalogue.follow_content(index, accepted_kinds)` adds the `map` entries of mounted packs (dot-core's `DotContentIndex`, filled by dot-cloud on mount) as delivered `DotMapDef`s, and rebuilds them whenever a pack arrives or the index changes session, so a subscription appears in solo and an online session never sees it. `accepted_kinds` is the game's `accepts.map_kinds`; empty means none, because the Workshop is opt-in per game, and `"*"` means every kind. A map the catalogue already holds under an id always wins over a pack's. `tag_pack` is silent, so call `refresh_content()` after it. A refresh emits `content_refreshed` (API level 6), which the `DotMapRotationFile` last applied to that catalogue listens to, so the fresh defs get the rotation's `in_rotation` marks (and `fallback_in`) again instead of defaulting to in. A pack map carries `pack_title`; `DotMapDef.label()`, `DotMapVote.option_labels()` and the `maps` command print it as `Name [Pack]`. The menu that draws the list belongs to the game or dot-menu and should print `label()`.
+`DotMapCatalogue.follow_content(index, accepted_kinds)` adds the `map` entries of mounted packs (GameSpice Core's `DotContentIndex`, filled by GameSpice Cloud on mount) as delivered `DotMapDef`s, and rebuilds them whenever a pack arrives or the index changes session, so a subscription appears in solo and an online session never sees it. `accepted_kinds` is the game's `accepts.map_kinds`; empty means none, because the Workshop is opt-in per game, and `"*"` means every kind. A map the catalogue already holds under an id always wins over a pack's. `tag_pack` is silent, so call `refresh_content()` after it. A refresh emits `content_refreshed` (API level 6), which the `DotMapRotationFile` last applied to that catalogue listens to, so the fresh defs get the rotation's `in_rotation` marks (and `fallback_in`) again instead of defaulting to in. A pack map carries `pack_title`; `DotMapDef.label()`, `DotMapVote.option_labels()` and the `maps` command print it as `Name [Pack]`. The menu that draws the list belongs to the game or GameSpice Menu and should print `label()`.
 
 ## Local maps: a convert folder copied in by hand
 
@@ -71,12 +71,12 @@ A local map named `<map>_orig` (what `dot-map-convert` `regen --orig-textures` w
 
 ## Deliberately not here
 
-- **A map downloader UI.** `fetching` says a fetch has started; dot-cloud reports progress; drawing a bar is the game's.
+- **A map downloader UI.** `fetching` says a fetch has started; GameSpice Cloud reports progress; drawing a bar is the game's.
 - **Map metadata scraped from the scene.** A tier, an author and a description are editorial, they change without the geometry changing, and reading them out of the scene would mean loading every map to list them.
-- **Per-map addon configuration.** A map that needed different movement would be a different game mode, and that is `DotFpsTunables` plus dot-server's module system.
+- **Per-map addon configuration.** A map that needed different movement would be a different game mode, and that is `DotFpsTunables` plus GameSpice Server's module system.
 - **Anything about what is *in* a map.** Spawns, zones, props and lights are the scene's and the timer's. This addon knows a map's name, version and where its scene is.
 
-## Shared stores as dot-cloud slices
+## Shared stores as GameSpice Cloud slices
 
 A converted map draws library textures and models that live in shared stores (`pbr-library`, `model-library`), not in its pack. `bsp.py storepack` publishes what each manifest draws as dot-cloud content, imported with VRAM compression, and writes `licence.store_pack = {id, version, shared}` into the manifest. A PBR set or model is cut by the group of maps that draw it; a group that is among the `--shared N` (default 8) biggest of any of its maps becomes its own slice, `<owner>/store-shared-<hash of the maps>@h<hash>`, and everything else stays in the map's own slice `<owner>/store-<map>@h<hash>` (the root, which also holds `credits.json`). The root declares its shared slices as manifest `dependencies`; dot-cloud takes eight per manifest and a chain four deep, so a root with more goes through empty group nodes (`store-<map>-g<level>-<n>`, a `group.json` and their own dependencies). A client that has downloaded map A fetches only the shared slices of map B that it lacks. `--shared 0` is one self-contained slice per map. The map's pack is published with `--depends id@version` (dot-cloud API 15), or `DotMapStore.ensure` fetches the root: either way the dependencies come first, once per client, because a pack mounts at `res://dot_cloud/<id>/<version>/` and never unmounts. `DotMapStore.apply(licence, cloud, surfaces, world)` sets `pbr_libraries` and `model_libraries` to the mounted root and its shared slices (the singular `pbr_library` and `model_library` to the root); `DotMapSurfaces` and `DotMapBspMesh` look a set or model up in each in order, `load()` the imported texture or model there and fall back to reading the webp or glb from a folder when no slice is mounted.
 

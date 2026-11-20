@@ -3,7 +3,7 @@ extends RefCounted
 
 ## The maps a server PLAYS, read from `cfg/addons/dot_map/maps.yml` and its tiers; the catalogue is what is merely installed. A map not in the rotation stays loadable by `map <id>` but is left out of the pool, ballots and nominations ([member DotMapDef.in_rotation]).
 ## Keys: `defaults:` and `games: <game>:` with `rotation`, `mode` (random with `cooldown`, or cycle), `maps` (patterns), `rotations: {name: {maps}}`. No file means every installed map rotates, sorted by id; `merge: true` adds to the shipped file. `exempt: [patterns]` (alias `remove:`; ids, `owner/map`, name globs) keeps maps out of the rotation, at the top of any layer or inside one rotation; a file with only `exempt:` rotates every installed map except those.
-## Layers, weakest first: shipped file, server `defaults:`, server `games:`. Parsing and matching are dot-core's [DotRotationSpec]; patterns expand at [method apply], called on every map change and rescan. A per-map PROFILE (`mode:` or its alias `cfg:` on an entry, a rotation or a section) is resolved by [method resolve_profile] and set on [member DotMapDef.profile]; dot-map never reads the mode or the cvars, the game does. See docs/rotation.md#per-map-profiles.
+## Layers, weakest first: shipped file, server `defaults:`, server `games:`. Parsing and matching are GameSpice Core's [DotRotationSpec]; patterns expand at [method apply], called on every map change and rescan. A per-map PROFILE (`mode:` or its alias `cfg:` on an entry, a rotation or a section) is resolved by [method resolve_profile] and set on [member DotMapDef.profile]; GameSpice Map never reads the mode or the cvars, the game does. See docs/rotation.md#per-map-profiles.
 
 ## A map changed and this is the profile its rotation entry gave it (`{}` for none). Emitted by [method attach]'s handler, and by [method note_changed] for a game that follows the session itself.
 signal profile_changed(map: DotMapDef, profile: Dictionary)
@@ -11,7 +11,7 @@ signal profile_changed(map: DotMapDef, profile: Dictionary)
 const CHANNEL := "map.rotation_file"
 const EXTENSIONS := ["yml", "yaml"]
 
-## A `mode:` with one of these values picks the next map (dot-core's [DotRotationSpec]); any other value is a profile.
+## A `mode:` with one of these values picks the next map (GameSpice Core's [DotRotationSpec]); any other value is a profile.
 const SELECTION_MODES := ["random", "cycle", "sequential"]
 
 ## Where a profile name is looked up, under each dot_map config tier (`cfg/server/addon/dot_map/cfg/ctf.yml`).

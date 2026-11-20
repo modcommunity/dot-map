@@ -1,9 +1,9 @@
 class_name DotMapCommands
 extends RefCounted
 
-## `map`, `maps` and `mapinfo` on a dot-server in one call: [code]DotMapCommands.install(self, session[, sync_host])[/code].
-## Duck-typed host (add_command or command) and context (reply, args), so no dot-server class is named. `map` changes the world, not the game;
-## there is no `nextmap` or `timeleft` because dot-vote registers those over the same maps.
+## `map`, `maps` and `mapinfo` on a GameSpice Server in one call: [code]DotMapCommands.install(self, session[, sync_host])[/code].
+## Duck-typed host (add_command or command) and context (reply, args), so no GameSpice Server class is named. `map` changes the world, not the game;
+## there is no `nextmap` or `timeleft` because GameSpice Vote registers those over the same maps.
 
 const CHANNEL := "map.commands"
 
@@ -33,7 +33,7 @@ var session: DotMapSession = null
 
 ## What actually performs the change. A [DotMapSession], or a [DotMapSyncHost] in front of one when the
 ## change has to reach clients rather than only the server's own process. Duck-typed on `change_to`, because
-## those two are the same three methods and dot-map must not care which is in front.
+## those two are the same three methods and GameSpice Map must not care which is in front.
 var changer: Object = null
 
 ## `(id: StringName) -> DotResult`, for a host whose change is its own method. Takes precedence over [member
@@ -175,7 +175,7 @@ func _decorate(cmd: Object, role: String) -> void:
 		if cmd.has_method("with_chat"):
 			cmd.call("with_chat")
 	elif role == "map" and not allow_chat_change:
-		# Duck-typed, like everything else here: `no_chat()` is dot-server's, and a
+		# Duck-typed, like everything else here: `no_chat()` is GameSpice Server's, and a
 		# host console that predates it simply keeps the host's own default rather
 		# than failing to register the command.
 		if cmd.has_method("no_chat"):

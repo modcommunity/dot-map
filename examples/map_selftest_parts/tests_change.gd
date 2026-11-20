@@ -2,7 +2,7 @@ extends "tests_defs.gd"
 
 ## Changing maps, and the host and client pair every sync section builds.
 
-## Stands in for a dot-server DotServer: the signal and the question
+## Stands in for a GameSpice Server DotServer: the signal and the question
 ## [method DotMapSession.follow_hibernation] duck-types.
 class FakeHibernatingServer extends Node:
 	signal hibernation_changed(hibernating: bool)

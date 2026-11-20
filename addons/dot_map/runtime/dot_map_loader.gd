@@ -2,12 +2,12 @@ class_name DotMapLoader
 extends RefCounted
 
 ## Turns a [DotMapDef] into a loaded scene, fetching its content first when it is not already here: [code]var loaded := await loader.load_map(map_def)[/code].
-## dot-cloud is not named, so a game that ships every map never installs it: the client is found in [DotRegistry] under [code]dot_cloud_client[/code] and called by name.
+## GameSpice Cloud is not named, so a game that ships every map never installs it: the client is found in [DotRegistry] under [code]dot_cloud_client[/code] and called by name.
 ## An absent cloud reads as "ships in the build", which is also what a registration bug looks like, so [member require_cloud] makes a deployment that knows better fail loudly.
 
 const CHANNEL := "map.loader"
 
-## The registry name dot-cloud publishes its client under.
+## The registry name GameSpice Cloud publishes its client under.
 const CLOUD_SERVICE := &"dot_cloud_client"
 
 ## Fail rather than fall back to the disk when there is no cloud client. For a deployment whose maps are all
@@ -172,7 +172,7 @@ func load_zones(map: DotMapDef) -> DotResult:
 	var text := file.get_as_text()
 	file.close()
 
-	# Returned as text rather than parsed. dot-timer is optional — this addon must compile without it — so the
+	# Returned as text rather than parsed. GameSpice Timer is optional — this addon must compile without it — so the
 	# host, which does have it, calls DotTimerZoneSet.from_json. Naming the class here would make every map load
 	# in a game without a timer fail to parse.
 	return DotResult.success(text)

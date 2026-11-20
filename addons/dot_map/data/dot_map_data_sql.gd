@@ -1,8 +1,8 @@
 class_name DotMapDataSql
 extends DotMapDataStore
 
-## Map data in a table, through a dot-sql driver held untyped (query, execute, batch, migrate, open) so dot-map
-## still parses without dot-sql. Every row read goes through [method DotMapDataBundle.from_json], so a
+## Map data in a table, through a GameSpice SQL driver held untyped (query, execute, batch, migrate, open) so GameSpice Map
+## still parses without GameSpice SQL. Every row read goes through [method DotMapDataBundle.from_json], so a
 ## hand-edited row meets the same limits as an imported file.
 
 const CHANNEL := "map_data"

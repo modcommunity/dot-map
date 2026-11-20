@@ -2,8 +2,8 @@
 class_name DotMapDef
 extends Resource
 
-## One map, as an entry in a catalogue rather than as a build: an id, a version, a scene path and, optionally, a dot-cloud pack the scene lives inside.
-## One game with many maps as content, not one project per map: the server switches under live players and a client downloads the one it needs. dot-cloud namespaces content by [code]id/version[/code] because a mounted pack can never be unmounted.
+## One map, as an entry in a catalogue rather than as a build: an id, a version, a scene path and, optionally, a GameSpice Cloud pack the scene lives inside.
+## One game with many maps as content, not one project per map: the server switches under live players and a client downloads the one it needs. GameSpice Cloud namespaces content by [code]id/version[/code] because a mounted pack can never be unmounted.
 ## Fill [code]id[/code], [code]version[/code], [code]scene_path[/code], [code]zones_path[/code] and [code]tier[/code].
 
 ## What kind of map this is, so a rotation can be filtered. StringNames rather than an enum because a game
@@ -22,7 +22,7 @@ const KIND_SANDBOX := &"sandbox"
 ## nothing keys on.
 @export var id: StringName = &""
 
-## Semantic version of the map's content. Part of the content's address, not decoration. dot-cloud namespaces
+## Semantic version of the map's content. Part of the content's address, not decoration. GameSpice Cloud namespaces
 ## a pack by [code]id/version[/code] because a mounted resource pack can never be unmounted on any platform —
 ## so a new version of a map is a new mount rather than a replacement, and both can be present at once.
 @export var version: String = "1.0.0"
@@ -50,13 +50,13 @@ const KIND_SANDBOX := &"sandbox"
 
 ## Where the map's scene is, once its content is available. A path inside the pack, not a path on this
 ## machine. When the map ships in the build this is an ordinary [code]res://[/code] path; when it is
-## delivered, it is the path the pack mounts at, which dot-cloud makes the same string on every machine.
+## delivered, it is the path the pack mounts at, which GameSpice Cloud makes the same string on every machine.
 @export var scene_path: String = ""
 
 ## The map's zone file, for a timed map. Empty when the map has no timer.
 @export var zones_path: String = ""
 
-## The dot-cloud content id this map lives in, or empty when it ships in the build. A separate field from
+## The GameSpice Cloud content id this map lives in, or empty when it ships in the build. A separate field from
 ## [member id] because several maps can share one pack — a map pack is exactly that — and because a map that
 ## ships in the build has no pack at all.
 @export var content_id: StringName = &""
@@ -86,7 +86,7 @@ const KIND_SANDBOX := &"sandbox"
 var in_rotation: bool = true
 
 ## The settings the active rotation's entry gives this map (`{waves: "easy", profile: "night"}`),
-## opaque to dot-map. Runtime state set by [DotMapRotationFile.apply], never saved; empty for a bare entry.
+## opaque to GameSpice Map. Runtime state set by [DotMapRotationFile.apply], never saved; empty for a bare entry.
 var play: Dictionary = {}
 
 ## The profile the active rotation gives this map (`mode:`/`cfg:` on its entry, rotation or section), resolved:
@@ -129,7 +129,7 @@ var entry_key: String = ""
 
 
 ## A map out of a delivered pack key, `<owner>/<map id>@<version>` -- what a game descriptor's `maps:` list
-## holds once the server has installed the game (dot-server's DotGameDescriptor.maps,
+## holds once the server has installed the game (GameSpice Server's DotGameDescriptor.maps,
 ## DotGameManager.current_maps). Null for a key that is not that.
 static func from_content_key(key: String, scene: String = "") -> DotMapDef:
 	var at := key.rfind("@")

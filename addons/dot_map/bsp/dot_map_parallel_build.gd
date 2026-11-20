@@ -65,7 +65,7 @@ static func textures(paths: PackedStringArray, workers: int, max_size: int = 0, 
 	return out
 
 
-## [method textures] that yields a frame whenever [param slice_ms] has passed since the last one, so the main loop (dot-cloud's fetch callbacks, the loading cover) runs between batches. A coroutine: `await` it.
+## [method textures] that yields a frame whenever [param slice_ms] has passed since the last one, so the main loop (GameSpice Cloud's fetch callbacks, the loading cover) runs between batches. A coroutine: `await` it.
 static func textures_async(paths: PackedStringArray, workers: int, max_size: int = 0, half_masks: bool = false, slice_ms: int = 8, half_normals: bool = false) -> Dictionary:
 	var out := {}
 	var step := batch_size(workers)

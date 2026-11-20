@@ -29,7 +29,7 @@ load      host -> peer   everyone has it; put it on screen now
 abort     host -> peer   the change was abandoned; stay where you are
 ```
 
-**`announce` and `load` are separate on purpose.** The host does not swap until its peers can, so there are necessarily two moments. Collapsing them is a bug this family has had by another name: dot-server's `report_content_ready` once sent a client to load the game the server had not swapped to yet.
+**`announce` and `load` are separate on purpose.** The host does not swap until its peers can, so there are necessarily two moments. Collapsing them is a bug this family has had by another name: GameSpice Server's `report_content_ready` once sent a client to load the game the server had not swapped to yet.
 
 The rules each of which was a real failure once ([history](history.md#what-the-first-transport-found)):
 
@@ -37,14 +37,14 @@ The rules each of which was a real failure once ([history](history.md#what-the-f
 - **A change waits only on the peers registered when it began** (`_participants`): those are the ones it sends `load` or `abort` to and counts as ready. A peer added during it is announced whatever map the host settled on.
 - **A refused `load` adopts nothing**: the requested version is checked before `announced` is set.
 - **Progress is throttled** by `progress_interval_sec` (0.25 s; 0 turns it off), because a server that rate-limits a client drops the excess without choosing, and that can be the `ready`. The first report of a fetch, a report of 1.0 and every `ready` always go; the local `fetch_progress` signal is never throttled.
-- **A `load` that overtakes its own fetch is held** until the fetch lands (`_load_after_fetch`), and an `abort` drops it. That is exactly the straggler `swap_without_stragglers` makes; taking the `load` at once asked the content client for the same pack twice mid-download, which only worked because dot-cloud happens to join a running request.
+- **A `load` that overtakes its own fetch is held** until the fetch lands (`_load_after_fetch`), and an `abort` drops it. That is exactly the straggler `swap_without_stragglers` makes; taking the `load` at once asked the content client for the same pack twice mid-download, which only worked because GameSpice Cloud happens to join a running request.
 - **A delivered map is compared by its pack too.** A republished delivered map keeps `version` and changes `content_version`; `_accept` takes the announced definition when its `content_version` differs from `effective_content_version()`, or a client with the old pack loads the old geometry.
 
 ### Changing a game and changing a map are different operations
 
 Confusing them is how you get a server that reconnects everybody every four minutes:
 
-| | Changing a **game** (dot-server) | Changing a **map** (here) |
+| | Changing a **game** (GameSpice Server) | Changing a **map** (here) |
 | --- | --- | --- |
 | What is replaced | The module, the netcode, the client's scene | The world, and nothing else |
 | What happens to players | `SPAWNED -> DOWNLOADING -> LOADING -> SPAWNED` | They stay spawned |
@@ -57,12 +57,12 @@ A rotation running through `DotGameManager.change_game` would put every player t
 
 ## The commands
 
-**`map` is a command here, not in dot-server.** Every server operator types `map` for the thing that swaps the level, and on a server running one game and a hundred maps that means the right-hand column of the table above. dot-server's game change is `changelevel`, `game` and `gamechange`.
+**`map` is a command here, not in GameSpice Server.** Every server operator types `map` for the thing that swaps the level, and on a server running one game and a hundred maps that means the right-hand column of the table above. GameSpice Server's game change is `changelevel`, `game` and `gamechange`.
 
-`DotMapCommands.install(host, session)` registers `map`, `maps` and `mapinfo` on anything with `add_command` (a `DotModule`) or `command` (a `DotConsole`), duck-typed, so this file names no dot-server class. Pass a `DotMapSyncHost` as the third argument when the change has to reach clients; it has the same three change methods, deliberately.
+`DotMapCommands.install(host, session)` registers `map`, `maps` and `mapinfo` on anything with `add_command` (a `DotModule`) or `command` (a `DotConsole`), duck-typed, so this file names no GameSpice Server class. Pass a `DotMapSyncHost` as the third argument when the change has to reach clients; it has the same three change methods, deliberately.
 
 - **`map` says nothing about chat.** `admin_permission` (`changemap`) decides who may change the map, the same way wherever the line was typed; `map` is left at `ChatPolicy.DEFAULT` so the host's `sv_chat_commands` has the last word, and `allow_chat_change = false` marks it `no_chat()` for a records server that wants a map change to cost a trip to the console.
-- **`nextmap` is not registered here.** dot-vote registers `nextmap` and `timeleft` over the same maps, and two commands of one name is the last one registered winning silently. `mapinfo` answers both questions without taking a name somebody else has.
+- **`nextmap` is not registered here.** GameSpice Vote registers `nextmap` and `timeleft` over the same maps, and two commands of one name is the last one registered winning silently. `mapinfo` answers both questions without taking a name somebody else has.
 
 ## The host may say *which* map, never *what* the map is
 
@@ -80,9 +80,9 @@ The sweep of the whole of `meta` is fail-closed on purpose: a template that one 
 
 ## It is transport-agnostic, and that is not laziness
 
-This addon depends on nothing but dot-core, so it cannot know whether the game carrying these messages uses dot-net's bit packer, Godot's RPCs, a WebSocket or a loopback. `send_fn` takes a `Dictionary` and one peer id, **never a broadcast address**, because `send(payload, 0)` is how this family once delivered a private per-player message to every client at once. The loop over peers is in the open, in `_broadcast`.
+This addon depends on nothing but GameSpice Core, so it cannot know whether the game carrying these messages uses GameSpice Net's bit packer, Godot's RPCs, a WebSocket or a loopback. `send_fn` takes a `Dictionary` and one peer id, **never a broadcast address**, because `send(payload, 0)` is how this family once delivered a private per-player message to every client at once. The loop over peers is in the open, in `_broadcast`.
 
 ## Deliberately not here
 
-- **A transport.** `send_fn` takes a `Dictionary`; putting it on a wire is the game's. dot-map cannot name dot-net.
+- **A transport.** `send_fn` takes a `Dictionary`; putting it on a wire is the game's. GameSpice Map cannot name GameSpice Net.
 - **Kicking a peer that cannot get the map.** `peer_timed_out` and `on_timeout_fn` say who; this addon has no session list and no socket, so it cannot drop anybody.

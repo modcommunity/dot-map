@@ -5,7 +5,7 @@ extends RefCounted
 ## [b]LOCAL ONLY.[/b] It reads the stock textures of a Source game the player installed, so a game can draw a dropped
 ## `<map>_orig` pack on that machine and fill the textures the pack lacks. Nothing it reads is ever written into a
 ## repository or a pack that leaves the machine: Valve's files are not ours to ship, only this reader is.
-## `dot-map-convert`'s `dotbsp/vpk.py` is the same reader for the converter (offline); this one runs in the game.
+## `gs-map-convert`'s `dotbsp/vpk.py` is the same reader for the converter (offline); this one runs in the game.
 ## [codeblock]
 ## var vpk := DotMapVpk.new()
 ## if vpk.open("C:/.../tf/tf2_textures_dir.vpk", PackedStringArray(["vmt", "vtf"])):
@@ -30,7 +30,7 @@ var error := ""
 ## Check each file against its CRC-32 in [method read] (default). A caller that trusts the disk may turn it off.
 var verify_crc := true
 
-## The native CRC-32 (dot-sim's `DotSimCrc`) once looked up: null before, false when absent.
+## The native CRC-32 (GameSpice Sim's `DotSimCrc`) once looked up: null before, false when absent.
 static var _native: Variant = null
 static var _tables: Array[PackedInt64Array] = []
 

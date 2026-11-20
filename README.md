@@ -1,6 +1,6 @@
 [![Map - GameSpice addon](docs/banner.png)](https://moddingcommunity.com/a/21-gs-map)
 
-Maps as content, not as builds. One Godot game can carry a hundred maps and switch between them under live players. dot-map gives you a map catalogue, a rotation with a cooldown, a time limit with rock-the-vote, nominations and voting, a loader that turns a map into a scene, and tools for drawing converted BSP maps. Part of TMC's open source [**GameSpice**](https://gamespice.net) collection (MIT licence).
+Maps as content, not as builds. One Godot game can carry a hundred maps and switch between them under live players. GameSpice Map gives you a map catalogue, a rotation with a cooldown, a time limit with rock-the-vote, nominations and voting, a loader that turns a map into a scene, and tools for drawing converted BSP maps. Part of TMC's open source [**GameSpice**](https://gamespice.net) collection (MIT licence).
 
 > Built with Claude Code. Every addon has a headless test suite and the suites pass, but little of this has met real players yet. Please report rough edges.
 
@@ -10,9 +10,9 @@ The obvious way to ship a hundred maps is a hundred Godot projects: a hundred ex
 
 ## Install
 
-Copy `addons/dot_map/` and [dot-core](https://github.com/gamespice-platform/core)'s `addons/dot_core/` into your project and enable dot-map under **Project > Project Settings > Plugins**.
+Copy `addons/dot_map/` and [GameSpice Core](https://github.com/gamespice-platform/core)'s `addons/dot_core/` into your project and enable dot-map under **Project > Project Settings > Plugins**.
 
-[dot-cloud](https://github.com/gamespice-platform/cloud) (to fetch delivered maps) and [dot-timer](https://github.com/gamespice-platform/timer) (zones) are optional and found at run time.
+[GameSpice Cloud](https://github.com/gamespice-platform/cloud) (to fetch delivered maps) and [GameSpice Timer](https://github.com/gamespice-platform/timer) (zones) are optional and found at run time.
 
 ## Quick start
 
@@ -61,9 +61,9 @@ await session.change_to(&"surf_beginner")
 }
 ```
 
-The second map is delivered: its scene lives in a dot-cloud pack that is fetched and mounted before the scene loads.
+The second map is delivered: its scene lives in a GameSpice Cloud pack that is fetched and mounted before the scene loads.
 
-A game whose maps are published one pack per map lists them in its descriptor's `maps:` as pinned `<owner>/<map id>@<version>` keys, and dot-server returns them as `DotGameManager.current_maps()`. `DotMapCatalogue.add_delivered(key, scene)` turns each into a delivered map, using the last part of the content id as the id a player types:
+A game whose maps are published one pack per map lists them in its descriptor's `maps:` as pinned `<owner>/<map id>@<version>` keys, and GameSpice Server returns them as `DotGameManager.current_maps()`. `DotMapCatalogue.add_delivered(key, scene)` turns each into a delivered map, using the last part of the content id as the id a player types:
 
 ```gdscript
 for key in server.games.current_maps():
@@ -87,7 +87,7 @@ for key in server.games.current_maps():
 
 ## A converted map, from files to a drawn world
 
-A converted map is a prefix: `<prefix>.json` (the manifest), `<prefix>.bin` (geometry, lightmaps, visibility), usually `<prefix>.doc.json` (entities and links) and `<prefix>.coverage.json`. `examples/bsp_mesh/fixture.json` and `fixture.bin` are a tiny one to start from. The converter, [dot-map-convert](https://github.com/gamespice-platform/map-convert), writes real ones.
+A converted map is a prefix: `<prefix>.json` (the manifest), `<prefix>.bin` (geometry, lightmaps, visibility), usually `<prefix>.doc.json` (entities and links) and `<prefix>.coverage.json`. `examples/bsp_mesh/fixture.json` and `fixture.bin` are a tiny one to start from. The converter, [GameSpice Map Convert](https://github.com/gamespice-platform/map-convert), writes real ones.
 
 ```gdscript
 # `world` is a DotMapBspMesh, read from the prefix (the path without ".json").
@@ -188,7 +188,7 @@ A hand-built level gets the same from `DotOccluderBaker` (large walls and floors
 
 ## Documentation
 
-[docs/README.md](docs/README.md) indexes the design notes: why the catalogue is not the rotation, the order a map change must happen in, and why the loader reaches dot-cloud through the registry.
+[docs/README.md](docs/README.md) indexes the design notes: why the catalogue is not the rotation, the order a map change must happen in, and why the loader reaches GameSpice Cloud through the registry.
 
 ## Testing
 

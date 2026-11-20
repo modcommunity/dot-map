@@ -17,7 +17,7 @@ Imported textures (`res://` with an import) are requested with `ResourceLoader.l
 
 ## Binding it
 
-dot-map has no console, so a game copies its cvar in once, before loading: `DotMapParallelBuild.default_workers = console.get_int("map_load_threads")`. A single world or surfaces object takes its own `load_threads`.
+GameSpice Map has no console, so a game copies its cvar in once, before loading: `DotMapParallelBuild.default_workers = console.get_int("map_load_threads")`. A single world or surfaces object takes its own `load_threads`.
 
 ## Where the time goes
 
@@ -27,7 +27,7 @@ Measured on two converted survival maps (about 1 800 surfaces, 4 000 to 6 600 hu
 
 A raw store file costs about 11 to 13 ms to decode (webp 11.1, png 10.7, jpg 4.8 for a 1k map; measured on 50 ze_biohazard_manor textures) plus 3.4 ms to mip-map and compress, 15 ms in all; loading the same image pre-baked is 0.18 ms. `dot-map-convert/tools/bake_textures.gd -- <store dir> [--out=<dir>] [--max=2048]` (`DotMapTextureBake`) writes `<name>.s3tc.res` and `<name>.etc2.res` beside each `albedo|normal|roughness|ao` file; `DotMapSurfaces` takes the one for the build's VRAM format when it is not larger than `max_texture_size`, else decodes as before. A baked file is about 0.9 MB against 0.23 MB for the webp, so ship it inside a compressed pack, not as a new download. Never published by the tool; baked files are engine-version specific like an import.
 
-`DotMapSurfaces.prefetch(world, dir)` is a coroutine: it decodes in worker batches and yields a frame every 8 ms, so dot-cloud's fetch callbacks and the loading cover run during the decode. `await` it before `world_material_for`, which then finds every texture cached; without the call the prefetch blocks the main thread as before.
+`DotMapSurfaces.prefetch(world, dir)` is a coroutine: it decodes in worker batches and yields a frame every 8 ms, so GameSpice Cloud's fetch callbacks and the loading cover run during the decode. `await` it before `world_material_for`, which then finds every texture cached; without the call the prefetch blocks the main thread as before.
 
 ## The pack read off the main thread
 

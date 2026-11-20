@@ -1,7 +1,7 @@
 class_name DotMapMessage
 extends RefCounted
 
-## The four messages a map change is made of, as plain [Dictionary]s because dot-map depends on nothing but dot-core and cannot know the game's transport.
+## The four messages a map change is made of, as plain [Dictionary]s because GameSpice Map depends on nothing but GameSpice Core and cannot know the game's transport.
 ## announce (host to peer: fetch this map), progress (peer to host), ready (peer to host: I have it), load (host to peer: everyone has it, show it).
 ## "load" is separate from "announce" because the host must not switch before its clients can; collapsing them is the map-change bug of a client sent to load a game the server had not swapped to.
 

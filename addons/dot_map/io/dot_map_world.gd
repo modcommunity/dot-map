@@ -3,7 +3,7 @@ extends Node3D
 
 ## A converted map's whole world from one call: [code]DotMapWorld.build(prefix, callables, options)[/code] gives the drawn mesh with its glass, the collision hulls, the I/O runtime, every entity class, volumes, effects, sounds, per-map settings and state replication; call [code]world.step(bodies)[/code] each tick.
 ## The game plugs its callables in once ([code]damage_fn, move_fn, event_fn, effect_fn, send_fn[/code]).
-## Nothing here names dot-player-controller: ladders and water reach it through [code]ladder_fn[/code] and [code]swim_fn[/code], which get an [code]Array[AABB][/code].
+## Nothing here names GameSpice Player Controller: ladders and water reach it through [code]ladder_fn[/code] and [code]swim_fn[/code], which get an [code]Array[AABB][/code].
 
 const CHANNEL := "map.world"
 const HOOKS := ["damage_fn", "move_fn", "event_fn", "effect_fn", "actor_fn", "propdata_fn", "player_fn"]
@@ -166,7 +166,7 @@ func apply_state(msg: Dictionary) -> DotResult:
 	return DotMapStateSync.new().apply(io, msg)
 
 
-## The boxes of every active ladder brush, for dot-player-controller's ladder mode.
+## The boxes of every active ladder brush, for GameSpice Player Controller's ladder mode.
 func ladder_boxes() -> Array[AABB]:
 	return volumes.ladder_boxes()
 

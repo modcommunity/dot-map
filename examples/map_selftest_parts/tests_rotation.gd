@@ -17,7 +17,7 @@ func _test_rotation_file() -> void:
 	var cat := _named_catalogue(["surf_a", "surf_b", "surf_c", "bhop_x", "bhop_y", "lobby"])
 	var rotation := DotMapRotation.of(cat)
 
-	# The reader is dot-core's: the file's own text, not a hand-built tree.
+	# The reader is GameSpice Core's: the file's own text, not a hand-built tree.
 	var parsed := DotYaml.parse("defaults:\n  maps: [surf_*]\n")
 	var comment := DotYaml.parse("name: Bob's map # c\ntabbed: x\t# t\nquoted: \"a # b\" # c\nmaps:\n- a\n- b\nafter: 1\n")
 	var tree: Dictionary = comment.value if comment.ok else {}

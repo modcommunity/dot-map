@@ -4,16 +4,16 @@ extends Node
 
 ## A peer's half of a map change: fetch what the host named, say so, then show it; the counterpart to [DotMapSyncHost].
 ## Transport-agnostic: set [member send_fn] to reach the host and feed what arrives into [method handle].
-## A host never names a scene path: the map comes from this client's own catalogue by id unless [member accept_unknown_maps], which is safe only inside dot-cloud's mount.
+## A host never names a scene path: the map comes from this client's own catalogue by id unless [member accept_unknown_maps], which is safe only inside GameSpice Cloud's mount.
 
 const CHANNEL := "map.sync.client"
 
 ## The mount prefix a delivered map's scene must be under to be accepted from a host. Duplicated from dot-
-## cloud rather than read from it: this addon must compile in a project that does not have dot-cloud, and a
-## constant that disagreed with dot-cloud would fail closed — a refused map, not a loaded wrong one.
+## cloud rather than read from it: this addon must compile in a project that does not have GameSpice Cloud, and a
+## constant that disagreed with GameSpice Cloud would fail closed — a refused map, not a loaded wrong one.
 const MOUNT_ROOT := "res://dot_cloud/"
 
-## The registry name dot-cloud publishes its client under.
+## The registry name GameSpice Cloud publishes its client under.
 const CLOUD_SERVICE := &"dot_cloud_client"
 
 ## The host announced a map and the fetch has begun. For a progress screen.
@@ -358,7 +358,7 @@ func _accept_delivered(dict: Dictionary, id: StringName) -> DotResult:
 	var templated := _is_trusted_template(map.scene_path)
 
 	# simplify_path first, because "res://dot_cloud/a/1/../../../addons/x.tscn" does
-	# begin with the prefix. dot-cloud learned this one the same way.
+	# begin with the prefix. GameSpice Cloud learned this one the same way.
 	if not templated and not _is_under(map.scene_path, prefix):
 		return DotResult.fail(
 			DotError.CODE_FORBIDDEN,
@@ -485,7 +485,7 @@ func _send(payload: Dictionary) -> void:
 	send_fn.call(payload)
 
 
-## Subscribes to dot-cloud's download progress, once. Wired here rather than left to the game.
+## Subscribes to GameSpice Cloud's download progress, once. Wired here rather than left to the game.
 func _subscribe_to_progress() -> void:
 	var cloud := DotRegistry.get_service(CLOUD_SERVICE)
 
@@ -504,7 +504,7 @@ func _on_cloud_progress(p: Dictionary) -> void:
 
 
 ## Reports fetch progress to the host. Called automatically while a fetch is running; public so a game whose
-## content does not come through dot-cloud can drive it itself. Throttled to one report per [member
+## content does not come through GameSpice Cloud can drive it itself. Throttled to one report per [member
 ## progress_interval_sec] on the way to the host; the [signal fetch_progress] signal is not.
 func report_progress(fraction: float) -> void:
 	if announced == null:

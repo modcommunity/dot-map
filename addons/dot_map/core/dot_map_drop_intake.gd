@@ -29,7 +29,7 @@ var search_depth := 3
 ## Connect [signal Window.files_dropped] of this node's window in [method _ready].
 var watch_window := true
 
-## Options whose next argument is their value; a game adds its own (dot-core reads [code]--config <dir>[/code], say).
+## Options whose next argument is their value; a game adds its own (GameSpice Core reads [code]--config <dir>[/code], say).
 var value_flags := PackedStringArray(ENGINE_VALUE_FLAGS)
 
 ## The explicit option: [code]--map-path=<path>[/code] or [code]--map-path <path>[/code], a path that must exist.
@@ -195,7 +195,7 @@ static func strip_config_args(args: PackedStringArray, prefixes: PackedStringArr
 	return out
 
 
-## Whether [param stem] names a non-boolean key of [param config] (a dot-core [code]DotConfig[/code]): a bare boolean option is a
+## Whether [param stem] names a non-boolean key of [param config] (a GameSpice Core [code]DotConfig[/code]): a bare boolean option is a
 ## switch, so the argument after it is not its value, nor after an unknown key.
 static func config_takes_value(config: Object, stem: String) -> bool:
 	var key := str(config.call(&"_match_key", stem, config.call(&"config_keys")))

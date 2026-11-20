@@ -77,8 +77,8 @@ var current: DotMapDef = null
 ## The root node of the loaded map, or null.
 var world: Node = null
 
-## The zone file's text for the current map, for a host that has dot-timer. Text rather than a parsed
-## `DotTimerZoneSet`, because dot-timer is optional and naming the class here would make every map load in a
+## The zone file's text for the current map, for a host that has GameSpice Timer. Text rather than a parsed
+## `DotTimerZoneSet`, because GameSpice Timer is optional and naming the class here would make every map load in a
 ## game without a timer fail to parse. The host parses it.
 var zones_json: String = ""
 
@@ -291,7 +291,7 @@ func set_hibernating(on: bool) -> void:
 
 
 ## Follows a server's hibernation through its [code]hibernation_changed(bool)[/code] signal,
-## from the state it is in now. Duck-typed: this addon names nothing in dot-server. Returns
+## from the state it is in now. Duck-typed: this addon names nothing in GameSpice Server. Returns
 ## false for an object without the signal. Safe to call twice.
 func follow_hibernation(server: Object) -> bool:
 	if server == null or not server.has_signal("hibernation_changed"):

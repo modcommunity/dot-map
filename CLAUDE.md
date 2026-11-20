@@ -1,17 +1,17 @@
-# dot-map
+# GameSpice Map
 
-Maps as content rather than as builds: one game, many maps, switched under live players. A catalogue, a loader that fetches delivered maps through dot-cloud, a session that swaps the world safely, a protocol that takes every client along, a rotation, a vote tally, and a time limit with rock-the-vote and extends.
+Maps as content rather than as builds: one game, many maps, switched under live players. A catalogue, a loader that fetches delivered maps through GameSpice Cloud, a session that swaps the world safely, a protocol that takes every client along, a rotation, a vote tally, and a time limit with rock-the-vote and extends.
 
 Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is specific to maps. The reasoning is in [docs/](docs/README.md).
 
-**Only dot-core is a dependency, at API level 19 or later (`DotYaml`, `DotRotationSpec`, `DotCommandNames`, `DotAddonConfig.file_layers`, `tier_dirs`, `apply_overrides`, `DotCfgLegacy`).** dot-cloud, dot-timer, dot-server and dot-net are all optional and none is named anywhere in the source: dot-cloud is found in `DotRegistry`, zones come back as text, commands are installed duck-typed, and messages go out through a `send_fn`. [content](docs/content.md#reaching-dot-cloud-without-naming-it)
+**Only GameSpice Core is a dependency, at API level 19 or later (`DotYaml`, `DotRotationSpec`, `DotCommandNames`, `DotAddonConfig.file_layers`, `tier_dirs`, `apply_overrides`, `DotCfgLegacy`).** GameSpice Cloud, GameSpice Timer, GameSpice Server and GameSpice Net are all optional and none is named anywhere in the source: GameSpice Cloud is found in `DotRegistry`, zones come back as text, commands are installed duck-typed, and messages go out through a `send_fn`. [content](docs/content.md#reaching-dot-cloud-without-naming-it)
 
 ## Read before
 
 | Read | Before |
 | --- | --- |
 | [docs/README.md](docs/README.md) | the index |
-| [docs/content.md](docs/content.md) | `DotMapDef`, the catalogue, the loader and dot-cloud, what is deliberately not here |
+| [docs/content.md](docs/content.md) | `DotMapDef`, the catalogue, the loader and GameSpice Cloud, what is deliberately not here |
 | [docs/changing.md](docs/changing.md) | `DotMapSession`, `net/` (the sync host and client), `DotMapCommands`, anything a host may tell a client |
 | [docs/rotation.md](docs/rotation.md) | `DotMapRotation`, `DotMapVote`, `DotMapTimeLimit` |
 | [docs/history.md](docs/history.md) | the bugs, and how each looked |
@@ -29,9 +29,9 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | `addons/dot_map/config/` | `DotMapConfig`: per-map settings from `map/<name>.yml` (globs, `cfg/server` over shipped), a key whitelist, `apply` on load and `restore` on the next map; the converter writes a commented starter (`python3 -m dotbsp.mapcfg`). [map-config](docs/map-config.md) |
 | `addons/dot_map/io/` | `DotMapIO`: a map's input/output logic on the server's tick (delays, fire-once counts, a zero-delay loop guard, a seeded stream per entity), `DotMapEntity` and the logic classes (relay, timer, counter, case, compare, branch, auto, trigger, template, `game_score`, `game_ui` through `feed_ui`, `logic_collision_pair`, `logic_beats` as a `beat` event and OnBeat from a `bpm` key or SetBPM, `logic_winlose` with `round_decide` and a `round_end` event of slow motion and camera); a game plugs in with `register_handler`, `register_class` and four callables, map commands are recorded and never run. [io](docs/io.md) |
 | `addons/dot_map/source/` | `DotMapVpk` (VPK v1/v2 tree: `open(dir_vpk, only_ext)`, `has`, `read`, CRC-checked unless `verify_crc` is off; `crc32` native through dot-sim's `DotSimCrc` when loaded, else slicing-by-8 `crc32_script`), `DotMapVtf` (`image(data, max_side)` for formats 0-3, 5, 6, 12, 16 and DXT1/3/5, `vmt_keys`, `clean_material`, `safe_name`), `DotMapVpkWriter` (the fixture writers tests share). READERS ONLY: the player's own install is read at run time, no Valve data is ever stored here. `examples/source_demo.tscn` (`-- --vpk=<*_dir.vpk> --sample=N` also times a real archive). [content](docs/content.md#reading-a-source-install-vpk-vtf-vmt) |
-| `addons/dot_map/store/`, `credits/` | `DotMapStore` (finds the PBR and model stores a map shipped as a dot-cloud slice, `licence.store_pack`; `ensure`, `apply`), `DotMapCredits` (`works`, `line`: the credits of the loaded map from the manifest's licence block, `only_attribution` for CC-BY). `examples/store_demo.tscn`. Missing slices draw stand-ins, never white, missing library models draw as boxes that are the only thing that collides, and each warns once; `dot-map-convert/tools/stage_stores.sh` stages the raw stores for a developer. [content](docs/content.md#shared-stores-as-dot-cloud-slices), [without the slices](docs/content.md#without-the-slices) |
+| `addons/dot_map/store/`, `credits/` | `DotMapStore` (finds the PBR and model stores a map shipped as a GameSpice Cloud slice, `licence.store_pack`; `ensure`, `apply`), `DotMapCredits` (`works`, `line`: the credits of the loaded map from the manifest's licence block, `only_attribution` for CC-BY). `examples/store_demo.tscn`. Missing slices draw stand-ins, never white, missing library models draw as boxes that are the only thing that collides, and each warns once; `dot-map-convert/tools/stage_stores.sh` stages the raw stores for a developer. [content](docs/content.md#shared-stores-as-dot-cloud-slices), [without the slices](docs/content.md#without-the-slices) |
 | `addons/dot_map/vote/` | `DotMapVote`, `DotMapTimeLimit` |
-| `addons/dot_map/data/` | `DotMapDataBundle` (dot-map-data schema 1 per game, map id and version; opaque sections spawns, nav_settings, nav_links, nav_annotations, cull; `from_json` caps, known sections only, no paths; `import_json` refuses another map id and needs force for another version or digest; `layered`), `DotMapDataStore` (`fetch`, `save`, `versions`, `remove` as `DotResult`; `read_layered(pack, store, ...)`; older version served with `stale`), `DotMapDataMemory`, `DotMapDataFile` (`user://map_data/<game>/<map>/<version>.json`, flushes the web filesystem), `DotMapDataPack` (read-only), `DotMapDataSql` (a table keyed game, map_id, map_version, section through a duck-typed dot-sql driver, `DotMapDataSqlSchema`; `open()` migrates), `DotMapDataHttp` (a duck-typed `request` client, bearer token, replies size-capped and checked to be the map asked for), `DotMapDataConfig` (`map_data_store` file/sql/http, `map_data_path`, `map_data_url`, `map_data_token` sensitive; `make_store`). Every row or reply goes through `from_json`. Design: dot-spawn `docs/map-data-tools.md` |
+| `addons/dot_map/data/` | `DotMapDataBundle` (dot-map-data schema 1 per game, map id and version; opaque sections spawns, nav_settings, nav_links, nav_annotations, cull; `from_json` caps, known sections only, no paths; `import_json` refuses another map id and needs force for another version or digest; `layered`), `DotMapDataStore` (`fetch`, `save`, `versions`, `remove` as `DotResult`; `read_layered(pack, store, ...)`; older version served with `stale`), `DotMapDataMemory`, `DotMapDataFile` (`user://map_data/<game>/<map>/<version>.json`, flushes the web filesystem), `DotMapDataPack` (read-only), `DotMapDataSql` (a table keyed game, map_id, map_version, section through a duck-typed GameSpice SQL driver, `DotMapDataSqlSchema`; `open()` migrates), `DotMapDataHttp` (a duck-typed `request` client, bearer token, replies size-capped and checked to be the map asked for), `DotMapDataConfig` (`map_data_store` file/sql/http, `map_data_path`, `map_data_url`, `map_data_token` sensitive; `make_store`). Every row or reply goes through `from_json`. Design: GameSpice Spawn `docs/map-data-tools.md` |
 | `addons/dot_map/integrations/` | `DotMapCommands`: `map`, `maps`, `mapinfo` on any host |
 | `dot-map-convert/dotbsp/texquality.py` | `bsp.py texquality <mesh prefix> [--store DIR]`: per replaced PBR set, pixels per metre (the slice's albedo width over the 2 m one repeat covers: the world material is triplanar, so the mesh uv and a retile change nothing) against the original's, worst by drawn area first, then area-weighted p5/p50/p95 of drawn and original px per metre and a too-dense list (`--dense`, 1024); a set missing from the store counts as the pack's small fallback albedo (`licence.SMALL_PX`, 128 since 2026-10-26, was 64). Tests: `dot-map-convert/tests/test_texquality.py`. `bsp_world_shot` takes `--aniso=N` |
 | `tools/texture_audit.sh` | `texture_audit.sh <world prefix> [--half=1] [--nomodels] [--fullnormals] [--fullmodelmasks] [--fullmodelnormals]`: builds a map, walks every material and prints texture memory per category and format plus the `RenderingServer` counters. [texture memory](docs/surfaces.md#texture-memory) |
@@ -62,7 +62,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 - The converter's own checks live in `../dot-map-convert` (`python3 -I tests/test_*.py` there). After changing what the runtime reads (manifest fields, the catalogue), re-convert a migrated game's maps there and compare.
 - The family's two steps ([family CLAUDE.md](../../CLAUDE.md#validating-anything)), then `godot --headless --path . res://examples/map_selftest.tscn` and `res://examples/brushes_demo.tscn`. Run the check-only pass first: a missing `await` is a parse error and the scene then hangs.
 - A change to the sync protocol is not done until game-airdrift's `headless_net` passes; the protocol's first real transport found five bugs here. [history](docs/history.md#what-the-first-transport-found)
-- A change to the cloud calls (`ensure`, `is_mounted`) must keep `_test_sync_a_delivered_map` meeting a real dot-cloud client: a by-name interface is one nobody else checks.
+- A change to the cloud calls (`ensure`, `is_mounted`) must keep `_test_sync_a_delivered_map` meeting a real GameSpice Cloud client: a by-name interface is one nobody else checks.
 
 ## Rules that bite
 
@@ -71,7 +71,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 - A map id is never renamed; change `display_name`. [content](docs/content.md#one-game-many-maps)
 - The catalogue is not the rotation. One bad entry is dropped loudly, never fatal. An exact id wins a search. [content](docs/content.md#the-catalogue-is-not-the-rotation)
 - `DotSemVer.parse` never returns null; check `.valid`. [content](docs/content.md#the-catalogue-is-not-the-rotation)
-- dot-cloud is reached through the registry by name; a deployment that delivers its maps sets `require_cloud`. [content](docs/content.md#reaching-dot-cloud-without-naming-it)
+- GameSpice Cloud is reached through the registry by name; a deployment that delivers its maps sets `require_cloud`. [content](docs/content.md#reaching-dot-cloud-without-naming-it)
 
 **Changing**
 
@@ -80,7 +80,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 - Progress messages are throttled; `ready` never is. [changing](docs/changing.md#changing-the-map-for-everybody)
 - A delivered map is compared by `content_version` as well as `version`. [changing](docs/changing.md#changing-the-map-for-everybody)
 - A map change is not a game change; never route a rotation through `DotGameManager`. [changing](docs/changing.md#changing-a-game-and-changing-a-map-are-different-operations)
-- `map` lives here; `nextmap` and `timeleft` are dot-vote's. Do not register a name another addon owns. [changing](docs/changing.md#the-commands)
+- `map` lives here; `nextmap` and `timeleft` are GameSpice Vote's. Do not register a name another addon owns. [changing](docs/changing.md#the-commands)
 - The host names *which* map, never *what* it is: unknown maps must be delivered and resolve inside their pack after `simplify_path`. [changing](docs/changing.md#the-host-may-say-which-map-never-what-the-map-is)
 - A template scene treats its pack as untrusted and takes paths only from keys the check covers; every path-shaped string in `meta` is checked. [changing](docs/changing.md#template-scenes)
 - `send_fn` is called per peer, never with a broadcast id. [changing](docs/changing.md#it-is-transport-agnostic-and-that-is-not-laziness)
@@ -107,7 +107,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | What is on a ballot | `DotMapVote.max_options` / `reserved_for_nominations` |
 | Whether a map is offered at all | `DotMapDef.enabled`, `min_players`, `max_players` |
 | What a map is worth | `DotMapDef.tier`, read by `DotTimerStyle.points_for` |
-| Where content comes from | A `DotCloudSource` subclass, in dot-cloud |
+| Where content comes from | A `DotCloudSource` subclass, in GameSpice Cloud |
 | Where a map's manifest is | `DotMapDef.manifest_url`, or the cloud client's `manifest_url_template` |
 | How map changes reach clients | `DotMapSyncHost.send_fn` / `DotMapSyncClient.send_fn` |
 | What a client will accept from a host | `DotMapSyncClient.accept_unknown_maps` |
@@ -118,4 +118,4 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | Whether `map` may be typed in chat | `DotMapCommands` `allow_chat_change`, then the host's `sv_chat_commands` |
 | Anything else about a map | `DotMapDef.meta` |
 
-Deliberately not here: a download UI, a transport, kicking a peer that cannot get the map, vote commands and menus (dot-vote, dot-ui), metadata scraped from the scene, per-map addon configuration, anything about what is in a map. [content](docs/content.md#deliberately-not-here), [changing](docs/changing.md#deliberately-not-here)
+Deliberately not here: a download UI, a transport, kicking a peer that cannot get the map, vote commands and menus (GameSpice Vote, GameSpice UI), metadata scraped from the scene, per-map addon configuration, anything about what is in a map. [content](docs/content.md#deliberately-not-here), [changing](docs/changing.md#deliberately-not-here)

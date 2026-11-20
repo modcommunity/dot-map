@@ -40,7 +40,7 @@ func validate() -> DotResult:
 	return DotResult.success(null)
 
 
-## The configured store. The sql store needs a dot-sql driver and the http store a client with `request`,
+## The configured store. The sql store needs a GameSpice SQL driver and the http store a client with `request`,
 ## because neither is named here. Fails when the one it needs is null.
 func make_store(sql_driver = null, http_client: Object = null) -> DotResult:
 	var ok := validate()

@@ -1,7 +1,7 @@
 extends Node
 
 ## The surface textures left out of the client shell's pck still resolve once a pack carrying them is mounted and listed in
-## DotMapSurfaces.fallback_roots. The pack is built here (PCKPacker, three 4x4 textures for one kind); no CDN, no dot-cloud.
+## DotMapSurfaces.fallback_roots. The pack is built here (PCKPacker, three 4x4 textures for one kind); no CDN, no GameSpice Cloud.
 
 const POOL := "res://dot_cloud/synth/1/surfaces"
 const MISSING_ROOT := "res://shell_without_surfaces"

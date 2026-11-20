@@ -4,7 +4,7 @@ For a level you built in the editor, not a converted BSP map (those use [visibil
 
 ## What Godot already does, and what this adds
 
-| Need | Godot 4.7 | dot-map |
+| Need | Godot 4.7 | GameSpice Map |
 | --- | --- | --- |
 | Hide what is behind a wall | `OccluderInstance3D` with a `BoxOccluder3D`, `QuadOccluder3D`, `PolygonOccluder3D` or a baked scene occluder; turn on `Viewport.use_occlusion_culling` (Project Settings, Rendering, Occlusion Culling) | Nothing; use it |
 | Hide what is far | `GeometryInstance3D.visibility_range_end` and fade; HLOD by pairing two ranges | Nothing; use it |

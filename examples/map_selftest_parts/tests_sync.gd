@@ -105,7 +105,7 @@ func _test_sync_refuses_what_a_host_may_not_send() -> void:
 	client.handle(DotMapMessage.announce(escaping))
 	_check(refused.size() == 2, "nor one whose scene is outside its own content")
 
-	# The traversal that a plain begins_with() lets through. dot-cloud learned this
+	# The traversal that a plain begins_with() lets through. GameSpice Cloud learned this
 	# exact one with a version of "../..".
 	var traversing := _map(&"surf_traverse")
 	traversing.content_id = &"a_pack"
@@ -464,7 +464,7 @@ func _test_sync_refused_load_adopts_nothing() -> void:
 	_done()
 
 
-## [b]Progress is throttled on the way out; ready is not.[/b] One message per dot-cloud
+## [b]Progress is throttled on the way out; ready is not.[/b] One message per GameSpice Cloud
 ## progress signal, into a server that rate-limits a client and drops the excess without
 ## choosing, can cost the ready that follows it.
 func _test_sync_progress_is_throttled() -> void:

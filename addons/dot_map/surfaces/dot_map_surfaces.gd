@@ -152,7 +152,7 @@ func _note_sets(world: RefCounted, dir: String) -> Dictionary:
 	return sets
 
 
-## Reads the map's textures ahead of [method world_material_for] without holding the main thread: decoded in batches on workers, a frame yielded whenever [param slice_ms] has passed, so dot-cloud's fetch callbacks and the loading cover keep running. The later [method world_material_for] finds them cached. Inline (no yield) when there are no workers.
+## Reads the map's textures ahead of [method world_material_for] without holding the main thread: decoded in batches on workers, a frame yielded whenever [param slice_ms] has passed, so GameSpice Cloud's fetch callbacks and the loading cover keep running. The later [method world_material_for] finds them cached. Inline (no yield) when there are no workers.
 func prefetch(world: RefCounted, dir: String, slice_ms: int = 8) -> void:
 	var sets := _resolve_sets(world, dir)
 	await _prefetch_async(world, sets["generated"], sets["library"], slice_ms, sets["stand_in"])

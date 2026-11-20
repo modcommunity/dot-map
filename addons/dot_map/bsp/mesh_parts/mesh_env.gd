@@ -4,7 +4,7 @@ extends "mesh_solids.gd"
 ## [code]mesh_props.gd[/code].
 
 ## Where [method build_sounds] and [method build_props] look for a stand-in by id when the
-## game gives no callable: this addon's own free Kenney set, then dot-audio's stock beds.
+## game gives no callable: this addon's own free Kenney set, then GameSpice Audio's stock beds.
 const DEFAULT_SOUND_DIRS: PackedStringArray = [
 	"res://addons/dot_map/sounds", "res://addons/dot_audio/stock/ambience"]
 const DEFAULT_PROP_DIRS: PackedStringArray = ["res://addons/dot_map/props"]

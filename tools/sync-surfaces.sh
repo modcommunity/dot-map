@@ -7,7 +7,7 @@
 #   tools/sync-surfaces.sh ../game-zombie-zone assets/surfaces --check      # copy nothing; exit 1 if anything is missing or differs
 #
 # Why a game vendors the textures instead of reading the addon's: the client shell bundles
-# dot-map, and 12 MB of textures every game may never draw must not ride in it. A game ships
+# GameSpice Map, and 12 MB of textures every game may never draw must not ride in it. A game ships
 # exactly the kinds it names, inside its own signed pack, and hands DotMapSurfaces that root
 # (docs/surfaces.md). The list lives in <dest>/kinds.txt, one kind per line, so the copy says
 # what it is for and a later sync does not guess.
@@ -64,7 +64,7 @@ for k in "${KINDS[@]}"; do
             cmp -s "$from" "$to" 2>/dev/null || cp "$from" "$to"
             if [ ! -f "$to.import" ]; then
                 # Source path rewritten and the uid and dest lines dropped: a copied uid would be the
-                # addon's own, and a game that links dot-map then has two resources under one uid.
+                # addon's own, and a game that links GameSpice Map then has two resources under one uid.
                 # Godot writes a fresh uid and dest hash on its first import.
                 sed -e "s#res://addons/dot_map/surfaces/#res://$DEST/#g" -e '/^uid=/d' -e '/^path=/d' -e '/^dest_files=/d' "$from.import" > "$to.import"
             fi

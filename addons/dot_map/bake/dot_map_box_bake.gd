@@ -1,7 +1,7 @@
 class_name DotMapBoxBake
 extends RefCounted
 
-## Baked light for a map a game draws from boxes in code: the half of dot-lighting's
+## Baked light for a map a game draws from boxes in code: the half of GameSpice Lighting's
 ## [code]DotLightBake[/code] every box-document game repeats.
 
 const CHANNEL := "dot.map.box_bake"
@@ -9,7 +9,7 @@ const CHANNEL := "dot.map.box_bake"
 ## Bump when what a bake means changes here (the bake scene's lamps, emission and sky): every fingerprint includes it.
 const VERSION := 1
 
-## dot-lighting's API level that has [code]DotLightBake[/code] and [code]DotLightmapSheet[/code].
+## GameSpice Lighting's API level that has [code]DotLightBake[/code] and [code]DotLightmapSheet[/code].
 const MIN_LEVEL := 5
 
 const BAKE_SCRIPT := "res://addons/dot_lighting/bake/dot_light_bake.gd"
@@ -23,7 +23,7 @@ const META_BAKEABLE := &"dot_bakeable"
 const DEFAULTS := {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 3, "texel_scale": 1.0, "ambient_gain": 4.0, "bounce_energy": 0.7, "emit": 0.4}
 
 
-## Whether this host's dot-lighting can lay a bake.
+## Whether this host's GameSpice Lighting can lay a bake.
 static func can_bake() -> bool:
 	return DotAddonApi.build_level("dot_lighting") >= MIN_LEVEL and ResourceLoader.exists(BAKE_SCRIPT) and ResourceLoader.exists(SHEET_SCRIPT)
 
@@ -66,8 +66,8 @@ static func fingerprint(parts: Dictionary) -> String:
 	return (load(BAKE_SCRIPT) as GDScript).call(&"fingerprint", mine)
 
 
-## Offline: the scene dot-lighting's baker bakes, from a map the game built as a client builds it. [param drawn] holds the meshes marked
-## [constant META_BAKEABLE] and the omni lamps; [param lighting] is the map's dot-lighting node (its sun is baked as bounce only and stays live).
+## Offline: the scene GameSpice Lighting's baker bakes, from a map the game built as a client builds it. [param drawn] holds the meshes marked
+## [constant META_BAKEABLE] and the omni lamps; [param lighting] is the map's GameSpice Lighting node (its sun is baked as bounce only and stays live).
 ## [param settings] override [constant DEFAULTS]; [param parts] are what [param fp] was made from.
 static func bake_scene(drawn: Node3D, lighting: Node3D, fp: String, out_path: String, settings: Dictionary = {}, parts: Dictionary = {}) -> Node3D:
 	var cfg := DEFAULTS.duplicate()

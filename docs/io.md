@@ -58,7 +58,7 @@ Work package 7. `DotMapVolumes.build(entities, io)` joins each manifest volume t
 | `trigger_push` (`DotMapPush`) | the push velocity (a `Vector3`, m/s) to `move_fn` each step; SetPushSpeed (source units), SetPushDirection |
 | `trigger_teleport` | a `Transform3D` to `move_fn` and a `teleport` event; the destination is `io.destinations[name]` (the manifest's `destinations`); `landmark` keeps the body's offset |
 | `trigger_gravity` | a `gravity` event with the scale on entry and 1 on leaving (not with `persist`) |
-| `func_ladder`, water brushes | `ladder_boxes()` and `water_boxes()`: one box per brush, for dot-player-controller's `DotFpsLadderMode.volumes` and `DotFpsSwimMode.volumes`; nothing here names that addon |
+| `func_ladder`, water brushes | `ladder_boxes()` and `water_boxes()`: one box per brush, for GameSpice Player Controller's `DotFpsLadderMode.volumes` and `DotFpsSwimMode.volumes`; nothing here names that addon |
 | `env_*` (`DotMapEffect`) | state to `effect_fn(kind, entity, on)` at map start and on each input; one-shots (explosion, shake, fade, spark) to `event_fn`; an explosion and a burning `env_fire` hurt bodies in range through `damage_fn` |
 | `ambient_generic` (`DotMapSound`) | PlaySound, StopSound, ToggleSound, Volume, Pitch, fades to `effect_fn("sound", entity, on)`; `io.attach_sounds(manifest.sounds.ambient)` gives each its free stand-in, and one with none stays silent |
 

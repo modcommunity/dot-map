@@ -4,7 +4,7 @@ A map can ask for settings (the commands its entities send, such as `sv_airaccel
 
 ## Where the files are
 
-A file is `map/<name>.yml` inside each `dot-map` tier of dot-core's `DotAddonConfig`: `cfg/addons/dot_map/`, `cfg/game/<game>/dot_map/`, then the operator's `cfg/server/addons/dot_map/` and `cfg/server/game/<game>/dot_map/`, in every root. `<name>` is a map id or a glob (`surf_%.yml` covers every surf map: `%` is any run of characters, `@` is exactly one, case does not matter; the literal `*` and `?` still work but cannot be in a file name on Windows or in a published pack, so spell them `%` and `@`; map ids never contain either) and the content is a flat mapping of key to one scalar. Nothing is nested and no value is ever a command line.
+A file is `map/<name>.yml` inside each `gs-map` tier of GameSpice Core's `DotAddonConfig`: `cfg/addons/dot_map/`, `cfg/game/<game>/dot_map/`, then the operator's `cfg/server/addons/dot_map/` and `cfg/server/game/<game>/dot_map/`, in every root. `<name>` is a map id or a glob (`surf_%.yml` covers every surf map: `%` is any run of characters, `@` is exactly one, case does not matter; the literal `*` and `?` still work but cannot be in a file name on Windows or in a published pack, so spell them `%` and `@`; map ids never contain either) and the content is a flat mapping of key to one scalar. Nothing is nested and no value is ever a command line.
 
 ## Which value wins
 
@@ -24,7 +24,7 @@ Every map gets one without being asked. `bsp.py store` writes `mapcfg.yml` into 
 
 ## Wiring a game
 
-A game does not call `DotMapConfig` itself: dot-game's `DotGameMapConfig` is the one wiring (`DotGameModule._map_config_keys()` on the server, `DotGameClient.map_changed` on the client). See dot-game's docs/map-config.md.
+A game does not call `DotMapConfig` itself: GameSpice Game's `DotGameMapConfig` is the one wiring (`DotGameModule._map_config_keys()` on the server, `DotGameClient.map_changed` on the client). See GameSpice Game's docs/map-config.md.
 
 ## Export
 

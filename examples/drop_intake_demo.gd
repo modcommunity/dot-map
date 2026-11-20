@@ -88,7 +88,7 @@ func _test_args() -> void:
 	_done()
 
 
-## A fake dot-core config: `--demo-title <value>` takes a value, `--demo-loud` is a bool switch.
+## A fake GameSpice Core config: `--demo-title <value>` takes a value, `--demo-loud` is a bool switch.
 class FakeConfig:
 	var title := ""
 	var loud := false

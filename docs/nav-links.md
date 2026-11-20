@@ -4,7 +4,7 @@ A navigation mesh is baked from static colliders, so the map's own logic is invi
 
 ## Why here, and not in the bot
 
-The facts live in the map's entity graph (`DotMapIO.entities`, their outputs, `destinations`, the volume nodes), which is dot-map's. A consumer that re-derived them would drift from the runtime that actually fires the inputs. dot-bot's `DotBotLinks` already read teleports and buttons by duck typing; it now takes this export as an opt-in, so a game that passes none is unchanged.
+The facts live in the map's entity graph (`DotMapIO.entities`, their outputs, `destinations`, the volume nodes), which is GameSpice Map's. A consumer that re-derived them would drift from the runtime that actually fires the inputs. GameSpice Bot's `DotBotLinks` already read teleports and buttons by duck typing; it now takes this export as an opt-in, so a game that passes none is unchanged.
 
 ## The structure
 

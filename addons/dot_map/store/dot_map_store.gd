@@ -1,6 +1,6 @@
 class_name DotMapStore
 extends RefCounted
-## Finds the shared PBR and model stores of a converted map, shipped as a dot-cloud slice (`licence.store_pack`) plus the shared slices it names.
+## Finds the shared PBR and model stores of a converted map, shipped as a GameSpice Cloud slice (`licence.store_pack`) plus the shared slices it names.
 
 const CHANNEL := "dot_map.store"
 ## What the one warning tells a developer to do; the steps are in docs/content.md#without-the-slices.
@@ -89,7 +89,7 @@ static func reset() -> void:
 	_warned.clear()
 
 
-## Downloads and mounts the slice when it is not, once per client (dot-cloud skips what it holds; an empty [param manifest_url] lets it resolve one). Ok with "" when
+## Downloads and mounts the slice when it is not, once per client (GameSpice Cloud skips what it holds; an empty [param manifest_url] lets it resolve one). Ok with "" when
 ## the map ships none. A pack acquired with `--depends` has it already, so this is for a map loaded from a folder.
 ## With no [param cloud], a [param folder] (the pack's own) whose `licence.pbr_store` holds the art counts as installed: a checkout with the raw stores staged beside it.
 static func ensure(licence: Dictionary, cloud: Object, manifest_url: String = "", folder: String = "") -> DotResult:

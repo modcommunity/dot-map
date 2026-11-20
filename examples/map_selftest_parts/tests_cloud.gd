@@ -2,7 +2,7 @@ extends "tests_sync.gd"
 
 ## Delivered maps, workshop maps and the commands sections.
 
-## The whole point of "maps are content", run end to end. dot-cloud is loaded by path, not named. This addon
+## The whole point of "maps are content", run end to end. GameSpice Cloud is loaded by path, not named. This addon
 ## must compile in a project that does not have it — that is why [DotMapLoader] duck-types through
 ## [DotRegistry] — and a `class_name` in this file would take the whole suite down with it.
 func _test_sync_a_delivered_map() -> void:
@@ -124,7 +124,7 @@ func _publish_delivered_pack(data: String) -> Dictionary:
 	return pair_keys
 
 
-## A dot-cloud client that trusts the test key and finds the published pack in [param data].
+## A GameSpice Cloud client that trusts the test key and finds the published pack in [param data].
 func _add_cloud(client_script: Variant, data: String, pair_keys: Dictionary) -> Node:
 	var config_script: Variant = load("res://addons/dot_cloud/dot_cloud_config.gd")
 
@@ -171,7 +171,7 @@ func _check_delivered_pair(cloud: Node, pair: SyncPair, host_progress: Array[flo
 		"and it kept the definition it was sent"
 	)
 
-	# Progress reached the host, which means the client subscribed to dot-cloud on its own. `report_progress`
+	# Progress reached the host, which means the client subscribed to GameSpice Cloud on its own. `report_progress`
 	# was public and called by nobody — a value produced correctly and consumed by nothing, which in this family
 	# is the shape that costs a week because the symptom points at the producer.
 	_check(
@@ -320,7 +320,7 @@ func _test_sync_a_delivered_template_and_a_straggler() -> void:
 	_done()
 
 
-## A signature-checking dot-cloud client in front of a [SlowContent], registered as the cloud for this test.
+## A signature-checking GameSpice Cloud client in front of a [SlowContent], registered as the cloud for this test.
 func _add_slow_cloud(client_script: Variant, data: String, public_key: String) -> SlowContent:
 	var config: Variant = load("res://addons/dot_cloud/dot_cloud_config.gd").new()
 	config.cache_dir = data.path_join("cache")
@@ -512,8 +512,8 @@ class FakeCommand:
 		return self
 
 
-## A `DotModule`-shaped host and nothing else, not a real `DotConsole`: dot-server is not linked here
-## and `DotMapCommands` names no dot-server class, so a fake proves the duck-typing.
+## A `DotModule`-shaped host and nothing else, not a real `DotConsole`: GameSpice Server is not linked here
+## and `DotMapCommands` names no GameSpice Server class, so a fake proves the duck-typing.
 class FakeHost:
 	extends RefCounted
 
@@ -676,7 +676,7 @@ func _test_commands_fetch(session: DotMapSession, map_cmd: FakeCommand) -> void:
 
 
 func _test_commands_naming(session: DotMapSession) -> void:
-	# Every name is configurable, for dot-vote's reason: a deployment may already have a
+	# Every name is configurable, for GameSpice Vote's reason: a deployment may already have a
 	# `map` of its own, and a second registration of one name is the first one gone.
 	var renamed := DotMapCommands.new()
 	renamed.session = session

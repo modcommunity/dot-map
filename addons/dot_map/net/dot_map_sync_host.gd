@@ -42,13 +42,13 @@ signal change_failed(map: DotMapDef, reason: String)
 @export_group("Waiting")
 
 ## Seconds to wait for every peer to have the new map's content. Generous, because it covers a download.
-## Shorter than dot-server's equivalent because a map is one world, not a whole game.
+## Shorter than GameSpice Server's equivalent because a map is one world, not a whole game.
 @export_range(5.0, 3600.0, 5.0) var sync_timeout_sec: float = 300.0
 
 ## Swap as soon as everyone is ready rather than waiting out the timeout.
 @export var swap_when_all_ready: bool = true
 
-## Change the map even though some peers never got the content. On, and the reason is the one dot-server
+## Change the map even though some peers never got the content. On, and the reason is the one GameSpice Server
 ## gives: the players who did get the map should not be denied the change by the ones who could not. Off
 ## holds the whole server on the current map for one client with a bad connection.
 @export var swap_without_stragglers: bool = true

@@ -159,7 +159,7 @@ static func _uncomment(line: String) -> String:
 	return line
 
 
-## The base material name as the converter writes it (dot-map-convert `reader.clean_material`): lower case, `/`, no
+## The base material name as the converter writes it (GameSpice Map Convert `reader.clean_material`): lower case, `/`, no
 ## leading `/`, and a cubemap-patched `maps/<map>/<path>_x_y_z` back to `<path>`.
 static func clean_material(material: String) -> String:
 	var m := material.to_lower().replace("\\", "/").lstrip("/")
@@ -169,7 +169,7 @@ static func clean_material(material: String) -> String:
 	return RegEx.create_from_string("_-?\\d+_-?\\d+_-?\\d+$").sub(patched, "")
 
 
-## The file name an `_orig` pack gives [param material]'s texture (dot-map-convert `origtex.safe`), without `.png`.
+## The file name an `_orig` pack gives [param material]'s texture (GameSpice Map Convert `origtex.safe`), without `.png`.
 static func safe_name(material: String) -> String:
 	var s := RegEx.create_from_string("[^a-z0-9_.-]+").sub(clean_material(material), "_", true).left(80)
 	return s if s != "" else "unnamed"
