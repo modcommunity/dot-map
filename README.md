@@ -1,4 +1,4 @@
-[![Map - GameSpice addon](docs/banner.png)](https://moddingcommunity.com/a/218-dot-map)
+[![Map - GameSpice addon](docs/banner.png)](https://moddingcommunity.com/a/21-gs-map)
 
 Maps as content, not as builds. One Godot game can carry a hundred maps and switch between them under live players. dot-map gives you a map catalogue, a rotation with a cooldown, a time limit with rock-the-vote, nominations and voting, a loader that turns a map into a scene, and tools for drawing converted BSP maps. Part of TMC's open source [**GameSpice**](https://gamespice.net) collection (MIT licence).
 
