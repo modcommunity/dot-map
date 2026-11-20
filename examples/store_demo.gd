@@ -2,8 +2,8 @@ extends Node
 ## Proves DotMapCredits and DotMapStore on a hand-written manifest and a stand-in cloud client.
 ## godot --headless --path . res://examples/store_demo.tscn
 
-const CHECKS := 65
-const SECTIONS := 8
+const CHECKS := 74
+const SECTIONS := 9
 
 var _passed := 0
 var _failed := 0
@@ -64,6 +64,17 @@ class PlanCloud:
 		return {"missing_bytes": MISSING[m.key]}
 
 
+## A PlanCloud whose storage has room for `room` bytes only; make_room records what it was asked.
+class TightCloud:
+	extends PlanCloud
+	var room := 0
+	var asked := -1
+
+	func make_room(incoming: int) -> Dictionary:
+		asked = incoming
+		return {"fits": incoming <= room, "free": room, "freed": 0}
+
+
 class PlanManifest:
 	extends RefCounted
 	var key := ""
@@ -98,6 +109,7 @@ func _run() -> void:
 	_credits()
 	await _store()
 	await _plan()
+	await _quota()
 	_surfaces()
 	await _missing_slices()
 	_stand_ins()
@@ -154,6 +166,41 @@ func _plan() -> void:
 	_check("a map with no slices costs nothing", res.ok and int(res.value["bytes"]) == 0)
 	res = await DotMapStore.plan(lic, FakeCloud.new())
 	_check("a client that cannot plan is not an error", res.ok and int(res.value["bytes"]) == 0)
+	_completed += 1
+
+
+func _quota() -> void:
+	_entered += 1
+	var lic := {"store_pack": {"id": "r", "version": "1"}}
+	var seen: Array = []
+	var on_problem := func(p: Dictionary) -> void: seen.append(p)
+	DotMapStore.events.art_problem.connect(on_problem)
+	DotMapStore.reset()
+	var tight := TightCloud.new()
+	tight.room = 1 << 20
+	var res: DotResult = await DotMapStore.ensure(lic, tight)
+	_check("art that cannot fit is refused", not res.ok and res.error.code == DotError.CODE_QUOTA)
+	_check("make_room was asked for the whole plan", tight.asked == 8 << 20)
+	_check("nothing was downloaded", tight.ensured == 0)
+	_check("art_problem fires once with the clear action", seen.size() == 1 and seen[0]["action"] == "clear_downloaded_content" and int(seen[0]["bytes"]) == 8 << 20)
+	_check("the notice names the storage, not a missing server", DotMapStore.notice(lic).contains("no room"))
+	var roomy := TightCloud.new()
+	roomy.room = 64 << 20
+	DotMapStore.reset()
+	res = await DotMapStore.ensure(lic, roomy)
+	_check("art that fits is downloaded", res.ok and roomy.ensured == 1 and seen.size() == 1)
+	var old := PlanCloud.new()
+	res = await DotMapStore.ensure(lic, old)
+	_check("a client without make_room downloads as before", res.ok and old.ensured == 1)
+	var tiny := TightCloud.new()
+	DotMapStore.reset()
+	var mounted_lic := {"store_pack": {"id": "m", "version": "1"}}
+	tiny.mounted["m@1"] = "res://x/"
+	res = await DotMapStore.ensure(mounted_lic, tiny)
+	_check("a mounted map never asks for room", res.ok and tiny.asked == -1)
+	_check("no problem is reported for it", seen.size() == 1)
+	DotMapStore.events.art_problem.disconnect(on_problem)
+	DotMapStore.reset()
 	_completed += 1
 
 

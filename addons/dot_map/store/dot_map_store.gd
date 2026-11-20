@@ -13,6 +13,20 @@ static var announce_download: bool = true
 ## The gate meta [method ensure] sets to the bytes still to download, for a client that draws progress against the whole.
 const META_DOWNLOAD_BYTES := &"download_bytes"
 
+## The gate meta set when the art cannot fit the browser's storage: `{message, action, bytes, free}`. A load overlay shows `message` and offers [constant ACTION_CLEAR].
+const META_ART_PROBLEM := &"art_problem"
+## The action id of the shell's "Clear downloaded content" command, named in the problem a UI can offer.
+const ACTION_CLEAR := &"clear_downloaded_content"
+
+
+## Static classes cannot own signals; this is the one object that does.
+class Events extends RefCounted:
+	## The map's art cannot be downloaded for lack of storage even after evicting what could go. [param problem] is the [constant META_ART_PROBLEM] dictionary.
+	signal art_problem(problem: Dictionary)
+
+
+static var events: Events = Events.new()
+
 ## Root slice ids already warned about: one WARN per map per process.
 static var _warned: Dictionary = {}
 
@@ -79,6 +93,8 @@ static func notice(licence: Dictionary) -> String:
 	var p := pack_of(licence)
 	if p.is_empty() or not _unfetched.has(str(p["id"])):
 		return ""
+	if str(_unfetched[str(p["id"])].get("why", "")) == "quota":
+		return "Map art is not downloaded: the browser has no room for it. Use \"Clear downloaded content\" and reload."
 	var n := (_unfetched[str(p["id"])]["ids"] as PackedStringArray).size()
 	return "Some map art is missing (%d art packs not downloaded), so surfaces look plainer. Reconnect to a server that provides them, or update the game." % n
 
@@ -110,7 +126,12 @@ static func ensure(licence: Dictionary, cloud: Object, manifest_url: String = ""
 	if announce_download:
 		var planned: DotResult = await plan(licence, cloud, manifest_url)
 		if planned.ok and int(planned.value["bytes"]) > 0:
+			var need := int(planned.value["bytes"])
 			_announce(planned.value)
+			if cloud.has_method("make_room"):
+				var room: Dictionary = await cloud.call("make_room", need)
+				if not bool(room.get("fits", true)):
+					return _refuse(licence, need, int(room.get("free", 0)))
 	var res: DotResult = await cloud.call("ensure", StringName(str(p["id"])), str(p["version"]), PackedStringArray(), manifest_url)
 	if not res.ok:
 		_unfetched[str(p["id"])] = {"ids": missing(licence, cloud), "why": res.error.message}
@@ -118,6 +139,21 @@ static func ensure(licence: Dictionary, cloud: Object, manifest_url: String = ""
 		return res.wrap("store slice %s@%s" % [p["id"], p["version"]])
 	_unfetched.erase(str(p["id"]))
 	return DotResult.success(mount_dir(licence, cloud))
+
+
+## Records the art as not fetched for lack of storage, tells the gate and [member events], and fails without downloading (a partial download only wastes the quota).
+static func _refuse(licence: Dictionary, need: int, free: int) -> DotResult:
+	var p := pack_of(licence)
+	var message := "Not enough browser storage for this map's art (needs %s, %s free). Clear downloaded content to make room." % [DotPaths.format_bytes(need), DotPaths.format_bytes(free)]
+	_unfetched[str(p["id"])] = {"ids": slice_ids(licence), "why": "quota"}
+	var problem := {"message": message, "action": ACTION_CLEAR, "bytes": need, "free": free}
+	DotLog.warn(CHANNEL, "map art does not fit the browser storage", {"need": DotPaths.format_bytes(need), "free": DotPaths.format_bytes(free)})
+	var gate := DotRegistry.get_service(DotLoadGate.SERVICE) as DotLoadGate
+	if gate != null and not gate.is_open():
+		gate.set_meta(META_ART_PROBLEM, problem)
+		gate.set_progress(gate.progress(), message)
+	events.art_problem.emit(problem)
+	return DotResult.fail(DotError.CODE_QUOTA, message)
 
 
 ## What fetching [param licence]'s slices would cost, without downloading: `{bytes, slices, ids}` summed over the root and every dependency not mounted or cached ([method DotCloudClient.plan_for]). Fails when a manifest cannot be had.
