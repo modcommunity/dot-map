@@ -103,6 +103,22 @@ func _run() -> void:
 	_check(merged.mesh.get_faces().size() % 36 == 0 and merged.mesh.get_faces().size() > 0, "the merged mesh is whole boxes")
 	var again := DotMapBoxBatch.build(root, DotMapBoxBatch.CELL, skip, true)
 	_check(int(again["boxes"]) == 0 and _visible_meshes(root) == after, "a second pass folds nothing")
+	_check_rotated_undo(floor_m)
+	_check_coarse(floor_m, glass, skip)
+	root.queue_free()
+	print("")
+	print("%d passed, %d failed" % [_passed, _failed])
+	for line in _failures:
+		print("  FAIL  %s" % line)
+	if _passed + _failed != CHECKS:
+		print("ERROR: %d checks ran; %d expected." % [_passed + _failed, CHECKS])
+		get_tree().quit(1)
+		return
+	get_tree().quit(1 if _failed > 0 else 0)
+
+
+
+func _check_rotated_undo(floor_m: Material) -> void:
 	# A rotated, offset box lands where the original drew.
 	var r := Node3D.new()
 	add_child(r)
@@ -117,6 +133,10 @@ func _run() -> void:
 	_check(folded.encloses(want.grow(-0.01)), "a rotated box is folded in place")
 	var shown := DotMapBoxBatch.undo(r)
 	_check(shown == 2 and _visible_meshes(r) == 2 and not r.has_node(DotMapBoxBatch.NODE_NAME), "undo shows the originals and frees the merge (%d)" % shown)
+	r.queue_free()
+
+
+func _check_coarse(floor_m: Material, glass: Material, skip: Callable) -> void:
 	var big := Node3D.new()
 	add_child(big)
 	for k in 3:
@@ -139,15 +159,4 @@ func _run() -> void:
 	_check(_visible_meshes(c) == 5, "1 merged, two lone boxes, the see-through and the vetoed one draw (%d)" % _visible_meshes(c))
 	_check(DotMapBoxBatch.undo(c) == 3 and _visible_meshes(c) == 7, "undo restores the coarse folds")
 	c.queue_free()
-	root.queue_free()
-	r.queue_free()
 	big.queue_free()
-	print("")
-	print("%d passed, %d failed" % [_passed, _failed])
-	for line in _failures:
-		print("  FAIL  %s" % line)
-	if _passed + _failed != CHECKS:
-		print("ERROR: %d checks ran; %d expected." % [_passed + _failed, CHECKS])
-		get_tree().quit(1)
-		return
-	get_tree().quit(1 if _failed > 0 else 0)
