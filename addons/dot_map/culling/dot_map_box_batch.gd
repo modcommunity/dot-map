@@ -22,6 +22,11 @@ extends RefCounted
 ## DotMapBoxBatch.build(level, DotMapBoxBatch.CELL, skip)
 ## [/codeblock]
 ##
+## [param coarse] (metres, default 0 = off) adds a second pass for the boxes that are alone in
+## their cell: those of one material that share a [param coarse]-metre cell (say 256, four cells)
+## fold together, so a lone lamp post or kerb stone no longer costs a draw of its own. A box that
+## already folded in the fine pass is not touched, and a see-through or vetoed box never joins.
+##
 ## Skipped on a headless server (nothing draws there; [param force] overrides, for a suite).
 
 const GROUP := &"dot_map_box_batch"
@@ -34,8 +39,9 @@ const NODE_NAME := "BoxBatch"
 
 ## Batches [param parent]'s box bodies. Returns `{boxes, nodes}`: how many boxes were folded
 ## and how many meshes now draw them. [param cell] is the cell edge in metres (zero or less puts
-## everything of a material in one mesh). A cell holding one box of a material is left alone.
-static func build(parent: Node3D, cell: float = CELL, skip: Callable = Callable(), force: bool = false) -> Dictionary:
+## everything of a material in one mesh). A cell holding one box of a material is left alone,
+## unless [param coarse] is above [param cell] and another such box shares its coarse cell.
+static func build(parent: Node3D, cell: float = CELL, skip: Callable = Callable(), force: bool = false, coarse: float = 0.0) -> Dictionary:
 	if not force and DisplayServer.get_name() == "headless":
 		return {"boxes": 0, "nodes": 0}
 	var groups := {}
@@ -57,6 +63,8 @@ static func build(parent: Node3D, cell: float = CELL, skip: Callable = Callable(
 		if not groups.has(key):
 			groups[key] = {"material": material, "items": [], "shadow": mi.cast_shadow, "layers": mi.layers}
 		groups[key]["items"].append([child, mi])
+	if coarse > cell and cell > 0.0:
+		_fold_singletons(groups, coarse)
 	var holder := Node3D.new()
 	holder.name = NODE_NAME
 	holder.add_to_group(GROUP)
@@ -79,6 +87,24 @@ static func build(parent: Node3D, cell: float = CELL, skip: Callable = Callable(
 		return {"boxes": 0, "nodes": 0}
 	parent.add_child(holder)
 	return {"boxes": boxes, "nodes": holder.get_child_count()}
+
+
+## Moves the boxes that are alone in their fine cell into [param coarse]-metre groups.
+static func _fold_singletons(groups: Dictionary, coarse: float) -> void:
+	var wide := {}
+	for key in groups.keys():
+		var g: Dictionary = groups[key]
+		if (g["items"] as Array).size() != 1:
+			continue
+		var item: Array = g["items"][0]
+		var at: Vector3 = (item[0] as Node3D).position
+		var wkey := [g["material"], int(floorf(at.x / coarse)), int(floorf(at.z / coarse)), g["shadow"], g["layers"], "coarse"]
+		if not wide.has(wkey):
+			wide[wkey] = {"material": g["material"], "items": [], "shadow": g["shadow"], "layers": g["layers"]}
+		wide[wkey]["items"].append(item)
+		groups.erase(key)
+	for wkey in wide:
+		groups[wkey] = wide[wkey]
 
 
 ## Shows the folded boxes' own meshes again and frees the merged ones.

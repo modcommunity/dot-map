@@ -15,5 +15,6 @@ extends RefCounted
 # 29: DotMapDocDrop (the document-pack drop acceptor for games whose maps are JSON documents: a file, folder or zip; write_doc, lines).
 # 30: DotMapDropIntake.config_prefixes, option_takes_value, paths_in, strip_config_args, config_takes_value (a game's own config options are never dropped paths).
 # 31: DotMapBoxBatch (opaque static boxes of one material per cell drawn as one ArrayMesh; skip callable; skipped headless).
-const LEVEL := 31
+# 32: DotMapBoxBatch.build `coarse` (a second pass folds boxes alone in their cell into a coarser cell; default off).
+const LEVEL := 32
 const OLDEST := 1

@@ -7,7 +7,7 @@ extends Node3D
 ## godot --headless --path . res://examples/box_batch_demo.tscn
 ## [/codeblock]
 
-const CHECKS := 13
+const CHECKS := 17
 
 var _passed := 0
 var _failed := 0
@@ -123,6 +123,22 @@ func _run() -> void:
 		_box(big, Vector3(k * 500, 1, 0), Vector3(1, 1, 1), floor_m)
 	var one := DotMapBoxBatch.build(big, 0.0, Callable(), true)
 	_check(int(one["nodes"]) == 1 and int(one["boxes"]) == 3, "cell 0 folds a material into one mesh (%s)" % [one])
+	# Coarse pass: singletons of one material in one 256 m cell fold; a pair already folded, a
+	# see-through and a vetoed box do not join.
+	var c := Node3D.new()
+	add_child(c)
+	for k in 4:
+		_box(c, Vector3(k * 100, 1, 0), Vector3(1, 1, 1), floor_m)
+	_box(c, Vector3(10, 1, 300), Vector3(1, 1, 1), floor_m)
+	_box(c, Vector3(20, 1, 20), Vector3(1, 1, 1), glass)
+	_box(c, Vector3(30, 1, 30), Vector3(1, 1, 1), floor_m, &"breakable")
+	var fine := DotMapBoxBatch.build(c, DotMapBoxBatch.CELL, skip, true)
+	_check(int(fine["boxes"]) == 0, "no coarse: lone boxes stay (%s)" % [fine])
+	var wide := DotMapBoxBatch.build(c, DotMapBoxBatch.CELL, skip, true, DotMapBoxBatch.CELL * 4.0)
+	_check(int(wide["boxes"]) == 3 and int(wide["nodes"]) == 1, "coarse folds the 3 singletons of x 0..200 into one 256 m cell (%s)" % [wide])
+	_check(_visible_meshes(c) == 5, "1 merged, two lone boxes, the see-through and the vetoed one draw (%d)" % _visible_meshes(c))
+	_check(DotMapBoxBatch.undo(c) == 3 and _visible_meshes(c) == 7, "undo restores the coarse folds")
+	c.queue_free()
 	root.queue_free()
 	r.queue_free()
 	big.queue_free()
