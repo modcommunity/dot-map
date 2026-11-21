@@ -69,3 +69,7 @@ The frame does not change: [before](img/culling_before.png) and [after](img/cull
 - Static geometry only: a quad does not follow a moved mesh. Rebake after moving walls, and keep movers out with `dot_no_occluder`.
 - Planar groups are per mesh. Curved walls and subdivided floors produce few or no quads; add a `BoxOccluder3D` by hand there.
 - Characters and particles are hidden by the same occluders; anything that must show through walls on purpose sets `ignore_occlusion_culling` on its node.
+
+## Fewer draw calls for a box map
+
+A map of hundreds of `StaticBody3D` boxes with one `BoxMesh` each draws one mesh per box, and the web renderer is draw-call bound. `DotMapBoxBatch.build(level, cell, skip, force)` folds the boxes of one material in one `cell`-metre square (default 64) into one `ArrayMesh`, hides the originals and leaves every body and shape as it was. Only a direct child body with one `BoxMesh` mesh and collision shapes, and an opaque `BaseMaterial3D`, is folded; a cell with one box of a material is left alone. `skip(body, mesh) -> bool` vetoes any box (breakables, doors, boxes the game restyles). It does nothing on a headless server unless `force`. `undo(level)` shows the originals again. Measured on Playlot's `pgc_town`: 1272 draws became 608 and 85.6 fps became 117.9 (staging02). `examples/box_batch_demo.tscn` is the draw budget.
